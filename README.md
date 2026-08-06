@@ -1,6 +1,6 @@
-# Bloombook
+# Buki
 
-A cozy scrapbook for kids' drawings. Point the camera at a drawing on paper — Bloombook finds the sheet, straightens it, cuts the artwork out of the background, and the drawing flies into an animated notebook where it can never get lost.
+**Buki** (ბუკი — "little book") is a cozy home for kids' drawings. Point the camera at a drawing on paper — Buki finds the sheet, straightens it, cuts the artwork out of the background, and the drawing flies into an animated scrapbook where it can never get lost.
 
 Inspired by Hewad Mubariz's "Make it Bloom" demo. Rebuilt from scratch in Expo.
 
@@ -10,7 +10,7 @@ Inspired by Hewad Mubariz's "Make it Bloom" demo. Rebuilt from scratch in Expo.
 - **Find the paper** — Otsu threshold + largest bright connected component over a downscaled grid ([`src/utils/cutout.ts`](src/utils/cutout.ts)).
 - **Straighten it** — corner detection (extreme-point method) plus a square→quad projective homography rectifies sheets photographed at an angle before extraction.
 - **Cut out the drawing** — the paper color is estimated from the sheet, and per-pixel color distance becomes a soft alpha matte; despeckling removes dust while keeping thin strokes.
-- **The magic** — React Native Skia + Reanimated: the segmentation glow, the cutout flying into the book, a hand-written title reveal, and a real page-curl (an SkSL runtime shader modeling the page rolling around a cylinder).
+- **The magic** — React Native Skia + Reanimated: the segmentation glow, the cutout flying into the book, the hand-written title reveal, and a real page-curl (an SkSL runtime shader modeling the page rolling around a cylinder).
 
 ## Run it
 

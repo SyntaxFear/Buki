@@ -146,7 +146,7 @@ export function Scan() {
         ) : (
           <View style={styles.deniedRoot}>
             <SymbolView name="camera.fill" size={38} tintColor="#8A8378" />
-            <Text style={styles.deniedTitle}>Bloombook needs the camera</Text>
+            <Text style={styles.deniedTitle}>Buki needs the camera</Text>
             <Text style={styles.deniedBody}>
               Point it at a drawing and it flies into your book. You can also import a photo with
               the gallery button below.

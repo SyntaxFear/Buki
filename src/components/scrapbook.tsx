@@ -113,7 +113,7 @@ half4 main(float2 xy) {
 
 const CURL_EFFECT = Skia.RuntimeEffect.Make(CURL_SKSL);
 if (!CURL_EFFECT) {
-  console.warn("Bloombook: page-curl shader failed to compile, using fold fallback");
+  console.warn("Buki: page-curl shader failed to compile, using fold fallback");
 }
 
 /** Debug helper: render the curl frozen at this progress on the settled screen. Set null to disable. */

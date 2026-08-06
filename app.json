@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Bloombook",
-    "slug": "Bloombook",
+    "name": "Buki",
+    "slug": "buki",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "bloombook",
+    "scheme": "buki",
     "userInterfaceStyle": "light",
     "ios": {
-      "bundleIdentifier": "com.parastashvili.bloombook",
+      "bundleIdentifier": "com.parastashvili.buki",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -22,7 +22,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.parastashvili.bloombook",
+      "package": "com.parastashvili.buki",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
@@ -46,13 +46,13 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Bloombook uses the camera to scan drawings into your book."
+          "cameraPermission": "Buki uses the camera to scan drawings into your book."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Bloombook opens your photo library so you can import a drawing photo."
+          "photosPermission": "Buki opens your photo library so you can import a drawing photo."
         }
       ]
     ],
@@ -63,7 +63,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "d600782c-a339-4fe0-88da-2605d7c4bcdc"
+        "projectId": "62b22ae4-3816-484a-8f34-5f2eb84abcd8"
       }
     },
     "owner": "parastashvili"

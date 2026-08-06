@@ -32,6 +32,11 @@ interface DrawingsState {
 }
 
 function indexFile(): File {
+  return new File(Paths.document, "buki.json");
+}
+
+/** Pre-rebrand index file; migrated on first hydrate after the Buki update. */
+function legacyIndexFile(): File {
   return new File(Paths.document, "bloombook.json");
 }
 
@@ -51,8 +56,13 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
   hydrate: () => {
     if (get().hydrated) return;
     let drawings: Drawing[] = [];
+    let migrated = false;
     try {
-      const file = indexFile();
+      let file = indexFile();
+      if (!file.exists && legacyIndexFile().exists) {
+        file = legacyIndexFile();
+        migrated = true;
+      }
       if (file.exists) {
         const parsed = JSON.parse(file.textSync()) as { drawings?: Drawing[] };
         drawings = (parsed.drawings ?? []).filter((d) => {
@@ -67,6 +77,12 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       console.warn("Failed to hydrate drawings", e);
     }
     set({ drawings, hydrated: true });
+    if (migrated) {
+      persist(drawings);
+      try {
+        legacyIndexFile().delete();
+      } catch {}
+    }
   },
 
   setPending: (cutout) => {

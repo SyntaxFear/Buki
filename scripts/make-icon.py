@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the Bloombook app icon + splash art (PIL, deterministic)."""
+"""Generate the Buki app icon + splash art (PIL, deterministic)."""
 from pathlib import Path
 
 from PIL import Image, ImageDraw

@@ -29,28 +29,27 @@ interface Props {
 }
 
 /**
- * "Bloombook" handwrites itself in two colored words, then a vine grows to
- * the right edge and a little flower blooms at its tip — mirroring the
- * original's "Make it Bloom" intro.
+ * "Buki" handwrites itself in two colored halves, then a vine grows to
+ * the right edge and a little flower blooms at its tip.
  */
 export function HandwrittenTitle({ width }: Props) {
   const font = useFont(PATRICK_HAND, FONT_SIZE);
 
-  const w1 = useSharedValue(0); // "Bloom" reveal
-  const w2 = useSharedValue(0); // "book" reveal
+  const w1 = useSharedValue(0); // "Bu" reveal
+  const w2 = useSharedValue(0); // "ki" reveal
   const vine = useSharedValue(0);
   const flower = useSharedValue(0);
 
   useEffect(() => {
     const ease = Easing.out(Easing.cubic);
-    w1.value = withDelay(350, withTiming(1, { duration: 620, easing: ease }));
-    w2.value = withDelay(1000, withTiming(1, { duration: 520, easing: ease }));
-    vine.value = withDelay(1600, withTiming(1, { duration: 700, easing: Easing.inOut(Easing.quad) }));
-    flower.value = withDelay(2300, withSpring(1, { damping: 9, stiffness: 180 }));
+    w1.value = withDelay(350, withTiming(1, { duration: 460, easing: ease }));
+    w2.value = withDelay(830, withTiming(1, { duration: 400, easing: ease }));
+    vine.value = withDelay(1250, withTiming(1, { duration: 700, easing: Easing.inOut(Easing.quad) }));
+    flower.value = withDelay(1950, withSpring(1, { damping: 9, stiffness: 180 }));
   }, [w1, w2, vine, flower]);
 
-  const word1 = "Bloom";
-  const word2 = "book";
+  const word1 = "Bu";
+  const word2 = "ki";
   const word1W = font ? font.getTextWidth(word1) : 0;
   const word2W = font ? font.getTextWidth(word2) : 0;
   const word2X = LEFT + word1W + 2;
