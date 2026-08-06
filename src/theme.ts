@@ -22,6 +22,19 @@ export const colors = {
 
 export const PATRICK_HAND = require("@expo-google-fonts/patrick-hand/400Regular/PatrickHand_400Regular.ttf");
 
+/** Cover colors a sketchpad can be born with (main + darker stitch tone). */
+export const PAD_COLORS = [
+  { main: "#E8695A", dark: "#D95B4C" }, // coral
+  { main: "#5EC6B4", dark: "#4BAE9D" }, // teal
+  { main: "#F2C94C", dark: "#DDB43A" }, // yellow
+  { main: "#7FB069", dark: "#6C9C58" }, // green
+  { main: "#6C9BD1", dark: "#5A87BC" }, // blue
+] as const;
+
+export function padDarkColor(main: string): string {
+  return PAD_COLORS.find((c) => c.main === main)?.dark ?? colors.bookBorderDark;
+}
+
 // Book geometry (fractions of screen width)
 export const BOOK = {
   widthFrac: 0.88,

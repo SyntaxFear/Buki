@@ -1,4 +1,5 @@
 import { BOOK } from "@/theme";
+import type { PadStyle } from "@/store/migrate";
 
 export interface Rect {
   x: number;
@@ -13,12 +14,35 @@ export interface BookLayout {
   /** Left / right page rects in screen coordinates */
   leftPage: Rect;
   rightPage: Rect;
-  /** Slot where a drawing sits on the right page, screen coordinates */
+  /** Slots where drawings sit on each page, screen coordinates */
+  leftSlot: Rect;
   rightSlot: Rect;
   spineX: number;
 }
 
+export interface VerticalLayout {
+  /** Book rect in screen coordinates */
+  book: Rect;
+  /** The single visible page */
+  page: Rect;
+  /** Slot where the drawing sits, screen coordinates */
+  slot: Rect;
+  /** Y of the top binding edge (the vertical book's "spine") */
+  spineY: number;
+}
+
 const PAGE_INSET = 10;
+
+function slotWithin(page: Rect, wFrac: number, hFrac: number): Rect {
+  const slotW = page.width * wFrac;
+  const slotH = page.height * hFrac;
+  return {
+    x: page.x + (page.width - slotW) / 2,
+    y: page.y + (page.height - slotH) / 2,
+    width: slotW,
+    height: slotH,
+  };
+}
 
 export function getBookLayout(screenWidth: number, screenHeight: number): BookLayout {
   const width = screenWidth * BOOK.widthFrac;
@@ -31,22 +55,56 @@ export function getBookLayout(screenWidth: number, screenHeight: number): BookLa
   const leftPage = { x: x + PAGE_INSET, y: y + PAGE_INSET, width: pageW, height: pageH };
   const rightPage = { x: x + PAGE_INSET + pageW, y: y + PAGE_INSET, width: pageW, height: pageH };
 
-  const slotW = pageW * 0.74;
-  const slotH = pageH * 0.72;
-  const rightSlot = {
-    x: rightPage.x + (pageW - slotW) / 2,
-    y: rightPage.y + (pageH - slotH) / 2,
-    width: slotW,
-    height: slotH,
-  };
-
   return {
     book: { x, y, width, height },
     leftPage,
     rightPage,
-    rightSlot,
+    leftSlot: slotWithin(leftPage, 0.74, 0.72),
+    rightSlot: slotWithin(rightPage, 0.74, 0.72),
     spineX: x + width / 2,
   };
+}
+
+/** Portrait single-page book, bound at its top edge like a flip pad. */
+export function getVerticalLayout(screenWidth: number, screenHeight: number): VerticalLayout {
+  const width = screenWidth * 0.64;
+  const height = width * 1.34;
+  const x = (screenWidth - width) / 2;
+  const y = screenHeight * 0.44 - height / 2;
+
+  const page = {
+    x: x + PAGE_INSET,
+    y: y + PAGE_INSET + 8, // extra room under the binding rings
+    width: width - PAGE_INSET * 2,
+    height: height - PAGE_INSET * 2 - 8,
+  };
+
+  return {
+    book: { x, y, width, height },
+    page,
+    slot: slotWithin(page, 0.8, 0.78),
+    spineY: y + PAGE_INSET + 8,
+  };
+}
+
+/** How many drawings one spread/page holds for a given pad style. */
+export function unitCapacity(style: PadStyle): number {
+  return style === "spread" ? 2 : 1;
+}
+
+/** Which spread/page a drawing index lives on. */
+export function unitForIndex(index: number, style: PadStyle): number {
+  return Math.floor(index / unitCapacity(style));
+}
+
+/** 0 = left page, 1 = right page (always 0 for vertical pads). */
+export function sideForIndex(index: number, style: PadStyle): 0 | 1 {
+  return style === "spread" && index % 2 === 1 ? 1 : 0;
+}
+
+/** Number of units (spreads/pages) that hold drawings, plus the empty end unit. */
+export function unitCount(drawingCount: number, style: PadStyle): number {
+  return Math.floor(drawingCount / unitCapacity(style)) + 1;
 }
 
 /** Contain-fit a w×h image into a slot, returns the fitted rect. */
