@@ -7,19 +7,22 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Easing, runOnJS, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { DrawingViewer } from "@/components/drawing-viewer";
 import { FlyingCutout } from "@/components/flying-cutout";
 import { HandwrittenTitle } from "@/components/handwritten-title";
 import { PadDrawer } from "@/components/pad-drawer";
 import { Scrapbook, type FlipState } from "@/components/scrapbook";
 import { VerticalBook } from "@/components/vertical-book";
-import { activeDrawingsOf, activePadOf, useDrawings } from "@/store/drawings";
+import { activeDrawingsOf, activePadOf, useDrawings, type Drawing } from "@/store/drawings";
 import { colors } from "@/theme";
 import {
+  drawingHitTest,
   getBookLayout,
   getVerticalLayout,
   sideForIndex,
   unitCount,
   unitForIndex,
+  type Rect,
 } from "@/utils/book-layout";
 
 const FLIP_MS = 680;
@@ -44,6 +47,7 @@ export function Home() {
   const [unit, setUnit] = useState(0);
   const [flip, setFlip] = useState<FlipState | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [viewing, setViewing] = useState<{ drawing: Drawing; rect: Rect } | null>(null);
   const flipAnim = useSharedValue(0);
   const flipBusy = useRef(false);
   const touredRef = useRef(false);
@@ -140,6 +144,7 @@ export function Home() {
 
   const pan = Gesture.Pan()
     .runOnJS(true)
+    .minDistance(12)
     .onEnd((e) => {
       if (pending || drawerOpen) return;
       const fwd = style === "spread" ? e.translationX < -46 : e.translationY < -46;
@@ -147,6 +152,27 @@ export function Home() {
       if (fwd && unit < maxUnit) flipTo(unit + 1);
       else if (back && unit > 0) flipTo(unit - 1);
     });
+
+  const tap = Gesture.Tap()
+    .runOnJS(true)
+    .onEnd((e, success) => {
+      if (!success || pending || flip || drawerOpen) return;
+      const hit = drawingHitTest(
+        e.absoluteX,
+        e.absoluteY,
+        style,
+        unitRef.current,
+        drawings,
+        spreadLayout,
+        verticalLayout,
+      );
+      if (hit && drawings[hit.index]) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        setViewing({ drawing: drawings[hit.index], rect: hit.rect });
+      }
+    });
+
+  const bookGesture = Gesture.Exclusive(pan, tap);
 
   const edgeOpen = Gesture.Pan()
     .runOnJS(true)
@@ -191,7 +217,7 @@ export function Home() {
       )}
 
       {/* gesture surface over the book */}
-      <GestureDetector gesture={pan}>
+      <GestureDetector gesture={bookGesture}>
         <View
           style={{
             position: "absolute",
@@ -226,6 +252,14 @@ export function Home() {
       </Pressable>
 
       <PadDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      {viewing ? (
+        <DrawingViewer
+          drawing={viewing.drawing}
+          originRect={viewing.rect}
+          onClose={() => setViewing(null)}
+        />
+      ) : null}
     </View>
   );
 }

@@ -1,5 +1,13 @@
 import { migrateStoreData } from "./migrate";
-import { sideForIndex, unitCapacity, unitCount, unitForIndex } from "@/utils/book-layout";
+import {
+  drawingHitTest,
+  getBookLayout,
+  getVerticalLayout,
+  sideForIndex,
+  unitCapacity,
+  unitCount,
+  unitForIndex,
+} from "@/utils/book-layout";
 
 const NOW = 1_700_000_000_000;
 
@@ -92,6 +100,39 @@ describe("slot math", () => {
     expect(unitCapacity("vertical")).toBe(1);
     expect(unitForIndex(3, "vertical")).toBe(3);
     expect(sideForIndex(3, "vertical")).toBe(0);
+  });
+
+  it("hit-tests drawings on both spread sides and vertical pages", () => {
+    const spread = getBookLayout(400, 900);
+    const vertical = getVerticalLayout(400, 900);
+    const square = { width: 100, height: 100 };
+
+    // spread unit 1 holds indices 2 (left) and 3 (right)
+    const drawings = [square, square, square, square];
+    const leftCenter = {
+      x: spread.leftSlot.x + spread.leftSlot.width / 2,
+      y: spread.leftSlot.y + spread.leftSlot.height / 2,
+    };
+    const hitLeft = drawingHitTest(leftCenter.x, leftCenter.y, "spread", 1, drawings, spread, vertical);
+    expect(hitLeft?.index).toBe(2);
+    const rightCenter = {
+      x: spread.rightSlot.x + spread.rightSlot.width / 2,
+      y: spread.rightSlot.y + spread.rightSlot.height / 2,
+    };
+    expect(drawingHitTest(rightCenter.x, rightCenter.y, "spread", 1, drawings, spread, vertical)?.index).toBe(3);
+
+    // a tap on an empty right side misses
+    expect(drawingHitTest(rightCenter.x, rightCenter.y, "spread", 1, [square, square, square], spread, vertical)).toBeNull();
+
+    // a tap outside the book misses
+    expect(drawingHitTest(2, 2, "spread", 1, drawings, spread, vertical)).toBeNull();
+
+    // vertical page i holds index i
+    const vCenter = {
+      x: vertical.slot.x + vertical.slot.width / 2,
+      y: vertical.slot.y + vertical.slot.height / 2,
+    };
+    expect(drawingHitTest(vCenter.x, vCenter.y, "vertical", 2, drawings, spread, vertical)?.index).toBe(2);
   });
 
   it("unitCount includes the trailing scan target", () => {

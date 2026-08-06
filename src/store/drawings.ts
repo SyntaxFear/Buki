@@ -77,10 +77,13 @@ function persist(s: { activePadId: string; pads: Sketchpad[]; drawingsByPad: Rec
 
 function deleteDrawingFiles(drawings: Drawing[]): void {
   for (const d of drawings) {
-    try {
-      const f = new File(d.uri);
-      if (f.exists) f.delete();
-    } catch {}
+    for (const uri of [d.uri, d.photoUri]) {
+      if (!uri) continue;
+      try {
+        const f = new File(uri);
+        if (f.exists) f.delete();
+      } catch {}
+    }
   }
 }
 
@@ -153,6 +156,7 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       height: pending.height,
       rotation: pending.rotation,
       addedAt: Date.now(),
+      photoUri: pending.photoUri,
     };
     const nextByPad = { ...drawingsByPad, [activePadId]: [...current, drawing] };
     set({ drawingsByPad: nextByPad, pending: null });

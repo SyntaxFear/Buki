@@ -11,6 +11,8 @@ export interface Drawing {
   /** small random tilt applied on the page, degrees */
   rotation: number;
   addedAt: number;
+  /** file:// URI of the original camera photo (absent on pre-photo scans) */
+  photoUri?: string;
 }
 
 export interface Sketchpad {

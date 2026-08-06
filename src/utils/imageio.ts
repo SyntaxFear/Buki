@@ -23,10 +23,18 @@ export interface ProcessedCutout {
   /** downscaled source photo dimensions the boxes refer to */
   sourceWidth: number;
   sourceHeight: number;
+  /** file:// URI of the preserved original photo (undefined if saving failed) */
+  photoUri?: string;
 }
 
 function drawingsDir(): Directory {
   const dir = new Directory(Paths.document, "drawings");
+  if (!dir.exists) dir.create({ intermediates: true });
+  return dir;
+}
+
+function photosDir(): Directory {
+  const dir = new Directory(Paths.document, "photos");
   if (!dir.exists) dir.create({ intermediates: true });
   return dir;
 }
@@ -104,8 +112,20 @@ export async function processPhotoToCutout(photoUri: string): Promise<ProcessedC
   const png = cutoutImage.encodeToBytes(ImageFormat.PNG, 100);
   if (!png) throw new Error("Could not encode cutout PNG");
 
-  const file = new File(drawingsDir(), `drawing-${Date.now()}.png`);
+  const stamp = Date.now();
+  const file = new File(drawingsDir(), `drawing-${stamp}.png`);
   file.write(png);
+
+  // Keep the original shot so the drawing can be viewed "as photographed".
+  // Never let a copy failure break the scan itself.
+  let savedPhotoUri: string | undefined;
+  try {
+    const photoFile = new File(photosDir(), `photo-${stamp}.jpg`);
+    new File(photoUri).copy(photoFile);
+    savedPhotoUri = photoFile.uri;
+  } catch (e) {
+    console.warn("Could not preserve original photo", e);
+  }
 
   return {
     uri: file.uri,
@@ -115,5 +135,6 @@ export async function processPhotoToCutout(photoUri: string): Promise<ProcessedC
     paperBox: result.paperBox,
     sourceWidth: width,
     sourceHeight: height,
+    photoUri: savedPhotoUri,
   };
 }

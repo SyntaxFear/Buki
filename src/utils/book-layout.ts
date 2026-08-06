@@ -107,6 +107,45 @@ export function unitCount(drawingCount: number, style: PadStyle): number {
   return Math.floor(drawingCount / unitCapacity(style)) + 1;
 }
 
+/**
+ * Which drawing (if any) sits under a screen point on the current
+ * spread/page. Returns its index and its fitted on-page rect (the zoom
+ * transition's origin).
+ */
+export function drawingHitTest(
+  px: number,
+  py: number,
+  style: PadStyle,
+  unit: number,
+  drawings: ReadonlyArray<{ width: number; height: number } | undefined>,
+  spread: BookLayout,
+  vertical: VerticalLayout,
+): { index: number; rect: Rect } | null {
+  const candidates =
+    style === "spread"
+      ? [
+          { index: 2 * unit, slot: spread.leftSlot },
+          { index: 2 * unit + 1, slot: spread.rightSlot },
+        ]
+      : [{ index: unit, slot: vertical.slot }];
+
+  const HIT_PAD = 10;
+  for (const c of candidates) {
+    const d = drawings[c.index];
+    if (!d) continue;
+    const r = fitRect(d.width, d.height, c.slot);
+    if (
+      px >= r.x - HIT_PAD &&
+      px <= r.x + r.width + HIT_PAD &&
+      py >= r.y - HIT_PAD &&
+      py <= r.y + r.height + HIT_PAD
+    ) {
+      return { index: c.index, rect: r };
+    }
+  }
+  return null;
+}
+
 /** Contain-fit a w×h image into a slot, returns the fitted rect. */
 export function fitRect(imgW: number, imgH: number, slot: Rect): Rect {
   const scale = Math.min(slot.width / imgW, slot.height / imgH);
