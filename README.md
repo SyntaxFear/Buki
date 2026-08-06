@@ -1,56 +1,44 @@
-# Welcome to your Expo app 👋
+# Bloombook
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A cozy scrapbook for kids' drawings. Point the camera at a drawing on paper — Bloombook finds the sheet, straightens it, cuts the artwork out of the background, and the drawing flies into an animated notebook where it can never get lost.
 
-## Get started
+Inspired by Hewad Mubariz's "Make it Bloom" demo. Rebuilt from scratch in Expo.
 
-1. Install dependencies
+## How it works
 
-   ```bash
-   npm install
-   ```
+- **Scan** — `expo-camera` captures the photo (bundled sample photos on the simulator, which has no camera).
+- **Find the paper** — Otsu threshold + largest bright connected component over a downscaled grid ([`src/utils/cutout.ts`](src/utils/cutout.ts)).
+- **Straighten it** — corner detection (extreme-point method) plus a square→quad projective homography rectifies sheets photographed at an angle before extraction.
+- **Cut out the drawing** — the paper color is estimated from the sheet, and per-pixel color distance becomes a soft alpha matte; despeckling removes dust while keeping thin strokes.
+- **The magic** — React Native Skia + Reanimated: the segmentation glow, the cutout flying into the book, a hand-written title reveal, and a real page-curl (an SkSL runtime shader modeling the page rolling around a cylinder).
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Runs in Expo Go (simulator uses the bundled demo photos; a real device uses the camera).
 
-### Other setup steps
+```bash
+npm test        # pixel-pipeline unit tests
+npx tsc --noEmit
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Build & release
 
-## Learn more
+EAS is configured (`eas.json`): `production` (store), `preview` (internal), `development` (dev client).
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npx eas-cli build -p ios --profile production
+npx eas-cli submit -p ios
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Structure
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `src/app/` — Expo Router routes
+- `src/screens/` — home (scrapbook) and scan screens
+- `src/components/` — Skia scrapbook, page-curl shader, handwritten title, flying cutout
+- `src/utils/` — pure-TS pixel pipeline (tested), Skia image IO, layout
+- `scripts/` — deterministic Pillow generators for the icon and sample photos
