@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DrawingViewer } from "@/components/drawing-viewer";
 import { FlyingCutout } from "@/components/flying-cutout";
+import { Glass } from "@/components/glass";
 import { HandwrittenTitle } from "@/components/handwritten-title";
 import { PadDrawer } from "@/components/pad-drawer";
 import { Scrapbook, type FlipState } from "@/components/scrapbook";
@@ -267,13 +268,20 @@ export function Home() {
       {/* active sketchpad pill */}
       <Pressable
         onPress={() => setDrawerOpen(true)}
-        style={({ pressed }) => [styles.padPill, pressed && { opacity: 0.7 }]}
+        style={({ pressed }) => [styles.padPillWrap, pressed && { opacity: 0.75 }]}
       >
-        <SymbolView name="books.vertical.fill" size={14} tintColor={pad?.coverColor ?? colors.bookBorder} />
-        <Text style={styles.padPillText} numberOfLines={1}>
-          {pad?.name ?? ""}
-        </Text>
-        <SymbolView name="chevron.down" size={10} tintColor="#8D8271" />
+        <Glass
+          tint="rgba(255,253,246,0.55)"
+          fallbackColor="rgba(255,253,246,0.85)"
+          interactive
+          style={styles.padPill}
+        >
+          <SymbolView name="books.vertical.fill" size={14} tintColor={pad?.coverColor ?? colors.bookBorder} />
+          <Text style={styles.padPillText} numberOfLines={1}>
+            {pad?.name ?? ""}
+          </Text>
+          <SymbolView name="chevron.down" size={10} tintColor="#8D8271" />
+        </Glass>
       </Pressable>
 
       {style === "spread" ? (
@@ -324,11 +332,14 @@ export function Home() {
           jumpToUnit(0);
         }}
         style={({ pressed }) => [
-          styles.fab,
-          { bottom: insets.bottom + 26, backgroundColor: pressed ? colors.fabPressed : colors.fab },
+          styles.fabWrap,
+          { bottom: insets.bottom + 26 },
+          pressed && { transform: [{ scale: 0.94 }] },
         ]}
       >
-        <SymbolView name="camera.fill" size={26} tintColor="#FFF7EE" />
+        <Glass tint={colors.fab} fallbackColor={colors.fab} interactive style={styles.fab}>
+          <SymbolView name="camera.fill" size={26} tintColor="#FFF7EE" />
+        </Glass>
       </Pressable>
 
       <PadDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
@@ -349,35 +360,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  padPillWrap: {
+    alignSelf: "flex-start",
+    marginLeft: 20,
+    marginTop: -6,
+    maxWidth: 220,
+  },
   padPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    alignSelf: "flex-start",
-    marginLeft: 22,
-    marginTop: -6,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,253,246,0.85)",
-    maxWidth: 220,
+    paddingVertical: 7,
+    borderRadius: 16,
   },
   padPillText: {
     fontSize: 13.5,
     fontWeight: "700",
     color: "#5A4F41",
   },
-  fab: {
+  fabWrap: {
     position: "absolute",
     alignSelf: "center",
+    shadowColor: "#7A4A38",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  fab: {
     width: 64,
     height: 64,
     borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#7A4A38",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
   },
 });

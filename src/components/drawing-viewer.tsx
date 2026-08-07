@@ -13,6 +13,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { Glass } from "@/components/glass";
 import type { Drawing } from "@/store/drawings";
 import { colors } from "@/theme";
 import { fitRect, type Rect } from "@/utils/book-layout";
@@ -156,13 +157,16 @@ export function DrawingViewer({ drawing, originRect, onClose }: Props) {
       </GestureDetector>
 
       <Animated.View style={[styles.topBar, { top: insets.top + 8 }, chromeStyle]}>
-        <Pressable onPress={close} style={styles.closeBtn}>
-          <SymbolView name="xmark" size={17} tintColor="#F5F2ED" />
+        <Pressable onPress={close}>
+          <Glass tint="rgba(30,26,22,0.4)" fallbackColor="rgba(255,247,238,0.18)" interactive style={styles.closeBtn}>
+            <SymbolView name="xmark" size={17} tintColor="#F5F2ED" />
+          </Glass>
         </Pressable>
       </Animated.View>
 
       {drawing.photoUri ? (
-        <Animated.View style={[styles.togglePill, { bottom: insets.bottom + 30 }, chromeStyle]}>
+        <Animated.View style={[styles.togglePillWrap, { bottom: insets.bottom + 30 }, chromeStyle]}>
+          <Glass tint="rgba(30,26,22,0.35)" fallbackColor="rgba(255,247,238,0.14)" style={styles.togglePill}>
           {(
             [
               { key: "drawing", label: "Drawing" },
@@ -179,6 +183,7 @@ export function DrawingViewer({ drawing, originRect, onClose }: Props) {
               </Text>
             </Pressable>
           ))}
+          </Glass>
         </Animated.View>
       ) : null}
     </View>
@@ -206,15 +211,15 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "rgba(255,247,238,0.18)",
     alignItems: "center",
     justifyContent: "center",
   },
-  togglePill: {
+  togglePillWrap: {
     position: "absolute",
     alignSelf: "center",
+  },
+  togglePill: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,247,238,0.14)",
     borderRadius: 22,
     padding: 4,
     gap: 4,

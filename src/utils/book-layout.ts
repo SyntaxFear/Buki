@@ -32,8 +32,15 @@ export interface VerticalLayout {
 }
 
 const PAGE_INSET = 10;
-/** The book bleeds nearly edge-to-edge for maximum drawing size */
-const EDGE_MARGIN = 4;
+
+/**
+ * Apple's standard layout margins for full-width content: 16pt on compact
+ * phones, 20pt on larger ones — what native apps use instead of hugging
+ * the screen edge.
+ */
+export function edgeMargin(screenWidth: number): number {
+  return screenWidth >= 414 ? 20 : 16;
+}
 
 function slotWithin(page: Rect, wFrac: number, hFrac: number): Rect {
   const slotW = page.width * wFrac;
@@ -52,7 +59,7 @@ export function getBookLayout(
   /** Bottom of the header (title + sketchpad pill); the book never rises above it */
   topOffset = 150,
 ): BookLayout {
-  const width = screenWidth - EDGE_MARGIN * 2;
+  const width = screenWidth - edgeMargin(screenWidth) * 2;
   const height = Math.min(width * BOOK.aspect, screenHeight * 0.52);
   const x = (screenWidth - width) / 2;
   const y = Math.max(screenHeight * 0.42 - height / 2, topOffset + 10);
@@ -81,7 +88,7 @@ export function getVerticalLayout(
   /** Space reserved at the bottom for the camera button */
   bottomOffset = 110,
 ): VerticalLayout {
-  const width = screenWidth - EDGE_MARGIN * 2;
+  const width = screenWidth - edgeMargin(screenWidth) * 2;
   const y = topOffset + 10;
   const height = Math.min(width * 1.34, screenHeight - bottomOffset - y);
   const x = (screenWidth - width) / 2;

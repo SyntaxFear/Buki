@@ -33,6 +33,7 @@ import {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { Glass } from "@/components/glass";
 import { useDrawings } from "@/store/drawings";
 import { colors } from "@/theme";
 import { processPhotoToCutout, resolveAssetUri, type ProcessedCutout } from "@/utils/imageio";
@@ -186,14 +187,18 @@ export function Scan() {
 
       {phase === "aim" ? (
         <View style={[styles.controls, { bottom: insets.bottom + 22 }]}>
-          <Pressable onPress={pickOrCycle} style={styles.galleryBtn}>
-            <SymbolView name="photo.on.rectangle" size={20} tintColor="#F2FBF9" />
+          <Pressable onPress={pickOrCycle}>
+            <Glass tint="rgba(94,198,180,0.55)" fallbackColor="rgba(94,198,180,0.82)" interactive style={styles.galleryBtn}>
+              <SymbolView name="photo.on.rectangle" size={20} tintColor="#F2FBF9" />
+            </Glass>
           </Pressable>
           <Pressable onPress={shoot} style={styles.shutterOuter}>
             <View style={styles.shutterInner} />
           </Pressable>
-          <Pressable onPress={() => router.back()} style={styles.closeBtn}>
-            <SymbolView name="xmark" size={18} tintColor="#F5F2ED" />
+          <Pressable onPress={() => router.back()}>
+            <Glass tint="rgba(40,34,28,0.45)" fallbackColor="rgba(40,34,28,0.65)" interactive style={styles.closeBtn}>
+              <SymbolView name="xmark" size={18} tintColor="#F5F2ED" />
+            </Glass>
           </Pressable>
         </View>
       ) : null}
@@ -349,7 +354,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: "rgba(94,198,180,0.82)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -372,7 +376,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(40,34,28,0.65)",
     alignItems: "center",
     justifyContent: "center",
   },

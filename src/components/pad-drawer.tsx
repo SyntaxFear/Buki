@@ -20,8 +20,10 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useFonts } from "expo-font";
+
 import { useDrawings, type PadStyle, type Sketchpad } from "@/store/drawings";
-import { colors, PAD_COLORS } from "@/theme";
+import { colors, PAD_COLORS, PATRICK_HAND } from "@/theme";
 
 interface Props {
   open: boolean;
@@ -40,6 +42,7 @@ export function PadDrawer({ open, onClose }: Props) {
   const renamePad = useDrawings((s) => s.renamePad);
   const deletePad = useDrawings((s) => s.deletePad);
 
+  const [brandFontLoaded] = useFonts({ PatrickHand: PATRICK_HAND });
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newStyle, setNewStyle] = useState<PadStyle>("spread");
@@ -111,7 +114,13 @@ export function PadDrawer({ open, onClose }: Props) {
       </Animated.View>
 
       <Animated.View style={[styles.panel, { paddingTop: insets.top + 18 }, panelStyle]}>
-        <Text style={styles.heading}>Sketchpads</Text>
+        <View style={styles.headingRow}>
+          <Text style={[styles.brand, brandFontLoaded && styles.brandFont]}>
+            <Text style={{ color: colors.titleGreen }}>Bu</Text>
+            <Text style={{ color: colors.titleCoral }}>ki</Text>
+          </Text>
+          <Text style={styles.headingCaption}>Sketchpads</Text>
+        </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 12 }}>
           {pads.map((pad) => {
@@ -237,11 +246,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 16,
   },
-  heading: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#5A4F41",
+  headingRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 10,
     marginBottom: 14,
+  },
+  brand: {
+    fontSize: 26,
+    fontWeight: "800",
+  },
+  brandFont: {
+    fontFamily: "PatrickHand",
+    fontSize: 38,
+    fontWeight: "400",
+    lineHeight: 40,
+  },
+  headingCaption: {
+    fontSize: 13,
+    color: "#8D8271",
+    marginBottom: 8,
   },
   row: {
     flexDirection: "row",
