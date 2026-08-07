@@ -46,11 +46,16 @@ function slotWithin(page: Rect, wFrac: number, hFrac: number): Rect {
   };
 }
 
-export function getBookLayout(screenWidth: number, screenHeight: number): BookLayout {
+export function getBookLayout(
+  screenWidth: number,
+  screenHeight: number,
+  /** Bottom of the header (title + sketchpad pill); the book never rises above it */
+  topOffset = 150,
+): BookLayout {
   const width = screenWidth - EDGE_MARGIN * 2;
   const height = Math.min(width * BOOK.aspect, screenHeight * 0.52);
   const x = (screenWidth - width) / 2;
-  const y = screenHeight * 0.42 - height / 2;
+  const y = Math.max(screenHeight * 0.42 - height / 2, topOffset + 10);
 
   const pageW = (width - PAGE_INSET * 2) / 2;
   const pageH = height - PAGE_INSET * 2;
@@ -68,11 +73,18 @@ export function getBookLayout(screenWidth: number, screenHeight: number): BookLa
 }
 
 /** Portrait single-page book, bound at its top edge like a flip pad. */
-export function getVerticalLayout(screenWidth: number, screenHeight: number): VerticalLayout {
+export function getVerticalLayout(
+  screenWidth: number,
+  screenHeight: number,
+  /** Bottom of the header (title + sketchpad pill) */
+  topOffset = 150,
+  /** Space reserved at the bottom for the camera button */
+  bottomOffset = 110,
+): VerticalLayout {
   const width = screenWidth - EDGE_MARGIN * 2;
-  const height = Math.min(width * 1.34, screenHeight * 0.64);
+  const y = topOffset + 10;
+  const height = Math.min(width * 1.34, screenHeight - bottomOffset - y);
   const x = (screenWidth - width) / 2;
-  const y = screenHeight * 0.44 - height / 2;
 
   const page = {
     x: x + PAGE_INSET,

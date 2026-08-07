@@ -40,8 +40,11 @@ export function Home() {
   const clearActivePad = useDrawings((s) => s.clearActivePad);
 
   const style = pad?.style ?? "spread";
-  const spreadLayout = getBookLayout(W, H);
-  const verticalLayout = getVerticalLayout(W, H);
+  // Title canvas (64) + the sketchpad pill row below it
+  const headerBottom = insets.top + 92;
+  const fabReserve = insets.bottom + 104;
+  const spreadLayout = getBookLayout(W, H, headerBottom);
+  const verticalLayout = getVerticalLayout(W, H, headerBottom, fabReserve);
   const bookRect = style === "spread" ? spreadLayout.book : verticalLayout.book;
 
   const [unit, setUnit] = useState(0);
