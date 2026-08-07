@@ -1,0 +1,33 @@
+{
+  "mode": "generate",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/generations?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Square iOS app icon artwork, full-bleed edge-to-edge, flat modern vector illustration with soft grain texture. An open children's scrapbook seen slightly from above, coral-red cover (#E8695A), cream pages (#FDF8ED); on the right page a child's crayon drawing of a smiling sun and a tiny house, on the left page a small red flower doodle with a green stem. A teal (#5EC6B4) washi tape strip on one corner and a yellow (#F2C94C) tape on the opposite corner, a few tiny colorful sparkle ticks around the book. Warm cream background (#EBE6DA). Rounded friendly shapes, thick smooth lines, centered, generous margins. No text, no letters, no watermark, no rounded-corner frame, no border.",
+    "size": "1024x1024",
+    "quality": "high",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [],
+  "saved_images": [
+    "/Users/bitcoin/Desktop/Buki/assets/design/icon-candidate-b.png"
+  ],
+  "created": 1786085305,
+  "usage": {
+    "input_tokens": 171,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 171
+    },
+    "output_tokens": 7024,
+    "output_tokens_details": {
+      "image_tokens": 7024,
+      "text_tokens": 0
+    },
+    "total_tokens": 7195
+  }
+}

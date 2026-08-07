@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Generate the Buki app icon + splash art (PIL, deterministic)."""
+"""Generate Buki's splash + Android adaptive art (PIL, deterministic).
+
+Note: assets/images/icon.png and favicon.png are the Azure-generated brand
+icon (assets/design/icon-candidate-a.png) - this script no longer writes them.
+"""
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -75,13 +79,10 @@ def draw_book(size: int, on_beige: bool) -> Image.Image:
 
 
 # iOS icon (opaque)
-draw_book(1024, True).convert("RGB").save(OUT / "icon.png")
 # splash icon (transparent, book only)
 draw_book(512, False).save(OUT / "splash-icon.png")
 # android adaptive: foreground transparent art, background solid beige
 draw_book(1024, False).save(OUT / "android-icon-foreground.png")
 Image.new("RGB", (1024, 1024), BEIGE[:3]).save(OUT / "android-icon-background.png")
 draw_book(1024, False).convert("LA").save(OUT / "android-icon-monochrome.png")
-# favicon
-draw_book(196, True).convert("RGB").save(OUT / "favicon.png")
 print("icons written to", OUT)

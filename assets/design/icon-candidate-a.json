@@ -1,0 +1,33 @@
+{
+  "mode": "generate",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/generations?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Square iOS app icon artwork, full-bleed edge-to-edge, flat modern vector illustration style with soft grain texture. A cozy coral-red children's scrapbook (color #E8695A) slightly open, with a cheerful child's crayon drawing of a little sailboat on cream paper sliding into the pages. Warm cream background (#EBE6DA), accents in teal (#5EC6B4) and sunny yellow (#F2C94C): a small washi tape strip on the book cover and tiny sparkle ticks. Rounded friendly shapes, thick smooth outlines, generous negative space, centered composition. No text, no letters, no watermark, no rounded-corner frame, no border, no drop shadow outside the artwork.",
+    "size": "1024x1024",
+    "quality": "high",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [],
+  "saved_images": [
+    "/Users/bitcoin/Desktop/Buki/assets/design/icon-candidate-a.png"
+  ],
+  "created": 1786085168,
+  "usage": {
+    "input_tokens": 152,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 152
+    },
+    "output_tokens": 7024,
+    "output_tokens_details": {
+      "image_tokens": 7024,
+      "text_tokens": 0
+    },
+    "total_tokens": 7176
+  }
+}
