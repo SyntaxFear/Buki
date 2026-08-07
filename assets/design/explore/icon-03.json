@@ -1,0 +1,33 @@
+{
+  "mode": "generate",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/generations?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "A paper airplane folded from a child's crayon drawing (visible crayon scribbles of sun and waves on its wings) soaring over a small open coral book below, soft mint-green background, tiny motion swoosh lines in yellow and teal. Square app icon artwork, full-bleed edge-to-edge, premium flat vector illustration with soft paper grain, thick rounded shapes, bold silhouettes readable at small size, generous negative space, centered composition. No text, no letters, no watermark, no rounded-corner frame, no border.",
+    "size": "1024x1024",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [],
+  "saved_images": [
+    "/Users/bitcoin/Desktop/Buki/assets/design/explore/icon-03.png"
+  ],
+  "created": 1786086098,
+  "usage": {
+    "input_tokens": 112,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 112
+    },
+    "output_tokens": 1756,
+    "output_tokens_details": {
+      "image_tokens": 1756,
+      "text_tokens": 0
+    },
+    "total_tokens": 1868
+  }
+}

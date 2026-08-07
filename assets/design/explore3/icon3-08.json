@@ -1,0 +1,33 @@
+{
+  "mode": "generate",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/generations?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "A sunny yellow clay sun with plump rays rising from the pages of a small open coral clay book, on deep teal background. Premium soft 3D clay render, squishy rounded toy-like forms, subtle subsurface scattering, gentle warm studio lighting from above, soft contact shadows, rich saturated but warm colors, matte plasticine texture, award-winning children's app icon quality. Single centered subject filling most of the square, plain rich solid background, full-bleed. No text, no letters, no watermark, no border, no frame.",
+    "size": "1024x1024",
+    "quality": "high",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [],
+  "saved_images": [
+    "/Users/bitcoin/Desktop/Buki/assets/design/explore3/icon3-08.png"
+  ],
+  "created": 1786087760,
+  "usage": {
+    "input_tokens": 115,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 115
+    },
+    "output_tokens": 7024,
+    "output_tokens_details": {
+      "image_tokens": 7024,
+      "text_tokens": 0
+    },
+    "total_tokens": 7139
+  }
+}

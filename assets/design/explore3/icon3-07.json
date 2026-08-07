@@ -1,0 +1,33 @@
+{
+  "mode": "generate",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/generations?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "A chunky felt book in coral red with stitched spine, two button eyes and a stitched smile, leaning slightly, on soft mint background. Premium felted wool and fabric craft render: soft fuzzy felt textures, visible gentle fibers, hand-stitched edges, warm cozy studio light, soft shadows, rich warm colors, high-end handmade toy look. Single centered subject filling most of the square, plain softly-textured solid background, full-bleed. No text, no letters, no watermark, no border, no frame.",
+    "size": "1024x1024",
+    "quality": "high",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [],
+  "saved_images": [
+    "/Users/bitcoin/Desktop/Buki/assets/design/explore3/icon3-07.png"
+  ],
+  "created": 1786087761,
+  "usage": {
+    "input_tokens": 111,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 111
+    },
+    "output_tokens": 7024,
+    "output_tokens_details": {
+      "image_tokens": 7024,
+      "text_tokens": 0
+    },
+    "total_tokens": 7135
+  }
+}

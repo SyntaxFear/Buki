@@ -1,0 +1,33 @@
+{
+  "mode": "generate",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/generations?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "An open storybook with a thick hand-drawn crayon rainbow arcing up out of its pages, small crayon stars and a smiling sun above, palette of crayon red, orange, yellow, green, blue on a soft sky-blue background. Square app icon artwork, full-bleed edge-to-edge, premium flat vector illustration with soft paper grain, thick rounded shapes, bold silhouettes readable at small size, generous negative space, centered composition. No text, no letters, no watermark, no rounded-corner frame, no border.",
+    "size": "1024x1024",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [],
+  "saved_images": [
+    "/Users/bitcoin/Desktop/Buki/assets/design/explore/icon-02.png"
+  ],
+  "created": 1786086088,
+  "usage": {
+    "input_tokens": 115,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 115
+    },
+    "output_tokens": 1756,
+    "output_tokens_details": {
+      "image_tokens": 1756,
+      "text_tokens": 0
+    },
+    "total_tokens": 1871
+  }
+}

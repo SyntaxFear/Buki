@@ -1,0 +1,33 @@
+{
+  "mode": "generate",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/generations?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Logo mark: an open book whose two curved pages together form a heart shape, coral-red heart-book on a warm cream background, tiny yellow spark above the center notch. Rendered as a single centered logo mark in premium flat vector style: smooth thick geometry, 2-4 flat colors with one dominant color, very subtle paper grain, crisp edges, bold silhouette readable at tiny size, generous even margins, full-bleed square app icon background in one solid warm color. Absolutely no text, no letters, no numbers, no watermark, no border, no rounded-corner frame, no scene, no extra decorations beyond the mark itself.",
+    "size": "1024x1024",
+    "quality": "high",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [],
+  "saved_images": [
+    "/Users/bitcoin/Desktop/Buki/assets/design/explore2/icon2-01.png"
+  ],
+  "created": 1786086594,
+  "usage": {
+    "input_tokens": 135,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 135
+    },
+    "output_tokens": 7024,
+    "output_tokens_details": {
+      "image_tokens": 7024,
+      "text_tokens": 0
+    },
+    "total_tokens": 7159
+  }
+}

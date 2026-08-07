@@ -2,7 +2,7 @@
 """Generate Buki's splash + Android adaptive art (PIL, deterministic).
 
 Note: assets/images/icon.png and favicon.png are the Azure-generated brand
-icon (assets/design/icon-candidate-a.png) - this script no longer writes them.
+icon (assets/design/explore3/icon3-01.png (clay bear)) - this script no longer writes them.
 """
 from pathlib import Path
 

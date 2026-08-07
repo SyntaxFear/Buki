@@ -1,0 +1,33 @@
+{
+  "mode": "generate",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/generations?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "A papercut sailboat with layered sails rising from an open paper book, layered paper waves and a scalloped yellow paper sun, on kraft-cream background. Premium layered paper-craft render: crisp cut-paper layers with real depth, soft drop shadows between layers, subtle paper texture, rich warm colors, museum-quality papercut art. Single centered subject filling most of the square, plain solid paper background, full-bleed. No text, no letters, no watermark, no border, no frame.",
+    "size": "1024x1024",
+    "quality": "high",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [],
+  "saved_images": [
+    "/Users/bitcoin/Desktop/Buki/assets/design/explore3/icon3-10.png"
+  ],
+  "created": 1786087893,
+  "usage": {
+    "input_tokens": 109,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 109
+    },
+    "output_tokens": 7024,
+    "output_tokens_details": {
+      "image_tokens": 7024,
+      "text_tokens": 0
+    },
+    "total_tokens": 7133
+  }
+}
