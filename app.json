@@ -8,7 +8,7 @@
     "scheme": "buki",
     "userInterfaceStyle": "light",
     "ios": {
-      "bundleIdentifier": "com.parastashvili.buki",
+      "bundleIdentifier": "com.parastashvili.bloombook",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
@@ -22,7 +22,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.parastashvili.buki",
+      "package": "com.parastashvili.bloombook",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
