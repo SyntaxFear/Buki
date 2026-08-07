@@ -31,6 +31,16 @@ export const PAD_COLORS = [
   { main: "#6C9BD1", dark: "#5A87BC" }, // blue
 ] as const;
 
+/** Soft page tints that keep crayon drawings readable. */
+export const PAGE_COLORS = [
+  "#FDF8ED", // classic cream
+  "#E9F6EC", // mint
+  "#EAF3FB", // sky
+  "#FBEDEE", // blush
+  "#FDF6DC", // butter
+  "#F1EDFA", // lavender
+] as const;
+
 export function padDarkColor(main: string): string {
   return PAD_COLORS.find((c) => c.main === main)?.dark ?? colors.bookBorderDark;
 }

@@ -12,15 +12,15 @@ import { FlyingCutout } from "@/components/flying-cutout";
 import { Glass } from "@/components/glass";
 import { HandwrittenTitle } from "@/components/handwritten-title";
 import { PadDrawer } from "@/components/pad-drawer";
+import { FlipPad } from "@/components/flip-pad";
 import { Scrapbook, type FlipState } from "@/components/scrapbook";
-import { VerticalBook } from "@/components/vertical-book";
 import { activeDrawingsOf, activePadOf, useDrawings, type Drawing } from "@/store/drawings";
 import { colors } from "@/theme";
 import {
   drawingHitTest,
   getBookLayout,
-  getVerticalLayout,
-  sideForIndex,
+  getPadPageLayout,
+  slotIndexForIndex,
   unitCount,
   unitForIndex,
   type Rect,
@@ -45,8 +45,9 @@ export function Home() {
   const headerBottom = insets.top + 92;
   const fabReserve = insets.bottom + 104;
   const spreadLayout = getBookLayout(W, H, headerBottom);
-  const verticalLayout = getVerticalLayout(W, H, headerBottom, fabReserve);
-  const bookRect = style === "spread" ? spreadLayout.book : verticalLayout.book;
+  const padLayout = getPadPageLayout(style === "spread" ? "vertical" : style, W, H, headerBottom, fabReserve);
+  const bookRect = style === "spread" ? spreadLayout.book : padLayout.book;
+  const horizontalFlip = style === "spread" || style === "album";
 
   const [unit, setUnit] = useState(0);
   const [flip, setFlip] = useState<FlipState | null>(null);
@@ -141,10 +142,10 @@ export function Home() {
   const nextIndex = drawings.length;
   const flySlot =
     style === "spread"
-      ? sideForIndex(nextIndex, "spread") === 1
+      ? slotIndexForIndex(nextIndex, "spread") === 1
         ? spreadLayout.rightSlot
         : spreadLayout.leftSlot
-      : verticalLayout.slot;
+      : padLayout.slots[slotIndexForIndex(nextIndex, style)];
 
   // ---- Interactive page drag: the finger drives the curl like real paper ----
   const dragState = useRef({ active: false, settling: false, dir: 1 as 1 | -1, to: 0, crest: false });
@@ -196,7 +197,7 @@ export function Home() {
     .minDistance(6)
     .onUpdate((e) => {
       const d = dragState.current;
-      const delta = style === "spread" ? e.translationX : e.translationY;
+      const delta = horizontalFlip ? e.translationX : e.translationY;
       if (!d.active) {
         if (flipBusy.current || pending || drawerOpen || Math.abs(delta) < 6) return;
         const dir: 1 | -1 = delta < 0 ? 1 : -1;
@@ -214,7 +215,7 @@ export function Home() {
         return;
       }
       if (d.settling) return;
-      const span = (style === "spread" ? bookRect.width : bookRect.height) * 0.9;
+      const span = (horizontalFlip ? bookRect.width : bookRect.height) * 0.9;
       const raw = (d.dir > 0 ? -delta : delta) / span;
       flipAnim.value = Math.min(1, Math.max(0, raw));
       // the paper crests over the spine
@@ -227,7 +228,7 @@ export function Home() {
       }
     })
     .onEnd((e) => {
-      releaseDrag(style === "spread" ? e.velocityX : e.velocityY);
+      releaseDrag(horizontalFlip ? e.velocityX : e.velocityY);
     })
     .onFinalize(() => {
       // safety: if the gesture was cancelled before onEnd, settle from here
@@ -245,7 +246,7 @@ export function Home() {
         unitRef.current,
         drawings,
         spreadLayout,
-        verticalLayout,
+        padLayout,
       );
       if (hit && drawings[hit.index]) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -273,7 +274,6 @@ export function Home() {
         <Glass
           tint="rgba(255,253,246,0.55)"
           fallbackColor="rgba(255,253,246,0.85)"
-          interactive
           style={styles.padPill}
         >
           <SymbolView name="books.vertical.fill" size={14} tintColor={pad?.coverColor ?? colors.bookBorder} />
@@ -292,15 +292,18 @@ export function Home() {
           flip={flip}
           flipAnim={flipAnim}
           coverColor={pad?.coverColor}
+          pageColor={pad?.pageColor}
         />
       ) : (
-        <VerticalBook
-          layout={verticalLayout}
+        <FlipPad
+          style={style}
+          layout={padLayout}
           drawings={drawings}
           page={unit}
           flip={flip}
           flipAnim={flipAnim}
           coverColor={pad?.coverColor}
+          pageColor={pad?.pageColor}
         />
       )}
 
@@ -337,7 +340,7 @@ export function Home() {
           pressed && { transform: [{ scale: 0.94 }] },
         ]}
       >
-        <Glass tint={colors.fab} fallbackColor={colors.fab} interactive style={styles.fab}>
+        <Glass tint={colors.fab} overlayColor="rgba(232,131,111,0.55)" fallbackColor={colors.fab} style={styles.fab}>
           <SymbolView name="camera.fill" size={26} tintColor="#FFF7EE" />
         </Glass>
       </Pressable>

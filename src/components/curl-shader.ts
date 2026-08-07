@@ -102,17 +102,23 @@ if (!CURL_EFFECT) {
   console.warn("Buki: page-curl shader failed to compile, using fold fallback");
 }
 
+export interface FaceItem {
+  drawing: Drawing;
+  image: SkImage | null;
+  /** Slot in page-local coordinates */
+  slotLocal: Rect;
+}
+
 /**
- * Render one page face — cream rounded page, dot grid, and optionally a
- * drawing fitted into a slot — as an offscreen image in natural screen
+ * Render one page face — cream rounded page, dot grid, and any drawings
+ * fitted into their slots — as an offscreen image in natural screen
  * orientation (pageW × pageH points, 2x supersampled).
  */
 export function buildFaceSnapshot(
   pageW: number,
   pageH: number,
-  drawing: Drawing | undefined,
-  image: SkImage | null,
-  slotLocal: Rect | null,
+  items: FaceItem[],
+  pageColor: string = colors.page,
 ): SkImage | null {
   const SS = 2;
   const surface = Skia.Surface.Make(Math.ceil(pageW * SS), Math.ceil(pageH * SS));
@@ -121,7 +127,7 @@ export function buildFaceSnapshot(
   canvas.scale(SS, SS);
 
   const pagePaint = Skia.Paint();
-  pagePaint.setColor(Skia.Color(colors.page));
+  pagePaint.setColor(Skia.Color(pageColor));
   canvas.drawRRect(Skia.RRectXY(Skia.XYWHRect(0, 0, pageW, pageH), 8, 8), pagePaint);
 
   const dotPaint = Skia.Paint();
@@ -132,7 +138,8 @@ export function buildFaceSnapshot(
     }
   }
 
-  if (drawing && image && slotLocal) {
+  for (const { drawing, image, slotLocal } of items) {
+    if (!image) continue;
     const r = fitRect(drawing.width, drawing.height, slotLocal);
     canvas.save();
     canvas.rotate(drawing.rotation, r.x + r.width / 2, r.y + r.height / 2);

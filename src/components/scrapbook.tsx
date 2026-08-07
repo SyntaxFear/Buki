@@ -38,6 +38,7 @@ interface Props {
   flip: FlipState | null;
   flipAnim: SharedValue<number>;
   coverColor?: string;
+  pageColor?: string;
 }
 
 function DrawingOnPage({
@@ -100,10 +101,11 @@ function Confetti({ cx, cy, seed }: { cx: number; cy: number; seed: number }) {
   );
 }
 
-export function Scrapbook({ layout, drawings, spread, flip, flipAnim, coverColor }: Props) {
+export function Scrapbook({ layout, drawings, spread, flip, flipAnim, coverColor, pageColor }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { book, leftPage, rightPage, leftSlot, rightSlot, spineX } = layout;
   const cover = coverColor ?? colors.bookBorder;
+  const paper = pageColor ?? colors.page;
   const coverDark = padDarkColor(cover);
 
   const dir = flip ? Math.sign(flip.to - flip.from) : 1;
@@ -160,12 +162,14 @@ export function Scrapbook({ layout, drawings, spread, flip, flipAnim, coverColor
 
   const frontSnapshot = useMemo(() => {
     if (!flip || !CURL_EFFECT) return null;
-    return buildFaceSnapshot(rightPage.width, rightPage.height, frontFace, frontImage, slotLocal);
+    const items = frontFace ? [{ drawing: frontFace, image: frontImage, slotLocal }] : [];
+    return buildFaceSnapshot(rightPage.width, rightPage.height, items, paper);
   }, [flip, frontFace, frontImage, rightPage, slotLocal]);
 
   const backSnapshot = useMemo(() => {
     if (!flip || !CURL_EFFECT) return null;
-    return buildFaceSnapshot(rightPage.width, rightPage.height, backFace, backImage, slotLocal);
+    const items = backFace ? [{ drawing: backFace, image: backImage, slotLocal }] : [];
+    return buildFaceSnapshot(rightPage.width, rightPage.height, items, paper);
   }, [flip, backFace, backImage, rightPage, slotLocal]);
 
   const curlUniforms = useDerivedValue(() => ({
@@ -216,7 +220,7 @@ export function Scrapbook({ layout, drawings, spread, flip, flipAnim, coverColor
         width={rightPage.x + rightPage.width - leftPage.x}
         height={leftPage.height}
         r={pageRadius}
-        color={colors.page}
+        color={paper}
       />
       <Path path={dotsPath} color="rgba(120,100,70,0.09)" />
 

@@ -188,7 +188,7 @@ export function Scan() {
       {phase === "aim" ? (
         <View style={[styles.controls, { bottom: insets.bottom + 22 }]}>
           <Pressable onPress={pickOrCycle}>
-            <Glass tint="rgba(94,198,180,0.55)" fallbackColor="rgba(94,198,180,0.82)" interactive style={styles.galleryBtn}>
+            <Glass tint="rgba(94,198,180,0.5)" overlayColor="rgba(94,198,180,0.4)" fallbackColor="rgba(94,198,180,0.82)" style={styles.galleryBtn}>
               <SymbolView name="photo.on.rectangle" size={20} tintColor="#F2FBF9" />
             </Glass>
           </Pressable>
@@ -196,7 +196,7 @@ export function Scan() {
             <View style={styles.shutterInner} />
           </Pressable>
           <Pressable onPress={() => router.back()}>
-            <Glass tint="rgba(40,34,28,0.45)" fallbackColor="rgba(40,34,28,0.65)" interactive style={styles.closeBtn}>
+            <Glass tint="rgba(40,34,28,0.4)" overlayColor="rgba(40,34,28,0.3)" fallbackColor="rgba(40,34,28,0.65)" style={styles.closeBtn}>
               <SymbolView name="xmark" size={18} tintColor="#F5F2ED" />
             </Glass>
           </Pressable>

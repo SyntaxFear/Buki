@@ -32,7 +32,7 @@ interface DrawingsState {
   clearPending: () => void;
   /** Wipe the active pad's drawings (long-press on the camera button). */
   clearActivePad: () => void;
-  createPad: (name: string, style: PadStyle, coverColor: string) => string;
+  createPad: (name: string, style: PadStyle, coverColor: string, pageColor?: string) => string;
   renamePad: (id: string, name: string) => void;
   /** Deletes the pad and its drawings from disk. No-op on the last pad. */
   deletePad: (id: string) => void;
@@ -173,9 +173,9 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     persist({ activePadId, pads, drawingsByPad: nextByPad });
   },
 
-  createPad: (name, style, coverColor) => {
+  createPad: (name, style, coverColor, pageColor) => {
     const { pads, drawingsByPad } = get();
-    const pad = makePad(name, style, coverColor || DEFAULT_COVER, Date.now());
+    const pad = makePad(name, style, coverColor || DEFAULT_COVER, Date.now(), undefined, pageColor);
     const nextPads = [...pads, pad];
     const nextByPad = { ...drawingsByPad, [pad.id]: [] };
     set({ pads: nextPads, drawingsByPad: nextByPad, activePadId: pad.id });

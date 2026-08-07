@@ -2,8 +2,9 @@ import { migrateStoreData } from "./migrate";
 import {
   drawingHitTest,
   getBookLayout,
-  getVerticalLayout,
+  getPadPageLayout,
   sideForIndex,
+  slotIndexForIndex,
   unitCapacity,
   unitCount,
   unitForIndex,
@@ -104,7 +105,7 @@ describe("slot math", () => {
 
   it("hit-tests drawings on both spread sides and vertical pages", () => {
     const spread = getBookLayout(400, 900);
-    const vertical = getVerticalLayout(400, 900);
+    const vertical = getPadPageLayout("vertical", 400, 900);
     const square = { width: 100, height: 100 };
 
     // spread unit 1 holds indices 2 (left) and 3 (right)
@@ -129,10 +130,67 @@ describe("slot math", () => {
 
     // vertical page i holds index i
     const vCenter = {
-      x: vertical.slot.x + vertical.slot.width / 2,
-      y: vertical.slot.y + vertical.slot.height / 2,
+      x: vertical.slots[0].x + vertical.slots[0].width / 2,
+      y: vertical.slots[0].y + vertical.slots[0].height / 2,
     };
     expect(drawingHitTest(vCenter.x, vCenter.y, "vertical", 2, drawings, spread, vertical)?.index).toBe(2);
+  });
+
+  it("album and grid styles slot correctly", () => {
+    expect(unitCapacity("album")).toBe(1);
+    expect(unitCapacity("grid")).toBe(4);
+    expect(slotIndexForIndex(6, "grid")).toBe(2);
+    expect(unitForIndex(6, "grid")).toBe(1);
+    expect(unitCount(0, "grid")).toBe(1);
+    expect(unitCount(4, "grid")).toBe(2);
+    expect(unitCount(3, "album")).toBe(4);
+
+    const album = getPadPageLayout("album", 400, 900);
+    expect(album.binding).toBe("left");
+    expect(album.slots).toHaveLength(1);
+    expect(album.book.width).toBeGreaterThan(album.book.height);
+
+    const grid = getPadPageLayout("grid", 400, 900);
+    expect(grid.binding).toBe("top");
+    expect(grid.slots).toHaveLength(4);
+
+    // hit-test the third grid cell on page 1 → index 1*4+2 = 6
+    const spread = getBookLayout(400, 900);
+    const square = { width: 100, height: 100 };
+    const eight = Array.from({ length: 8 }, () => square);
+    const c = grid.slots[2];
+    const hit = drawingHitTest(c.x + c.width / 2, c.y + c.height / 2, "grid", 1, eight, spread, grid);
+    expect(hit?.index).toBe(6);
+  });
+
+  it("strip style holds three drawings per page, stacked with no overlap", () => {
+    expect(unitCapacity("strip")).toBe(3);
+    expect(unitForIndex(4, "strip")).toBe(1);
+    expect(slotIndexForIndex(4, "strip")).toBe(1);
+    expect(unitCount(0, "strip")).toBe(1);
+    expect(unitCount(3, "strip")).toBe(2);
+    expect(unitCount(6, "strip")).toBe(3);
+
+    const strip = getPadPageLayout("strip", 400, 900);
+    expect(strip.binding).toBe("top");
+    expect(strip.slots).toHaveLength(3);
+    // stacked top-to-bottom, each within the page, none overlapping
+    const [a, b, c] = strip.slots;
+    expect(a.y).toBeLessThan(b.y);
+    expect(b.y).toBeLessThan(c.y);
+    expect(a.y + a.height).toBeLessThanOrEqual(b.y);
+    expect(b.y + b.height).toBeLessThanOrEqual(c.y);
+    for (const s of strip.slots) {
+      expect(s.x).toBeGreaterThanOrEqual(strip.page.x);
+      expect(s.x + s.width).toBeLessThanOrEqual(strip.page.x + strip.page.width + 0.01);
+    }
+
+    // hit-test the middle slot on page 1 → index 1*3+1 = 4
+    const spread = getBookLayout(400, 900);
+    const square = { width: 100, height: 100 };
+    const five = Array.from({ length: 5 }, () => square);
+    const hit = drawingHitTest(b.x + b.width / 2, b.y + b.height / 2, "strip", 1, five, spread, strip);
+    expect(hit?.index).toBe(4);
   });
 
   it("unitCount includes the trailing scan target", () => {

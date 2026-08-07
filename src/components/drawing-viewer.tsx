@@ -158,7 +158,7 @@ export function DrawingViewer({ drawing, originRect, onClose }: Props) {
 
       <Animated.View style={[styles.topBar, { top: insets.top + 8 }, chromeStyle]}>
         <Pressable onPress={close}>
-          <Glass tint="rgba(30,26,22,0.4)" fallbackColor="rgba(255,247,238,0.18)" interactive style={styles.closeBtn}>
+          <Glass tint="rgba(30,26,22,0.35)" overlayColor="rgba(30,26,22,0.25)" fallbackColor="rgba(255,247,238,0.18)" style={styles.closeBtn}>
             <SymbolView name="xmark" size={17} tintColor="#F5F2ED" />
           </Glass>
         </Pressable>

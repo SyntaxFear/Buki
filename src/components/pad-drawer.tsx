@@ -20,10 +20,11 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { Host, Picker } from "@expo/ui";
 import { useFonts } from "expo-font";
 
 import { useDrawings, type PadStyle, type Sketchpad } from "@/store/drawings";
-import { colors, PAD_COLORS, PATRICK_HAND } from "@/theme";
+import { colors, PAD_COLORS, PAGE_COLORS, PATRICK_HAND } from "@/theme";
 
 interface Props {
   open: boolean;
@@ -31,6 +32,14 @@ interface Props {
 }
 
 const PANEL_W = 300;
+
+const STYLE_LABEL: Record<PadStyle, string> = {
+  spread: "Spread book",
+  vertical: "Vertical pad",
+  album: "Album",
+  grid: "Photo grid",
+  strip: "Filmstrip",
+};
 
 export function PadDrawer({ open, onClose }: Props) {
   const insets = useSafeAreaInsets();
@@ -47,6 +56,7 @@ export function PadDrawer({ open, onClose }: Props) {
   const [newName, setNewName] = useState("");
   const [newStyle, setNewStyle] = useState<PadStyle>("spread");
   const [newColor, setNewColor] = useState<string>(PAD_COLORS[0].main);
+  const [newPageColor, setNewPageColor] = useState<string>(PAGE_COLORS[0]);
 
   const anim = useSharedValue(0);
   useEffect(() => {
@@ -62,7 +72,7 @@ export function PadDrawer({ open, onClose }: Props) {
   }));
 
   const submitCreate = () => {
-    createPad(newName, newStyle, newColor);
+    createPad(newName, newStyle, newColor, newPageColor);
     setNewName("");
     setCreating(false);
     onClose();
@@ -142,7 +152,7 @@ export function PadDrawer({ open, onClose }: Props) {
                     {pad.name}
                   </Text>
                   <Text style={styles.rowMeta}>
-                    {pad.style === "spread" ? "Spread book" : "Vertical pad"} · {count}{" "}
+                    {STYLE_LABEL[pad.style]} · {count}{" "}
                     {count === 1 ? "drawing" : "drawings"}
                   </Text>
                 </View>
@@ -165,21 +175,24 @@ export function PadDrawer({ open, onClose }: Props) {
                   onSubmitEditing={submitCreate}
                 />
                 <View style={styles.styleRow}>
-                  {(
-                    [
-                      { key: "spread", label: "Spread" },
-                      { key: "vertical", label: "Vertical" },
-                    ] as const
-                  ).map((opt) => (
-                    <Pressable
-                      key={opt.key}
-                      onPress={() => setNewStyle(opt.key)}
-                      style={[styles.styleCard, newStyle === opt.key && styles.styleCardActive]}
-                    >
-                      <MiniCover style={opt.key} color={newColor} />
-                      <Text style={styles.styleLabel}>{opt.label}</Text>
-                    </Pressable>
-                  ))}
+                  <View style={styles.stylePreview}>
+                    <MiniCover style={newStyle} color={newColor} />
+                    <Text style={styles.styleLabel}>{STYLE_LABEL[newStyle]}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Host matchContents>
+                      <Picker
+                        selectedValue={newStyle}
+                        onValueChange={(v) => setNewStyle(v as PadStyle)}
+                      >
+                        <Picker.Item label="Spread book" value="spread" />
+                        <Picker.Item label="Vertical pad" value="vertical" />
+                        <Picker.Item label="Album" value="album" />
+                        <Picker.Item label="Photo grid" value="grid" />
+                        <Picker.Item label="Filmstrip" value="strip" />
+                      </Picker>
+                    </Host>
+                  </View>
                 </View>
                 <View style={styles.colorRow}>
                   {PAD_COLORS.map((c) => (
@@ -190,6 +203,20 @@ export function PadDrawer({ open, onClose }: Props) {
                         styles.colorDot,
                         { backgroundColor: c.main },
                         newColor === c.main && styles.colorDotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.colorCaption}>Page color</Text>
+                <View style={styles.colorRow}>
+                  {PAGE_COLORS.map((c) => (
+                    <Pressable
+                      key={c}
+                      onPress={() => setNewPageColor(c)}
+                      style={[
+                        styles.pageDot,
+                        { backgroundColor: c },
+                        newPageColor === c && styles.pageDotActive,
                       ]}
                     />
                   ))}
@@ -216,12 +243,29 @@ export function PadDrawer({ open, onClose }: Props) {
 }
 
 function MiniCover({ style, color }: { style: PadStyle; color: string }) {
-  const w = style === "spread" ? 42 : 28;
-  const h = style === "spread" ? 30 : 38;
+  const wide = style === "spread" || style === "album";
+  const w = wide ? 42 : 28;
+  const h = wide ? 30 : 38;
   return (
     <View style={[styles.cover, { width: w, height: h, backgroundColor: color }]}>
-      <View style={styles.coverPage}>
-        {style === "spread" ? <View style={styles.coverSpine} /> : <View style={styles.coverRings} />}
+      <View style={[styles.coverPage, style === "album" && { flexDirection: "row" }]}>
+        {style === "spread" ? <View style={styles.coverSpine} /> : null}
+        {style === "vertical" ? <View style={styles.coverRings} /> : null}
+        {style === "album" ? <View style={styles.coverRingsLeft} /> : null}
+        {style === "grid" ? (
+          <View style={styles.coverGrid}>
+            {[0, 1, 2, 3].map((i) => (
+              <View key={i} style={styles.coverGridDot} />
+            ))}
+          </View>
+        ) : null}
+        {style === "strip" ? (
+          <View style={styles.coverStrip}>
+            {[0, 1, 2].map((i) => (
+              <View key={i} style={styles.coverStripLine} />
+            ))}
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -316,6 +360,25 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginTop: -10,
   },
+  coverRingsLeft: {
+    width: 1.5,
+    height: "70%",
+    backgroundColor: "rgba(150,130,110,0.6)",
+    marginLeft: 2,
+  },
+  coverGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    width: 14,
+    gap: 2,
+    alignSelf: "center",
+  },
+  coverGridDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 1.5,
+    backgroundColor: "rgba(150,130,110,0.55)",
+  },
   newIcon: {
     width: 42,
     height: 30,
@@ -345,19 +408,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  styleCard: {
-    flex: 1,
+  stylePreview: {
     alignItems: "center",
     gap: 6,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "transparent",
-    backgroundColor: "#F6F1E4",
-  },
-  styleCardActive: {
-    borderColor: colors.titleCoral,
-    backgroundColor: "rgba(232,105,90,0.08)",
+    paddingVertical: 4,
+    minWidth: 84,
   },
   styleLabel: {
     fontSize: 13,
@@ -373,6 +428,33 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
+  },
+  colorCaption: {
+    fontSize: 12,
+    color: "#9A8F7D",
+    textAlign: "center",
+    marginTop: 2,
+  },
+  pageDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(150,130,110,0.35)",
+  },
+  pageDotActive: {
+    borderWidth: 2.5,
+    borderColor: colors.titleCoral,
+  },
+  coverStrip: {
+    width: "72%",
+    gap: 2,
+    alignSelf: "center",
+  },
+  coverStripLine: {
+    height: 4,
+    borderRadius: 1.5,
+    backgroundColor: "rgba(150,130,110,0.55)",
   },
   colorDotActive: {
     borderWidth: 3,

@@ -20,15 +20,18 @@ export interface BookLayout {
   spineX: number;
 }
 
-export interface VerticalLayout {
+/** Single-page pad layout shared by vertical, album, and grid styles. */
+export interface PadPageLayout {
   /** Book rect in screen coordinates */
   book: Rect;
   /** The single visible page */
   page: Rect;
-  /** Slot where the drawing sits, screen coordinates */
-  slot: Rect;
-  /** Y of the top binding edge (the vertical book's "spine") */
-  spineY: number;
+  /** Slots where drawings sit, screen coordinates (1 or 4 depending on style) */
+  slots: Rect[];
+  /** Where the binding rings sit */
+  binding: "top" | "left";
+  /** The binding line coordinate: y for top-bound pads, x for left-bound */
+  spine: number;
 }
 
 const PAGE_INSET = 10;
@@ -79,20 +82,47 @@ export function getBookLayout(
   };
 }
 
-/** Portrait single-page book, bound at its top edge like a flip pad. */
-export function getVerticalLayout(
+/**
+ * Single-page pad layouts:
+ * - vertical: portrait page bound at the top, one drawing per page
+ * - album:    landscape page bound at the left, one drawing per page
+ * - grid:     portrait page bound at the top, four drawings in a 2x2 grid
+ */
+export function getPadPageLayout(
+  style: Exclude<PadStyle, "spread">,
   screenWidth: number,
   screenHeight: number,
   /** Bottom of the header (title + sketchpad pill) */
   topOffset = 150,
   /** Space reserved at the bottom for the camera button */
   bottomOffset = 110,
-): VerticalLayout {
+): PadPageLayout {
   const width = screenWidth - edgeMargin(screenWidth) * 2;
+  const x = (screenWidth - width) / 2;
+  const availableH = screenHeight - bottomOffset - (topOffset + 10);
+
+  if (style === "album") {
+    // Landscape page, rings along the left edge
+    const height = Math.min(width * 0.74, availableH);
+    const y = topOffset + 10 + Math.max(0, (availableH - height) * 0.4);
+    const page = {
+      x: x + PAGE_INSET + 8, // extra room right of the binding rings
+      y: y + PAGE_INSET,
+      width: width - PAGE_INSET * 2 - 8,
+      height: height - PAGE_INSET * 2,
+    };
+    return {
+      book: { x, y, width, height },
+      page,
+      slots: [slotWithin(page, 0.82, 0.8)],
+      binding: "left",
+      spine: x + PAGE_INSET + 8,
+    };
+  }
+
+  // vertical + grid: portrait page, rings along the top edge
   const y = topOffset + 10;
   const height = Math.min(width * 1.34, screenHeight - bottomOffset - y);
-  const x = (screenWidth - width) / 2;
-
   const page = {
     x: x + PAGE_INSET,
     y: y + PAGE_INSET + 8, // extra room under the binding rings
@@ -100,17 +130,67 @@ export function getVerticalLayout(
     height: height - PAGE_INSET * 2 - 8,
   };
 
+  const slots =
+    style === "grid"
+      ? gridSlots(page)
+      : style === "strip"
+        ? stripSlots(page)
+        : [slotWithin(page, 0.8, 0.78)];
+
   return {
     book: { x, y, width, height },
     page,
-    slot: slotWithin(page, 0.8, 0.78),
-    spineY: y + PAGE_INSET + 8,
+    slots,
+    binding: "top",
+    spine: y + PAGE_INSET + 8,
   };
+}
+
+/** Three stacked landscape slots, like a filmstrip. */
+function stripSlots(page: Rect): Rect[] {
+  const inset = Math.min(page.width, page.height) * 0.045;
+  const gap = inset;
+  const cellH = (page.height - inset * 2 - gap * 2) / 3;
+  const cellW = page.width - inset * 2;
+  return [0, 1, 2].map((row) => ({
+    x: page.x + inset,
+    y: page.y + inset + row * (cellH + gap),
+    width: cellW,
+    height: cellH,
+  }));
+}
+
+/** 2x2 slots with breathing room, reading order: TL, TR, BL, BR. */
+function gridSlots(page: Rect): Rect[] {
+  const inset = Math.min(page.width, page.height) * 0.05;
+  const gap = inset;
+  const cellW = (page.width - inset * 2 - gap) / 2;
+  const cellH = (page.height - inset * 2 - gap) / 2;
+  const out: Rect[] = [];
+  for (let row = 0; row < 2; row++) {
+    for (let col = 0; col < 2; col++) {
+      out.push({
+        x: page.x + inset + col * (cellW + gap),
+        y: page.y + inset + row * (cellH + gap),
+        width: cellW,
+        height: cellH,
+      });
+    }
+  }
+  return out;
 }
 
 /** How many drawings one spread/page holds for a given pad style. */
 export function unitCapacity(style: PadStyle): number {
-  return style === "spread" ? 2 : 1;
+  if (style === "spread") return 2;
+  if (style === "grid") return 4;
+  if (style === "strip") return 3;
+  return 1;
+}
+
+/** Which slot within its unit a drawing index occupies. */
+export function slotIndexForIndex(index: number, style: PadStyle): number {
+  return index % unitCapacity(style);
 }
 
 /** Which spread/page a drawing index lives on. */
@@ -140,15 +220,16 @@ export function drawingHitTest(
   unit: number,
   drawings: ReadonlyArray<{ width: number; height: number } | undefined>,
   spread: BookLayout,
-  vertical: VerticalLayout,
+  padPage: PadPageLayout,
 ): { index: number; rect: Rect } | null {
+  const cap = unitCapacity(style);
   const candidates =
     style === "spread"
       ? [
           { index: 2 * unit, slot: spread.leftSlot },
           { index: 2 * unit + 1, slot: spread.rightSlot },
         ]
-      : [{ index: unit, slot: vertical.slot }];
+      : padPage.slots.map((slot, i) => ({ index: unit * cap + i, slot }));
 
   const HIT_PAD = 10;
   for (const c of candidates) {

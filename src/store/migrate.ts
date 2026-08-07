@@ -1,7 +1,9 @@
 // Pure store-shape types + migration, kept free of native imports so the
 // logic is unit-testable with plain objects.
 
-export type PadStyle = "spread" | "vertical";
+export type PadStyle = "spread" | "vertical" | "album" | "grid" | "strip";
+
+export const PAD_STYLES: readonly PadStyle[] = ["spread", "vertical", "album", "grid", "strip"];
 
 export interface Drawing {
   id: string;
@@ -20,6 +22,8 @@ export interface Sketchpad {
   name: string;
   style: PadStyle;
   coverColor: string;
+  /** Page tint; older pads omit it and render the classic cream */
+  pageColor?: string;
   createdAt: number;
 }
 
@@ -32,6 +36,7 @@ export interface StoreData {
 
 export const DEFAULT_PAD_NAME = "My Book";
 export const DEFAULT_COVER = "#E8695A";
+export const DEFAULT_PAGE = "#FDF8ED";
 
 export function makePad(
   name: string,
@@ -39,12 +44,14 @@ export function makePad(
   coverColor: string,
   now: number,
   id?: string,
+  pageColor: string = DEFAULT_PAGE,
 ): Sketchpad {
   return {
     id: id ?? `pad-${now}-${Math.random().toString(36).slice(2, 8)}`,
     name: name.trim() || DEFAULT_PAD_NAME,
     style,
     coverColor,
+    pageColor,
     createdAt: now,
   };
 }
@@ -76,7 +83,7 @@ export function migrateStoreData(raw: unknown, now: number): StoreData {
         p !== null &&
         typeof (p as Sketchpad).id === "string" &&
         typeof (p as Sketchpad).name === "string" &&
-        ((p as Sketchpad).style === "spread" || (p as Sketchpad).style === "vertical"),
+        PAD_STYLES.includes((p as Sketchpad).style),
     );
     if (pads.length === 0) return emptyStore(now);
     const byPad: Record<string, Drawing[]> = {};

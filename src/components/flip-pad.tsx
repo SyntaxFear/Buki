@@ -19,62 +19,82 @@ import { useMemo } from "react";
 import { StyleSheet, useWindowDimensions } from "react-native";
 import { useDerivedValue, type SharedValue } from "react-native-reanimated";
 
-import { buildFaceSnapshot, CURL_EFFECT } from "@/components/curl-shader";
+import { buildFaceSnapshot, CURL_EFFECT, type FaceItem } from "@/components/curl-shader";
 import type { FlipState } from "@/components/scrapbook";
-import type { Drawing } from "@/store/drawings";
+import type { Drawing, PadStyle } from "@/store/drawings";
 import { colors, padDarkColor } from "@/theme";
-import { fitRect, type VerticalLayout } from "@/utils/book-layout";
+import { fitRect, unitCapacity, type PadPageLayout } from "@/utils/book-layout";
 import { useImageCache } from "@/utils/image-cache";
 
 interface Props {
-  layout: VerticalLayout;
+  style: Exclude<PadStyle, "spread">;
+  layout: PadPageLayout;
   drawings: Drawing[];
-  /** Current page index; page i shows drawings[i], the last page is empty */
+  /** Current page index; page i shows drawings[i*cap .. i*cap+cap-1] */
   page: number;
   flip: FlipState | null;
   flipAnim: SharedValue<number>;
   coverColor?: string;
+  pageColor?: string;
 }
 
 /**
- * Portrait single-page pad bound at the top like a flip notepad. Pages curl
- * upward over the binding using the shared cylinder shader, transposed.
+ * Single-page pad bound at the top (vertical, grid) or the left (album).
+ * Pages curl over the binding using the shared cylinder shader — transposed
+ * for top bindings, straight for left bindings.
  */
-export function VerticalBook({ layout, drawings, page, flip, flipAnim, coverColor }: Props) {
+export function FlipPad({ style, layout, drawings, page, flip, flipAnim, coverColor, pageColor }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
-  const { book, page: pageRect, slot, spineY } = layout;
+  const { book, page: pageRect, slots, binding, spine } = layout;
   const cover = coverColor ?? colors.bookBorder;
+  const paper = pageColor ?? colors.page;
   const coverDark = padDarkColor(cover);
+  const cap = unitCapacity(style);
 
   const dir = flip ? Math.sign(flip.to - flip.from) : 1;
-  const underDrawing = flip ? (dir > 0 ? drawings[flip.to] : drawings[flip.from]) : drawings[page];
-  const frontFace = flip ? (dir > 0 ? drawings[flip.from] : drawings[flip.to]) : undefined;
+  const underUnit = flip ? (dir > 0 ? flip.to : flip.from) : page;
+  const frontUnit = flip ? (dir > 0 ? flip.from : flip.to) : null;
 
   const lookup = useImageCache(drawings.map((d) => d.uri));
   const imageFor = (drawing: Drawing | undefined): SkImage | null =>
     drawing ? lookup(drawing.uri) : null;
+  const unitDrawings = (unit: number | null): Drawing[] => {
+    if (unit === null) return [];
+    return slots
+      .map((_, i) => drawings[unit * cap + i])
+      .filter((d): d is Drawing => Boolean(d));
+  };
 
-  const slotLocal = useMemo(
-    () => ({
-      x: slot.x - pageRect.x,
-      y: slot.y - pageRect.y,
-      width: slot.width,
-      height: slot.height,
-    }),
-    [slot, pageRect],
+  const slotsLocal = useMemo(
+    () =>
+      slots.map((slot) => ({
+        x: slot.x - pageRect.x,
+        y: slot.y - pageRect.y,
+        width: slot.width,
+        height: slot.height,
+      })),
+    [slots, pageRect],
   );
 
-  const frontImage = imageFor(frontFace);
   const frontSnapshot = useMemo(() => {
-    if (!flip || !CURL_EFFECT) return null;
-    return buildFaceSnapshot(pageRect.width, pageRect.height, frontFace, frontImage, slotLocal);
-  }, [flip, frontFace, frontImage, pageRect, slotLocal]);
+    if (!flip || !CURL_EFFECT || frontUnit === null) return null;
+    const items: FaceItem[] = [];
+    slots.forEach((_, i) => {
+      const d = drawings[frontUnit * cap + i];
+      if (d) items.push({ drawing: d, image: imageFor(d), slotLocal: slotsLocal[i] });
+    });
+    return buildFaceSnapshot(pageRect.width, pageRect.height, items, paper);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flip, frontUnit, drawings, pageRect, slotsLocal, lookup]);
 
   const curlUniforms = useDerivedValue(() => ({
-    origin: [pageRect.x, spineY],
-    size: [pageRect.height, pageRect.width],
+    origin: binding === "top" ? [pageRect.x, spine] : [spine, pageRect.y],
+    size:
+      binding === "top"
+        ? [pageRect.height, pageRect.width]
+        : [pageRect.width, pageRect.height],
     t: dir > 0 ? flipAnim.value : 1 - flipAnim.value,
-    transposed: 1,
+    transposed: binding === "top" ? 1 : 0,
     spineOff: 0,
     hasBack: 0,
   }));
@@ -90,14 +110,21 @@ export function VerticalBook({ layout, drawings, page, flip, flipAnim, coverColo
   }, [pageRect]);
 
   const rings = useMemo(() => {
-    const out: number[] = [];
-    for (let x = pageRect.x + 18; x < pageRect.x + pageRect.width - 12; x += 30) {
-      out.push(x);
+    const out: { x: number; y: number }[] = [];
+    if (binding === "top") {
+      for (let x = pageRect.x + 18; x < pageRect.x + pageRect.width - 12; x += 30) {
+        out.push({ x, y: spine - 4 });
+      }
+    } else {
+      for (let y = pageRect.y + 18; y < pageRect.y + pageRect.height - 12; y += 30) {
+        out.push({ x: spine - 4, y });
+      }
     }
     return out;
-  }, [pageRect]);
+  }, [binding, pageRect, spine]);
 
   const overhang = 30;
+  const underItems = unitDrawings(underUnit);
 
   return (
     <Canvas style={[StyleSheet.absoluteFill, { width: screenW, height: screenH }]} pointerEvents="none">
@@ -136,20 +163,23 @@ export function VerticalBook({ layout, drawings, page, flip, flipAnim, coverColo
         width={pageRect.width}
         height={pageRect.height}
         r={8}
-        color={colors.page}
+        color={paper}
       />
       <Path path={dotsPath} color="rgba(120,100,70,0.09)" />
 
-      {/* underlying drawing (revealed by the flip, or the settled one) */}
-      {underDrawing ? <UnderDrawing drawing={underDrawing} image={imageFor(underDrawing)} slot={slot} /> : null}
+      {/* underlying drawings (revealed by the flip, or the settled unit) */}
+      {underItems.map((d) => {
+        const slotIdx = (drawings.indexOf(d)) % cap;
+        return <SlotDrawing key={d.id} drawing={d} image={imageFor(d)} slot={slots[slotIdx]} />;
+      })}
 
-      {/* flipping page rolling up over the binding */}
+      {/* flipping page curling over the binding */}
       {flip && CURL_EFFECT && frontSnapshot ? (
         <Rect
-          x={pageRect.x}
-          y={spineY - overhang}
-          width={pageRect.width}
-          height={pageRect.height + overhang}
+          x={binding === "top" ? pageRect.x : spine - overhang}
+          y={binding === "top" ? spine - overhang : pageRect.y}
+          width={binding === "top" ? pageRect.width : pageRect.width + overhang}
+          height={binding === "top" ? pageRect.height + overhang : pageRect.height}
         >
           <Shader source={CURL_EFFECT} uniforms={curlUniforms}>
             <ImageShader
@@ -166,11 +196,16 @@ export function VerticalBook({ layout, drawings, page, flip, flipAnim, coverColo
         </Rect>
       ) : null}
 
-      {/* spiral binding rings over everything at the top edge */}
-      {rings.map((x) => (
-        <Group key={x}>
-          <Circle cx={x} cy={spineY - 4} r={5.5} style="stroke" strokeWidth={2.6} color={coverDark} />
-          <Circle cx={x} cy={spineY + 3} r={1.8} color="rgba(90,60,45,0.35)" />
+      {/* binding rings over everything */}
+      {rings.map((r, i) => (
+        <Group key={i}>
+          <Circle cx={r.x} cy={r.y} r={5.5} style="stroke" strokeWidth={2.6} color={coverDark} />
+          <Circle
+            cx={binding === "top" ? r.x : r.x + 7}
+            cy={binding === "top" ? r.y + 7 : r.y}
+            r={1.8}
+            color="rgba(90,60,45,0.35)"
+          />
         </Group>
       ))}
 
@@ -191,7 +226,7 @@ export function VerticalBook({ layout, drawings, page, flip, flipAnim, coverColo
   );
 }
 
-function UnderDrawing({
+function SlotDrawing({
   drawing,
   image,
   slot,
