@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Buki",
-    "slug": "buki",
+    "slug": "Bloombook",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -63,7 +63,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "62b22ae4-3816-484a-8f34-5f2eb84abcd8"
+        "projectId": "d600782c-a339-4fe0-88da-2605d7c4bcdc"
       }
     },
     "owner": "parastashvili"
