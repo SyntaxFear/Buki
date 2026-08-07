@@ -19,6 +19,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6798754626",
+        "appName": "Buki: Kids Art Book",
+        "language": "en-US"
+      }
+    }
   }
 }
