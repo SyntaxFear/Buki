@@ -32,6 +32,8 @@ export interface VerticalLayout {
 }
 
 const PAGE_INSET = 10;
+/** The book bleeds nearly edge-to-edge for maximum drawing size */
+const EDGE_MARGIN = 4;
 
 function slotWithin(page: Rect, wFrac: number, hFrac: number): Rect {
   const slotW = page.width * wFrac;
@@ -45,8 +47,8 @@ function slotWithin(page: Rect, wFrac: number, hFrac: number): Rect {
 }
 
 export function getBookLayout(screenWidth: number, screenHeight: number): BookLayout {
-  const width = screenWidth * BOOK.widthFrac;
-  const height = width * BOOK.aspect;
+  const width = screenWidth - EDGE_MARGIN * 2;
+  const height = Math.min(width * BOOK.aspect, screenHeight * 0.52);
   const x = (screenWidth - width) / 2;
   const y = screenHeight * 0.42 - height / 2;
 
@@ -67,8 +69,8 @@ export function getBookLayout(screenWidth: number, screenHeight: number): BookLa
 
 /** Portrait single-page book, bound at its top edge like a flip pad. */
 export function getVerticalLayout(screenWidth: number, screenHeight: number): VerticalLayout {
-  const width = screenWidth * 0.64;
-  const height = width * 1.34;
+  const width = screenWidth - EDGE_MARGIN * 2;
+  const height = Math.min(width * 1.34, screenHeight * 0.64);
   const x = (screenWidth - width) / 2;
   const y = screenHeight * 0.44 - height / 2;
 

@@ -12,7 +12,6 @@ import {
   RoundedRect,
   Shader,
   Skia,
-  useImage,
   vec,
   type SkImage,
 } from "@shopify/react-native-skia";
@@ -23,6 +22,7 @@ import { useDerivedValue, type SharedValue } from "react-native-reanimated";
 import { buildFaceSnapshot, CURL_EFFECT } from "@/components/curl-shader";
 import type { Drawing } from "@/store/drawings";
 import { colors, padDarkColor } from "@/theme";
+import { useImageCache } from "@/utils/image-cache";
 import { fitRect, type BookLayout, type Rect as LayoutRect } from "@/utils/book-layout";
 
 export interface FlipState {
@@ -122,22 +122,11 @@ export function Scrapbook({ layout, drawings, spread, flip, flipAnim, coverColor
   const frontFace = flip ? (dir > 0 ? drawings[2 * fromIdx + 1] : drawings[2 * toIdx + 1]) : undefined;
   const backFace = flip ? (dir > 0 ? drawings[2 * toIdx] : drawings[2 * fromIdx]) : undefined;
 
-  // Preload a 6-drawing window around the current spread so any one-step
-  // flip starts with both faces already decoded
-  const base = 2 * (spread - 1);
-  const img0 = useImage(drawings[base]?.uri ?? null);
-  const img1 = useImage(drawings[base + 1]?.uri ?? null);
-  const img2 = useImage(drawings[base + 2]?.uri ?? null);
-  const img3 = useImage(drawings[base + 3]?.uri ?? null);
-  const img4 = useImage(drawings[base + 4]?.uri ?? null);
-  const img5 = useImage(drawings[base + 5]?.uri ?? null);
-  const windowImages = [img0, img1, img2, img3, img4, img5];
-  const imageFor = (drawing: Drawing | undefined): SkImage | null => {
-    if (!drawing) return null;
-    const idx = drawings.indexOf(drawing);
-    const off = idx - base;
-    return off >= 0 && off < 6 ? windowImages[off] : null;
-  };
+  // Persistent cache: every drawing in the pad stays decoded, so flips and
+  // spread changes render synchronously with no image pop-in
+  const lookup = useImageCache(drawings.map((d) => d.uri));
+  const imageFor = (drawing: Drawing | undefined): SkImage | null =>
+    drawing ? lookup(drawing.uri) : null;
 
   const dotsPath = useMemo(() => {
     const p = Skia.Path.Make();

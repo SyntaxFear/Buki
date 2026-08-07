@@ -142,15 +142,92 @@ export function Home() {
         : spreadLayout.leftSlot
       : verticalLayout.slot;
 
+  // ---- Interactive page drag: the finger drives the curl like real paper ----
+  const dragState = useRef({ active: false, settling: false, dir: 1 as 1 | -1, to: 0, crest: false });
+  const maxUnitRef = useRef(maxUnit);
+  maxUnitRef.current = maxUnit;
+
+  const settleFlip = useCallback(
+    (to: number, completed: boolean) => {
+      const d = dragState.current;
+      d.active = false;
+      d.settling = false;
+      d.crest = false;
+      if (completed) {
+        // the page lands
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(() => {});
+        finishFlip(to);
+      } else {
+        setFlip(null);
+        flipAnim.value = 0;
+        flipBusy.current = false;
+      }
+    },
+    [finishFlip, flipAnim],
+  );
+
+  const releaseDrag = useCallback(
+    (velocity: number) => {
+      const d = dragState.current;
+      if (!d.active || d.settling) return;
+      d.settling = true;
+      const fling = d.dir > 0 ? velocity < -420 : velocity > 420;
+      const p = flipAnim.value;
+      const complete = fling || p > 0.34;
+      const remaining = complete ? 1 - p : p;
+      const to = d.to;
+      flipAnim.value = withTiming(
+        complete ? 1 : 0,
+        { duration: 90 + 240 * remaining, easing: Easing.out(Easing.cubic) },
+        (finished) => {
+          if (finished) runOnJS(settleFlip)(to, complete);
+        },
+      );
+    },
+    [flipAnim, settleFlip],
+  );
+
   const pan = Gesture.Pan()
     .runOnJS(true)
-    .minDistance(12)
+    .minDistance(6)
+    .onUpdate((e) => {
+      const d = dragState.current;
+      const delta = style === "spread" ? e.translationX : e.translationY;
+      if (!d.active) {
+        if (flipBusy.current || pending || drawerOpen || Math.abs(delta) < 6) return;
+        const dir: 1 | -1 = delta < 0 ? 1 : -1;
+        const to = unitRef.current + dir;
+        if (to < 0 || to > maxUnitRef.current) return;
+        flipBusy.current = true;
+        d.active = true;
+        d.settling = false;
+        d.dir = dir;
+        d.to = to;
+        d.crest = false;
+        setFlip({ from: unitRef.current, to });
+        // fingertip grabs the page
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        return;
+      }
+      if (d.settling) return;
+      const span = (style === "spread" ? bookRect.width : bookRect.height) * 0.9;
+      const raw = (d.dir > 0 ? -delta : delta) / span;
+      flipAnim.value = Math.min(1, Math.max(0, raw));
+      // the paper crests over the spine
+      if (!d.crest && flipAnim.value > 0.5) {
+        d.crest = true;
+        Haptics.selectionAsync().catch(() => {});
+      } else if (d.crest && flipAnim.value < 0.42) {
+        d.crest = false;
+        Haptics.selectionAsync().catch(() => {});
+      }
+    })
     .onEnd((e) => {
-      if (pending || drawerOpen) return;
-      const fwd = style === "spread" ? e.translationX < -46 : e.translationY < -46;
-      const back = style === "spread" ? e.translationX > 46 : e.translationY > 46;
-      if (fwd && unit < maxUnit) flipTo(unit + 1);
-      else if (back && unit > 0) flipTo(unit - 1);
+      releaseDrag(style === "spread" ? e.velocityX : e.velocityY);
+    })
+    .onFinalize(() => {
+      // safety: if the gesture was cancelled before onEnd, settle from here
+      releaseDrag(0);
     });
 
   const tap = Gesture.Tap()

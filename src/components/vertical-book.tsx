@@ -12,7 +12,6 @@ import {
   RoundedRect,
   Shader,
   Skia,
-  useImage,
   vec,
   type SkImage,
 } from "@shopify/react-native-skia";
@@ -25,6 +24,7 @@ import type { FlipState } from "@/components/scrapbook";
 import type { Drawing } from "@/store/drawings";
 import { colors, padDarkColor } from "@/theme";
 import { fitRect, type VerticalLayout } from "@/utils/book-layout";
+import { useImageCache } from "@/utils/image-cache";
 
 interface Props {
   layout: VerticalLayout;
@@ -50,16 +50,9 @@ export function VerticalBook({ layout, drawings, page, flip, flipAnim, coverColo
   const underDrawing = flip ? (dir > 0 ? drawings[flip.to] : drawings[flip.from]) : drawings[page];
   const frontFace = flip ? (dir > 0 ? drawings[flip.from] : drawings[flip.to]) : undefined;
 
-  const base = page - 1;
-  const imgA = useImage(drawings[base]?.uri ?? null);
-  const imgB = useImage(drawings[base + 1]?.uri ?? null);
-  const imgC = useImage(drawings[base + 2]?.uri ?? null);
-  const windowImages = [imgA, imgB, imgC];
-  const imageFor = (drawing: Drawing | undefined): SkImage | null => {
-    if (!drawing) return null;
-    const off = drawings.indexOf(drawing) - base;
-    return off >= 0 && off < 3 ? windowImages[off] : null;
-  };
+  const lookup = useImageCache(drawings.map((d) => d.uri));
+  const imageFor = (drawing: Drawing | undefined): SkImage | null =>
+    drawing ? lookup(drawing.uri) : null;
 
   const slotLocal = useMemo(
     () => ({
