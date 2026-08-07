@@ -157,16 +157,19 @@ export function DrawingViewer({ drawing, originRect, onClose }: Props) {
       </GestureDetector>
 
       <Animated.View style={[styles.topBar, { top: insets.top + 8 }, chromeStyle]}>
-        <Pressable onPress={close}>
-          <Glass tint="rgba(30,26,22,0.35)" overlayColor="rgba(30,26,22,0.25)" fallbackColor="rgba(255,247,238,0.18)" style={styles.closeBtn}>
+        <Glass tint="#1E1A16" fallbackColor="rgba(255,247,238,0.18)" style={styles.closeBtn}>
+          <Pressable
+            onPress={close}
+            style={({ pressed }) => [StyleSheet.absoluteFill, styles.closeBtnTouchable, pressed && { opacity: 0.8 }]}
+          >
             <SymbolView name="xmark" size={17} tintColor="#F5F2ED" />
-          </Glass>
-        </Pressable>
+          </Pressable>
+        </Glass>
       </Animated.View>
 
       {drawing.photoUri ? (
         <Animated.View style={[styles.togglePillWrap, { bottom: insets.bottom + 30 }, chromeStyle]}>
-          <Glass tint="rgba(30,26,22,0.35)" fallbackColor="rgba(255,247,238,0.14)" style={styles.togglePill}>
+          <Glass tint="#1E1A16" fallbackColor="rgba(255,247,238,0.14)" style={styles.togglePill}>
           {(
             [
               { key: "drawing", label: "Drawing" },
@@ -211,6 +214,8 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
+  },
+  closeBtnTouchable: {
     alignItems: "center",
     justifyContent: "center",
   },

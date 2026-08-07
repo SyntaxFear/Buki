@@ -1,36 +1,46 @@
-import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
+import { GlassView, isGlassEffectAPIAvailable } from "expo-glass-effect";
 import { StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from "react-native";
 
-/** True when the OS renders native Liquid Glass (iOS 26+). */
-export const liquidGlass = isLiquidGlassAvailable();
+/**
+ * `isLiquidGlassAvailable()` only reports whether the app opted into the
+ * Liquid Glass design; the runtime rendering API can still be missing on
+ * some iOS 26 builds (expo/expo#40911), which is what actually crashes or
+ * silently fails to paint. `isGlassEffectAPIAvailable()` is the check the
+ * docs say to gate GlassView/GlassContainer on.
+ */
+export const liquidGlass = isGlassEffectAPIAvailable();
 
 interface GlassProps extends ViewProps {
-  /** Tint washed into the glass material */
-  tint?: string;
   /**
-   * Semi-transparent color layered over the glass for strong brand colors —
-   * the tint alone reads as a faint wash.
+   * Solid brand color passed straight through to GlassView's own
+   * `tintColor`. The system blends it into the material — pass a real
+   * opaque color, not a pre-diluted rgba(); stacking a manual translucent
+   * wash on top double-applies transparency and flattens the glass.
    */
-  overlayColor?: string;
-  /** Solid background used on platforms without Liquid Glass */
+  tint?: string;
+  /** Solid background used when the native glass API is unavailable */
   fallbackColor?: string;
   style?: StyleProp<ViewStyle>;
 }
 
+function borderRadiusOf(style: StyleProp<ViewStyle>): number | undefined {
+  const flat = StyleSheet.flatten(style) ?? {};
+  const r = flat.borderRadius;
+  return typeof r === "number" ? r : undefined;
+}
+
 /**
- * Liquid Glass surface following the documented pattern: the glass is a
- * non-interactive background layer inside a plain container, so wrapping
- * Pressables receive every touch. Pass the shape and content layout via
- * `style`. Never set opacity:0 on this or an ancestor — it disables the
- * native effect entirely.
+ * Native Liquid Glass surface with a plain-color fallback pre-iOS 26. The
+ * radius is read out of `style` and applied to the glass layer directly —
+ * native compositor effects need their own corner mask, not just a
+ * clipping parent — so round corners via `style.borderRadius` as usual.
  */
-export function Glass({ tint, overlayColor, fallbackColor, style, children, ...rest }: GlassProps) {
+export function Glass({ tint, fallbackColor, style, children, ...rest }: GlassProps) {
+  const radius = borderRadiusOf(style);
+
   if (!liquidGlass) {
     return (
-      <View
-        style={[style, { backgroundColor: overlayColor ?? fallbackColor }, styles.clip]}
-        {...rest}
-      >
+      <View style={[style, fallbackColor ? { backgroundColor: fallbackColor } : undefined]} {...rest}>
         {children}
       </View>
     );
@@ -40,16 +50,10 @@ export function Glass({ tint, overlayColor, fallbackColor, style, children, ...r
       <GlassView
         glassEffectStyle="regular"
         tintColor={tint}
-        isInteractive={false}
-        style={StyleSheet.absoluteFill}
+        isInteractive
+        style={[StyleSheet.absoluteFill, radius !== undefined && { borderRadius: radius }]}
         pointerEvents="none"
       />
-      {overlayColor ? (
-        <View
-          style={[StyleSheet.absoluteFill, { backgroundColor: overlayColor }]}
-          pointerEvents="none"
-        />
-      ) : null}
       {children}
     </View>
   );

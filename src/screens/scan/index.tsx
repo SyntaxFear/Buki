@@ -187,19 +187,25 @@ export function Scan() {
 
       {phase === "aim" ? (
         <View style={[styles.controls, { bottom: insets.bottom + 22 }]}>
-          <Pressable onPress={pickOrCycle}>
-            <Glass tint="rgba(94,198,180,0.5)" overlayColor="rgba(94,198,180,0.4)" fallbackColor="rgba(94,198,180,0.82)" style={styles.galleryBtn}>
+          <Glass tint={colors.tapeTeal} fallbackColor="rgba(94,198,180,0.82)" style={styles.galleryBtn}>
+            <Pressable
+              onPress={pickOrCycle}
+              style={({ pressed }) => [StyleSheet.absoluteFill, styles.glassBtnTouchable, pressed && { opacity: 0.8 }]}
+            >
               <SymbolView name="photo.on.rectangle" size={20} tintColor="#F2FBF9" />
-            </Glass>
-          </Pressable>
+            </Pressable>
+          </Glass>
           <Pressable onPress={shoot} style={styles.shutterOuter}>
             <View style={styles.shutterInner} />
           </Pressable>
-          <Pressable onPress={() => router.back()}>
-            <Glass tint="rgba(40,34,28,0.4)" overlayColor="rgba(40,34,28,0.3)" fallbackColor="rgba(40,34,28,0.65)" style={styles.closeBtn}>
+          <Glass tint="#28221C" fallbackColor="rgba(40,34,28,0.65)" style={styles.closeBtn}>
+            <Pressable
+              onPress={() => router.back()}
+              style={({ pressed }) => [StyleSheet.absoluteFill, styles.glassBtnTouchable, pressed && { opacity: 0.8 }]}
+            >
               <SymbolView name="xmark" size={18} tintColor="#F5F2ED" />
-            </Glass>
-          </Pressable>
+            </Pressable>
+          </Glass>
         </View>
       ) : null}
     </View>
@@ -354,6 +360,8 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
+  },
+  glassBtnTouchable: {
     alignItems: "center",
     justifyContent: "center",
   },
@@ -376,7 +384,5 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

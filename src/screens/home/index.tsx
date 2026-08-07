@@ -266,23 +266,25 @@ export function Home() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <HandwrittenTitle width={W} />
 
-      {/* active sketchpad pill */}
-      <Pressable
-        onPress={() => setDrawerOpen(true)}
-        style={({ pressed }) => [styles.padPillWrap, pressed && { opacity: 0.75 }]}
-      >
-        <Glass
-          tint="rgba(255,253,246,0.55)"
-          fallbackColor="rgba(255,253,246,0.85)"
-          style={styles.padPill}
-        >
-          <SymbolView name="books.vertical.fill" size={14} tintColor={pad?.coverColor ?? colors.bookBorder} />
-          <Text style={styles.padPillText} numberOfLines={1}>
-            {pad?.name ?? ""}
-          </Text>
-          <SymbolView name="chevron.down" size={10} tintColor="#8D8271" />
+      {/* active sketchpad pill — Pressable is Glass's child, not its parent: the
+          native glass view sits between a Pressable ancestor and a touch,
+          so it must never be a Pressable's *ancestor* or it swallows the
+          gesture. Glass merely paints the background behind normal-flow
+          content, matching how the viewer's toggle pill already works. */}
+      <View style={styles.padPillWrap}>
+        <Glass fallbackColor="rgba(255,253,246,0.85)" style={styles.padPillGlass}>
+          <Pressable
+            onPress={() => setDrawerOpen(true)}
+            style={({ pressed }) => [styles.padPill, pressed && { opacity: 0.7 }]}
+          >
+            <SymbolView name="books.vertical.fill" size={14} tintColor={pad?.coverColor ?? colors.bookBorder} />
+            <Text style={styles.padPillText} numberOfLines={1}>
+              {pad?.name ?? ""}
+            </Text>
+            <SymbolView name="chevron.down" size={10} tintColor="#8D8271" />
+          </Pressable>
         </Glass>
-      </Pressable>
+      </View>
 
       {style === "spread" ? (
         <Scrapbook
@@ -327,23 +329,21 @@ export function Home() {
 
       {pending ? <FlyingCutout pending={pending} targetSlot={flySlot} onLanded={handleLanded} /> : null}
 
-      <Pressable
-        onPress={() => router.push("/scan")}
-        onLongPress={() => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-          clearActivePad();
-          jumpToUnit(0);
-        }}
-        style={({ pressed }) => [
-          styles.fabWrap,
-          { bottom: insets.bottom + 26 },
-          pressed && { transform: [{ scale: 0.94 }] },
-        ]}
-      >
-        <Glass tint={colors.fab} overlayColor="rgba(232,131,111,0.55)" fallbackColor={colors.fab} style={styles.fab}>
-          <SymbolView name="camera.fill" size={26} tintColor="#FFF7EE" />
+      <View style={[styles.fabWrap, { bottom: insets.bottom + 26 }]}>
+        <Glass tint={colors.fab} fallbackColor={colors.fab} style={styles.fab}>
+          <Pressable
+            onPress={() => router.push("/scan")}
+            onLongPress={() => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+              clearActivePad();
+              jumpToUnit(0);
+            }}
+            style={({ pressed }) => [StyleSheet.absoluteFill, styles.fabTouchable, pressed && { opacity: 0.85 }]}
+          >
+            <SymbolView name="camera.fill" size={26} tintColor="#FFF7EE" />
+          </Pressable>
         </Glass>
-      </Pressable>
+      </View>
 
       <PadDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
@@ -369,13 +369,16 @@ const styles = StyleSheet.create({
     marginTop: -6,
     maxWidth: 220,
   },
+  // Shape only — Glass auto-sizes to its normal-flow Pressable child below.
+  padPillGlass: {
+    borderRadius: 16,
+  },
   padPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 16,
   },
   padPillText: {
     fontSize: 13.5,
@@ -394,6 +397,8 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
+  },
+  fabTouchable: {
     alignItems: "center",
     justifyContent: "center",
   },

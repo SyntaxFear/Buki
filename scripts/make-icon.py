@@ -79,8 +79,8 @@ def draw_book(size: int, on_beige: bool) -> Image.Image:
 
 
 # iOS icon (opaque)
-# splash icon (transparent, book only)
-draw_book(512, False).save(OUT / "splash-icon.png")
+# splash-icon.png retired: app.json now points the splash directly at
+# icon.png (the Azure bear art) for a seamless, brand-matched launch screen.
 # android adaptive: foreground transparent art, background solid beige
 draw_book(1024, False).save(OUT / "android-icon-foreground.png")
 Image.new("RGB", (1024, 1024), BEIGE[:3]).save(OUT / "android-icon-background.png")
