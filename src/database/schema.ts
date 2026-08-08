@@ -180,6 +180,13 @@ CREATE INDEX IF NOT EXISTS sync_queue_owner_ready_idx
 ON sync_queue(owner_id, available_at, created_at);
 `;
 
+const SCHEMA_V4 = `
+DROP INDEX IF EXISTS media_checksum_idx;
+
+CREATE INDEX IF NOT EXISTS media_checksum_idx
+ON media_files(owner_id, checksum, kind);
+`;
+
 export async function migrateDatabaseSchema(db: SQLiteDatabase): Promise<void> {
   await db.execAsync("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   const current = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
@@ -203,6 +210,13 @@ export async function migrateDatabaseSchema(db: SQLiteDatabase): Promise<void> {
     await db.withExclusiveTransactionAsync(async (tx) => {
       await tx.execAsync(SCHEMA_V3);
       await tx.execAsync("PRAGMA user_version = 3");
+    });
+  }
+
+  if (currentVersion < 4) {
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      await tx.execAsync(SCHEMA_V4);
+      await tx.execAsync("PRAGMA user_version = 4");
     });
   }
 

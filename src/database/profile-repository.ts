@@ -302,6 +302,18 @@ export async function deleteLocalChild(db: SQLiteDatabase, childId: string): Pro
   );
   if ((count?.count ?? 0) <= 1) throw new Error("Buki must keep at least one child profile.");
   await db.withExclusiveTransactionAsync(async (tx) => {
+    const mediaFiles = await tx.getAllAsync<{ id: string }>(
+      `SELECT media_files.id
+       FROM media_files
+       JOIN artworks ON artworks.id = media_files.artwork_id
+       WHERE media_files.owner_id = ? AND artworks.owner_id = ? AND artworks.child_id = ?`,
+      ownerId,
+      ownerId,
+      childId,
+    );
+    for (const media of mediaFiles) {
+      await enqueueEntityDeletion(tx, ownerId, "media_file", media.id);
+    }
     await enqueueEntityDeletion(tx, ownerId, "child_profile", childId);
     await tx.runAsync("DELETE FROM child_profiles WHERE id = ? AND owner_id = ?", childId, ownerId);
     const next = await tx.getFirstAsync<{ id: string }>(

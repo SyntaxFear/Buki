@@ -8,6 +8,7 @@ import {
   artworkTagEntityId,
   enqueueCurrentArtwork,
   enqueueCurrentArtworkTag,
+  enqueueCurrentMediaFile,
   enqueueCurrentSketchpad,
   enqueueCurrentTag,
   enqueueEntityDeletion,
@@ -157,6 +158,9 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
     const existingTagIds = ownerId
       ? new Set((await tx.getAllAsync<{ id: string }>("SELECT id FROM tags WHERE owner_id = ?", ownerId)).map((row) => row.id))
       : new Set<string>();
+    const existingMediaIds = ownerId
+      ? new Set((await tx.getAllAsync<{ id: string }>("SELECT id FROM media_files WHERE owner_id = ?", ownerId)).map((row) => row.id))
+      : new Set<string>();
     const existingRelations = ownerId
       ? await tx.getAllAsync<{ artwork_id: string; tag_id: string }>(
           `SELECT artwork_tags.artwork_id, artwork_tags.tag_id
@@ -169,6 +173,7 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
         )
       : [];
     const nextRelationIds = new Set<string>();
+    const nextMediaIds = new Set<string>();
     const artworkIds: string[] = [];
     for (const [sortOrder, pad] of data.pads.entries()) {
       await tx.runAsync(
@@ -244,9 +249,13 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
         );
 
         const tagIds = await replaceArtworkTags(tx, drawing, ownerId, now);
-        await upsertMediaRows(tx, drawing, ownerId, now);
+        const mediaIds = await upsertMediaRows(tx, drawing, ownerId, now);
+        for (const mediaId of mediaIds) nextMediaIds.add(mediaId);
         if (ownerId) {
           await enqueueCurrentArtwork(tx, ownerId, drawing.id);
+          for (const mediaId of mediaIds) {
+            await enqueueCurrentMediaFile(tx, ownerId, mediaId);
+          }
           for (const tagId of tagIds) {
             nextRelationIds.add(artworkTagEntityId(drawing.id, tagId));
             await enqueueCurrentTag(tx, ownerId, tagId);
@@ -257,6 +266,11 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
     }
 
     if (ownerId) {
+      for (const mediaId of existingMediaIds) {
+        if (!nextMediaIds.has(mediaId)) {
+          await enqueueEntityDeletion(tx, ownerId, "media_file", mediaId);
+        }
+      }
       const nextArtworkIds = new Set(artworkIds);
       for (const artworkId of existingArtworkIds) {
         if (!nextArtworkIds.has(artworkId)) {
@@ -278,6 +292,24 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
           });
         }
       }
+    }
+
+    if (nextMediaIds.size === 0) {
+      await tx.runAsync(
+        "DELETE FROM media_files WHERE ((? IS NULL AND owner_id IS NULL) OR owner_id = ?)",
+        ownerId,
+        ownerId,
+      );
+    } else {
+      const mediaPlaceholders = [...nextMediaIds].map(() => "?").join(",");
+      await tx.runAsync(
+        `DELETE FROM media_files
+         WHERE ((? IS NULL AND owner_id IS NULL) OR owner_id = ?)
+           AND id NOT IN (${mediaPlaceholders})`,
+        ownerId,
+        ownerId,
+        ...nextMediaIds,
+      );
     }
 
     if (artworkIds.length === 0) {
@@ -387,9 +419,10 @@ async function upsertMediaRows(
   drawing: Drawing,
   ownerId: string | null,
   now: number,
-): Promise<void> {
+): Promise<string[]> {
   const rows = [
     { id: `${drawing.id}:cutout`, kind: "cutout", uri: drawing.uri, mime: "image/png" },
+    { id: `${drawing.id}:preview`, kind: "preview", uri: drawing.uri, mime: "image/png" },
     ...(drawing.photoUri
       ? [{ id: `${drawing.id}:original`, kind: "original", uri: drawing.photoUri, mime: "image/jpeg" }]
       : []),
@@ -402,8 +435,26 @@ async function upsertMediaRows(
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'local', ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         local_uri = excluded.local_uri,
-        byte_size = excluded.byte_size,
-        mime_type = excluded.mime_type,
+        remote_path = CASE
+          WHEN media_files.local_uri IS NOT excluded.local_uri THEN NULL
+          ELSE media_files.remote_path
+        END,
+        checksum = CASE
+          WHEN media_files.local_uri IS NOT excluded.local_uri THEN NULL
+          ELSE media_files.checksum
+        END,
+        byte_size = CASE
+          WHEN media_files.local_uri IS NOT excluded.local_uri THEN excluded.byte_size
+          ELSE COALESCE(media_files.byte_size, excluded.byte_size)
+        END,
+        mime_type = CASE
+          WHEN media_files.local_uri IS NOT excluded.local_uri THEN excluded.mime_type
+          ELSE COALESCE(media_files.mime_type, excluded.mime_type)
+        END,
+        upload_state = CASE
+          WHEN media_files.local_uri IS NOT excluded.local_uri OR media_files.upload_state = 'failed' THEN 'local'
+          ELSE media_files.upload_state
+        END,
         updated_at = excluded.updated_at`,
       row.id,
       ownerId,
@@ -416,4 +467,5 @@ async function upsertMediaRows(
       now,
     );
   }
+  return rows.map((row) => row.id);
 }

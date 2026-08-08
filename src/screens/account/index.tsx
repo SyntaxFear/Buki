@@ -157,7 +157,7 @@ export function AccountCenter() {
 
   useEffect(() => {
     void loadBukiUsage().then(setUsage).catch(() => {});
-  }, [artworkCount, pads.length]);
+  }, [artworkCount, lastSyncedAt, pads.length, pendingSyncCount]);
 
   const openExternal = async (url: string, reason: string) => {
     if (!(await confirmAdult(reason))) return;

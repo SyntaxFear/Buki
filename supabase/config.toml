@@ -393,3 +393,21 @@ entrypoint = "./functions/verify-entitlement/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/verify-entitlement/*.html" ]
+
+[functions.create-media-upload]
+enabled = true
+verify_jwt = true
+import_map = "./functions/create-media-upload/deno.json"
+entrypoint = "./functions/create-media-upload/index.ts"
+
+[functions.complete-media-upload]
+enabled = true
+verify_jwt = true
+import_map = "./functions/complete-media-upload/deno.json"
+entrypoint = "./functions/complete-media-upload/index.ts"
+
+[functions.delete-media]
+enabled = true
+verify_jwt = true
+import_map = "./functions/delete-media/deno.json"
+entrypoint = "./functions/delete-media/index.ts"

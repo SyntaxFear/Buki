@@ -50,6 +50,13 @@ import {
   setLocalAutomaticBackup,
 } from "./sync-repository";
 import { enqueueFullAccountSnapshot } from "./sync-serialization";
+import {
+  loadLocalMediaFile,
+  markLocalMediaFailed,
+  markLocalMediaUploaded,
+  markLocalMediaUploading,
+  saveLocalCloudUsage,
+} from "./media-repository";
 
 export { BUKI_DATABASE_NAME };
 
@@ -230,4 +237,25 @@ export async function enqueueBukiSyncDevice(
   });
 }
 
+export function loadBukiLocalMedia(ownerId: string, mediaId: string) {
+  return loadLocalMediaFile(requireBukiDatabase(), ownerId, mediaId);
+}
+
+export function markBukiMediaUploading(ownerId: string, mediaId: string) {
+  return markLocalMediaUploading(requireBukiDatabase(), ownerId, mediaId);
+}
+
+export function markBukiMediaUploaded(input: Parameters<typeof markLocalMediaUploaded>[1]) {
+  return markLocalMediaUploaded(requireBukiDatabase(), input);
+}
+
+export function markBukiMediaFailed(ownerId: string, mediaId: string, mediaMissing: boolean) {
+  return markLocalMediaFailed(requireBukiDatabase(), ownerId, mediaId, mediaMissing);
+}
+
+export function saveBukiCloudUsage(ownerId: string, bytesUsed: number, bytesLimit: number) {
+  return saveLocalCloudUsage(requireBukiDatabase(), ownerId, bytesUsed, bytesLimit);
+}
+
 export type { ImportedArchiveLibrary };
+export type { LocalMediaFile, LocalMediaKind } from "./media-repository";

@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/auth/supabase";
+import { deleteQueuedMedia, uploadQueuedMedia } from "./media-upload";
 import type { SyncEntityType, SyncQueueItem } from "./types";
 
 const TOMBSTONE_TYPE: Partial<Record<SyncEntityType, string>> = {
@@ -129,6 +130,12 @@ async function pushDelete(item: SyncQueueItem): Promise<void> {
 }
 
 export async function pushRemoteSyncItem(item: SyncQueueItem): Promise<void> {
+  if (item.entityType === "media_file") {
+    payloadFor(item);
+    if (item.operation === "upsert") await uploadQueuedMedia(item);
+    else await deleteQueuedMedia(item);
+    return;
+  }
   if (item.operation === "upsert") await pushUpsert(item);
   else await pushDelete(item);
 }

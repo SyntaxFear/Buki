@@ -185,6 +185,50 @@ export async function enqueueCurrentArtwork(
   });
 }
 
+export async function enqueueCurrentMediaFile(
+  db: SQLiteDatabase,
+  ownerId: string,
+  mediaId: string,
+): Promise<void> {
+  const row = await db.getFirstAsync<{
+    id: string;
+    artwork_id: string;
+    kind: string;
+    checksum: string | null;
+    byte_size: number | null;
+    mime_type: string | null;
+    updated_at: number;
+  }>(
+    `SELECT media_files.id, media_files.artwork_id, media_files.kind,
+            media_files.checksum, media_files.byte_size, media_files.mime_type,
+            media_files.updated_at
+     FROM media_files
+     JOIN artworks ON artworks.id = media_files.artwork_id
+     WHERE media_files.owner_id = ? AND media_files.id = ?
+       AND artworks.owner_id = ? AND artworks.deleted_at IS NULL`,
+    ownerId,
+    mediaId,
+    ownerId,
+  );
+  if (!row) return;
+  await enqueueLocalSyncOperation(db, {
+    ownerId,
+    operation: "upsert",
+    entityType: "media_file",
+    entityId: row.id,
+    payload: {
+      owner_id: ownerId,
+      id: row.id,
+      artwork_id: row.artwork_id,
+      kind: row.kind,
+      checksum: row.checksum,
+      byte_size: row.byte_size,
+      mime_type: row.mime_type,
+      updated_at: iso(row.updated_at),
+    },
+  });
+}
+
 export async function enqueueCurrentTag(
   db: SQLiteDatabase,
   ownerId: string,
@@ -291,6 +335,16 @@ export async function enqueueFullAccountSnapshot(
     ownerId,
   );
   for (const artwork of artworks) await enqueueCurrentArtwork(db, ownerId, artwork.id);
+  const mediaFiles = await db.getAllAsync<{ id: string }>(
+    `SELECT media_files.id
+     FROM media_files
+     JOIN artworks ON artworks.id = media_files.artwork_id
+     WHERE media_files.owner_id = ? AND artworks.owner_id = ? AND artworks.deleted_at IS NULL
+     ORDER BY media_files.created_at`,
+    ownerId,
+    ownerId,
+  );
+  for (const media of mediaFiles) await enqueueCurrentMediaFile(db, ownerId, media.id);
   const tags = await db.getAllAsync<{ id: string }>(
     "SELECT id FROM tags WHERE owner_id = ? AND deleted_at IS NULL ORDER BY created_at",
     ownerId,
