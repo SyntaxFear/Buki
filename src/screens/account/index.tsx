@@ -382,8 +382,22 @@ export function AccountCenter() {
               else void introducePro("exportData", "account_export_artwork");
             }}
           />
-          <SettingRow title="Sketchpad PDF" detail="Preserve the selected layout" onPress={() => void introducePro("exportData", "account_export_pdf")} />
-          <SettingRow title="Batch ZIP" detail="Images with JSON/CSV metadata" onPress={() => void introducePro("exportData", "account_export_zip")} />
+          <SettingRow
+            title="Sketchpad PDF"
+            detail={capabilities.exportData ? "Create a print-ready book in the selected layout" : "Preserve the selected layout · Buki Pro"}
+            onPress={() => {
+              if (capabilities.exportData) router.push("/exports");
+              else void introducePro("exportData", "account_export_pdf");
+            }}
+          />
+          <SettingRow
+            title="Batch ZIP"
+            detail={capabilities.exportData ? "Images, originals, JSON, and CSV metadata" : "Images with JSON/CSV metadata · Buki Pro"}
+            onPress={() => {
+              if (capabilities.exportData) router.push("/exports");
+              else void introducePro("exportData", "account_export_zip");
+            }}
+          />
           <SettingRow title="Buki archive" detail="Versioned backup and import" onPress={() => void introducePro("exportData", "account_export_archive")} />
         </Section>
 

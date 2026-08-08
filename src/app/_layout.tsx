@@ -100,6 +100,10 @@ function ReadyApp() {
           options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
         />
         <Stack.Screen
+          name="exports"
+          options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
+        />
+        <Stack.Screen
           name="artwork"
           options={{
             presentation: "formSheet",
