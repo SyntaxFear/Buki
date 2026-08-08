@@ -2,7 +2,7 @@ import { buildLegacyMigrationRecords } from "./legacy-records";
 import type { StoreData } from "@/store/migrate";
 
 const legacy: StoreData = {
-  version: 4,
+  version: 5,
   activePadId: "pad-a",
   pads: [
     {
@@ -28,6 +28,11 @@ const legacy: StoreData = {
         height: 240,
         rotation: -4.5,
         addedAt: 200,
+        title: "Blue house",
+        notes: "Painted at school",
+        favorite: true,
+        tags: ["School", "Paint"],
+        updatedAt: 240,
       },
     ],
   },
@@ -52,6 +57,11 @@ describe("legacy SQLite migration records", () => {
       height: 240,
       rotation: -4.5,
       addedAt: 200,
+      title: "Blue house",
+      notes: "Painted at school",
+      favorite: true,
+      tags: ["School", "Paint"],
+      updatedAt: 240,
       mediaMissing: false,
     });
   });

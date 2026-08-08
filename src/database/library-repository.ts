@@ -26,7 +26,16 @@ interface ArtworkRow {
   width: number;
   height: number;
   rotation: number;
+  title: string | null;
+  notes: string | null;
+  favorite: number;
   added_at: number;
+  updated_at: number;
+}
+
+interface ArtworkTagRow {
+  artwork_id: string;
+  name: string;
 }
 
 function fileExists(uri: string): boolean {
@@ -56,10 +65,21 @@ export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
     ownerId,
   );
   const artworks = await db.getAllAsync<ArtworkRow>(
-    `SELECT id, sketchpad_id, cutout_uri, photo_uri, width, height, rotation, added_at
+    `SELECT id, sketchpad_id, cutout_uri, photo_uri, width, height, rotation,
+            title, notes, favorite, added_at, updated_at
      FROM artworks
      WHERE deleted_at IS NULL AND ((? IS NULL AND owner_id IS NULL) OR owner_id = ?)
      ORDER BY added_at`,
+    ownerId,
+    ownerId,
+  );
+  const tagRows = await db.getAllAsync<ArtworkTagRow>(
+    `SELECT artwork_tags.artwork_id, tags.name
+     FROM artwork_tags
+     JOIN tags ON tags.id = artwork_tags.tag_id
+     WHERE tags.deleted_at IS NULL
+       AND ((? IS NULL AND tags.owner_id IS NULL) OR tags.owner_id = ?)
+     ORDER BY tags.name COLLATE NOCASE`,
     ownerId,
     ownerId,
   );
@@ -69,6 +89,12 @@ export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
   );
 
   const drawingsByPad: Record<string, Drawing[]> = Object.fromEntries(pads.map((pad) => [pad.id, []]));
+  const tagsByArtwork = new Map<string, string[]>();
+  for (const row of tagRows) {
+    const tags = tagsByArtwork.get(row.artwork_id) ?? [];
+    tags.push(row.name);
+    tagsByArtwork.set(row.artwork_id, tags);
+  }
   for (const artwork of artworks) {
     const drawings = drawingsByPad[artwork.sketchpad_id];
     if (!drawings) continue;
@@ -80,12 +106,17 @@ export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
       height: artwork.height,
       rotation: artwork.rotation,
       addedAt: artwork.added_at,
+      title: artwork.title ?? undefined,
+      notes: artwork.notes ?? undefined,
+      favorite: artwork.favorite === 1,
+      tags: tagsByArtwork.get(artwork.id) ?? [],
+      updatedAt: artwork.updated_at,
     });
   }
 
   return migrateStoreData(
     {
-      version: 4,
+      version: 5,
       activePadId: active?.value ?? pads[0]?.id,
       pads: pads.map((pad) => ({
         id: pad.id,
@@ -148,8 +179,8 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
         await tx.runAsync(
           `INSERT INTO artworks (
             id, owner_id, child_id, sketchpad_id, cutout_uri, photo_uri, width,
-            height, rotation, media_missing, added_at, updated_at, deleted_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            height, rotation, title, notes, favorite, media_missing, added_at, updated_at, deleted_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
           ON CONFLICT(id) DO UPDATE SET
             child_id = excluded.child_id,
             sketchpad_id = excluded.sketchpad_id,
@@ -158,6 +189,9 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
             width = excluded.width,
             height = excluded.height,
             rotation = excluded.rotation,
+            title = excluded.title,
+            notes = excluded.notes,
+            favorite = excluded.favorite,
             media_missing = excluded.media_missing,
             added_at = excluded.added_at,
             updated_at = excluded.updated_at,
@@ -171,11 +205,15 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
           drawing.width,
           drawing.height,
           drawing.rotation,
+          drawing.title?.trim() || null,
+          drawing.notes?.trim() || null,
+          drawing.favorite ? 1 : 0,
           fileExists(drawing.uri) ? 0 : 1,
           drawing.addedAt,
-          now,
+          drawing.updatedAt ?? drawing.addedAt,
         );
 
+        await replaceArtworkTags(tx, drawing, ownerId, now);
         await upsertMediaRows(tx, drawing, ownerId, now);
       }
     }
@@ -212,7 +250,60 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
       data.activePadId,
       now,
     );
+
+    await tx.runAsync(
+      `DELETE FROM tags
+       WHERE ((? IS NULL AND owner_id IS NULL) OR owner_id = ?)
+         AND id NOT IN (SELECT tag_id FROM artwork_tags)`,
+      ownerId,
+      ownerId,
+    );
   });
+}
+
+async function replaceArtworkTags(
+  db: SQLiteDatabase,
+  drawing: Drawing,
+  ownerId: string | null,
+  now: number,
+): Promise<void> {
+  await db.runAsync("DELETE FROM artwork_tags WHERE artwork_id = ?", drawing.id);
+  for (const name of drawing.tags ?? []) {
+    const normalizedName = name.trim().toLocaleLowerCase();
+    if (!normalizedName) continue;
+    let tag = await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM tags
+       WHERE normalized_name = ?
+         AND ((? IS NULL AND owner_id IS NULL) OR owner_id = ?)
+         AND deleted_at IS NULL
+       LIMIT 1`,
+      normalizedName,
+      ownerId,
+      ownerId,
+    );
+    if (!tag) {
+      const id = `tag-${now}-${Math.random().toString(36).slice(2, 9)}`;
+      await db.runAsync(
+        `INSERT INTO tags (
+          id, owner_id, name, normalized_name, created_at, updated_at, deleted_at
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+        id,
+        ownerId,
+        name.trim(),
+        normalizedName,
+        now,
+        now,
+      );
+      tag = { id };
+    }
+    await db.runAsync(
+      `INSERT OR IGNORE INTO artwork_tags (artwork_id, tag_id, created_at)
+       VALUES (?, ?, ?)`,
+      drawing.id,
+      tag.id,
+      now,
+    );
+  }
 }
 
 async function upsertMediaRows(

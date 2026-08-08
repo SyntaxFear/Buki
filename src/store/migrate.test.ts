@@ -25,7 +25,7 @@ describe("migrateStoreData", () => {
   it("wraps a v1 store into a single default spread pad", () => {
     const v1 = { version: 1, drawings: [drawing(1), drawing(2)] };
     const out = migrateStoreData(v1, NOW);
-    expect(out.version).toBe(4);
+    expect(out.version).toBe(5);
     expect(out.pads).toHaveLength(1);
     expect(out.pads[0].style).toBe("spread");
     expect(out.pads[0].name).toBe("My Book");
@@ -48,7 +48,7 @@ describe("migrateStoreData", () => {
       drawingsByPad: { p1: [drawing(1)], p2: [drawing(2), drawing(3)] },
     };
     const out = migrateStoreData(v2, NOW);
-    expect(out.version).toBe(4);
+    expect(out.version).toBe(5);
     expect(out.pads).toHaveLength(2);
     expect(out.activePadId).toBe("p2");
     expect(out.pads[0].design).toBe("berry");
@@ -84,7 +84,7 @@ describe("migrateStoreData", () => {
     expect(out.drawingsByPad.p1).toHaveLength(1);
   });
 
-  it("preserves an explicit v3 design choice", () => {
+  it("preserves a v3 design choice and artwork metadata", () => {
     const v3 = {
       version: 3,
       activePadId: "p1",
@@ -99,15 +99,33 @@ describe("migrateStoreData", () => {
           createdAt: NOW,
         },
       ],
-      drawingsByPad: { p1: [] },
+      drawingsByPad: {
+        p1: [
+          {
+            ...drawing(1),
+            title: "Night sky",
+            notes: "First telescope drawing",
+            favorite: true,
+            tags: [" Space ", "space", "Night"],
+            updatedAt: NOW + 5,
+          },
+        ],
+      },
     };
     const out = migrateStoreData(v3, NOW);
-    expect(out.version).toBe(4);
+    expect(out.version).toBe(5);
     expect(out.pads[0].design).toBe("sky");
     expect(out.pads[0].childId).toBe("child-default");
     expect(out.pads[0].pageColor).toBe("#F8FCFF");
     expect(out.pads[0].border).toBe("none");
     expect(out.pads[0].decoration).toBe("none");
+    expect(out.drawingsByPad.p1[0]).toMatchObject({
+      title: "Night sky",
+      notes: "First telescope drawing",
+      favorite: true,
+      tags: ["Space", "Night"],
+      updatedAt: NOW + 5,
+    });
   });
 
   it("preserves premium visuals in a v4 library", () => {

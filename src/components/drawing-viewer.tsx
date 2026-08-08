@@ -31,6 +31,7 @@ interface Props {
   /** The drawing's fitted rect on the page — where the zoom starts and ends */
   originRect: Rect;
   onClose: () => void;
+  onOpenDetails: () => void;
 }
 
 /**
@@ -38,7 +39,7 @@ interface Props {
  * pinch-zoomed and panned, and — when the original photo was preserved —
  * flipped between the cutout and the real photograph.
  */
-export function DrawingViewer({ drawing, originRect, onClose }: Props) {
+export function DrawingViewer({ drawing, originRect, onClose, onOpenDetails }: Props) {
   const { width: W, height: H } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -225,6 +226,17 @@ export function DrawingViewer({ drawing, originRect, onClose }: Props) {
       <Animated.View style={[styles.topBar, { top: insets.top + 8 }, chromeStyle]}>
         <Glass tint="#1E1A16" fallbackColor="rgba(255,247,238,0.18)" style={styles.closeBtn}>
           <Pressable
+            onPress={onOpenDetails}
+            accessibilityRole="button"
+            accessibilityLabel="Open artwork details"
+            hitSlop={8}
+            style={({ pressed }) => [StyleSheet.absoluteFill, styles.closeBtnTouchable, pressed && { opacity: 0.8 }]}
+          >
+            <SymbolView name="info.circle" size={18} tintColor="#F5F2ED" />
+          </Pressable>
+        </Glass>
+        <Glass tint="#1E1A16" fallbackColor="rgba(255,247,238,0.18)" style={styles.closeBtn}>
+          <Pressable
             onPress={close}
             accessibilityRole="button"
             accessibilityLabel="Close image viewer"
@@ -288,6 +300,8 @@ const styles = StyleSheet.create({
   topBar: {
     position: "absolute",
     right: 16,
+    flexDirection: "row",
+    gap: 9,
   },
   closeBtn: {
     width: 38,

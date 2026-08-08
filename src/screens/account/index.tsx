@@ -369,6 +369,11 @@ export function AccountCenter() {
         </Section>
 
         <Section title="Data & Export" caption="Exports remain on this adult-controlled screen.">
+          <SettingRow
+            title="Art library & organization"
+            detail={capabilities.advancedOrganization ? "Search, tags, favorites, filters, and bulk actions" : "Browse all artwork; Pro unlocks advanced organization"}
+            onPress={() => router.push("/library")}
+          />
           <SettingRow title="Single artwork or share card" detail="PNG, JPG, decorated card" onPress={() => void introducePro("exportData", "account_export_artwork")} />
           <SettingRow title="Sketchpad PDF" detail="Preserve the selected layout" onPress={() => void introducePro("exportData", "account_export_pdf")} />
           <SettingRow title="Batch ZIP" detail="Images with JSON/CSV metadata" onPress={() => void introducePro("exportData", "account_export_zip")} />

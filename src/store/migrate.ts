@@ -15,6 +15,7 @@ import {
   type PadBorderId,
   type PadDecorationId,
 } from "@/pad-visuals";
+import { normalizeArtworkTags } from "@/organization/artwork-organizer";
 
 export type PadStyle = "spread" | "vertical" | "album" | "grid" | "strip";
 
@@ -30,6 +31,11 @@ export interface Drawing {
   addedAt: number;
   /** file:// URI of the original camera photo (absent on pre-photo scans) */
   photoUri?: string;
+  title?: string;
+  notes?: string;
+  favorite?: boolean;
+  tags?: string[];
+  updatedAt?: number;
 }
 
 export interface Sketchpad {
@@ -47,7 +53,7 @@ export interface Sketchpad {
 }
 
 export interface StoreData {
-  version: 4;
+  version: 5;
   activePadId: string;
   pads: Sketchpad[];
   drawingsByPad: Record<string, Drawing[]>;
@@ -85,18 +91,35 @@ export function makePad(
 
 function emptyStore(now: number): StoreData {
   const pad = makePad(DEFAULT_PAD_NAME, "spread", DEFAULT_PAD_DESIGN_ID, now, "pad-default");
-  return { version: 4, activePadId: pad.id, pads: [pad], drawingsByPad: { [pad.id]: [] } };
+  return { version: 5, activePadId: pad.id, pads: [pad], drawingsByPad: { [pad.id]: [] } };
 }
 
-function isDrawing(d: unknown): d is Drawing {
-  if (typeof d !== "object" || d === null) return false;
+function normalizeDrawing(d: unknown): Drawing | null {
+  if (typeof d !== "object" || d === null) return null;
   const o = d as Record<string, unknown>;
-  return typeof o.uri === "string" && typeof o.width === "number" && typeof o.height === "number";
+  if (typeof o.uri !== "string" || typeof o.width !== "number" || typeof o.height !== "number") {
+    return null;
+  }
+  const addedAt = typeof o.addedAt === "number" ? o.addedAt : 0;
+  return {
+    id: typeof o.id === "string" ? o.id : `d-${o.uri.split("/").pop() ?? addedAt}`,
+    uri: o.uri,
+    width: o.width,
+    height: o.height,
+    rotation: typeof o.rotation === "number" ? o.rotation : 0,
+    addedAt,
+    photoUri: typeof o.photoUri === "string" ? o.photoUri : undefined,
+    title: typeof o.title === "string" ? o.title : undefined,
+    notes: typeof o.notes === "string" ? o.notes : undefined,
+    favorite: o.favorite === true,
+    tags: normalizeArtworkTags(o.tags),
+    updatedAt: typeof o.updatedAt === "number" ? o.updatedAt : addedAt,
+  };
 }
 
 /**
- * Accepts whatever JSON was on disk — v1 ({version:1, drawings}), v2/v3, or
- * garbage — and returns a valid v4 store. v1 collections become a single
+ * Accepts whatever JSON was on disk — v1 ({version:1, drawings}), v2-v5, or
+ * garbage — and returns a valid v5 store. v1 collections become a single
  * default spread pad so nothing is lost.
  */
 export function migrateStoreData(raw: unknown, now: number): StoreData {
@@ -104,7 +127,7 @@ export function migrateStoreData(raw: unknown, now: number): StoreData {
   const o = raw as Record<string, unknown>;
 
   if (
-    (o.version === 2 || o.version === 3 || o.version === 4) &&
+    (o.version === 2 || o.version === 3 || o.version === 4 || o.version === 5) &&
     Array.isArray(o.pads) &&
     typeof o.drawingsByPad === "object" &&
     o.drawingsByPad !== null
@@ -116,19 +139,23 @@ export function migrateStoreData(raw: unknown, now: number): StoreData {
     const byPad: Record<string, Drawing[]> = {};
     for (const pad of pads) {
       const list = (o.drawingsByPad as Record<string, unknown>)[pad.id];
-      byPad[pad.id] = Array.isArray(list) ? list.filter(isDrawing) : [];
+      byPad[pad.id] = Array.isArray(list)
+        ? list.map(normalizeDrawing).filter((drawing): drawing is Drawing => drawing !== null)
+        : [];
     }
     const activePadId =
       typeof o.activePadId === "string" && pads.some((p) => p.id === o.activePadId)
         ? o.activePadId
         : pads[0].id;
-    return { version: 4, activePadId, pads, drawingsByPad: byPad };
+    return { version: 5, activePadId, pads, drawingsByPad: byPad };
   }
 
   // v1: a single flat drawing list
   if (Array.isArray(o.drawings)) {
     const store = emptyStore(now);
-    store.drawingsByPad[store.activePadId] = (o.drawings as unknown[]).filter(isDrawing);
+    store.drawingsByPad[store.activePadId] = (o.drawings as unknown[])
+      .map(normalizeDrawing)
+      .filter((drawing): drawing is Drawing => drawing !== null);
     return store;
   }
 

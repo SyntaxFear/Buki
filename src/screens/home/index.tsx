@@ -486,6 +486,20 @@ export function Home() {
         </Text>
       </Pressable>
 
+      <Pressable
+        onPress={() => router.push("/library")}
+        accessibilityRole="button"
+        accessibilityLabel="Open art library"
+        hitSlop={8}
+        style={({ pressed }) => [
+          styles.libraryButton,
+          { top: insets.top + 12 },
+          pressed && styles.accountButtonPressed,
+        ]}
+      >
+        <SymbolView name="square.grid.2x2.fill" size={18} tintColor={colors.titleTeal} />
+      </Pressable>
+
       <View style={styles.padPillWrap}>
         <Pressable
           onPress={() => setDrawerOpen(true)}
@@ -610,6 +624,11 @@ export function Home() {
           drawing={viewing.drawing}
           originRect={viewing.rect}
           onClose={() => setViewing(null)}
+          onOpenDetails={() => {
+            const artworkId = viewing.drawing.id;
+            setViewing(null);
+            router.push({ pathname: "/artwork", params: { id: artworkId } });
+          }}
         />
       ) : null}
     </View>
@@ -637,6 +656,24 @@ const styles = StyleSheet.create({
     shadowColor: "#75624B",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.14,
+    shadowRadius: 7,
+  },
+  libraryButton: {
+    position: "absolute",
+    right: 72,
+    zIndex: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderCurve: "continuous",
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: "rgba(22,125,130,0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#75624B",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
     shadowRadius: 7,
   },
   accountButtonPressed: { opacity: 0.72, transform: [{ scale: 0.96 }] },

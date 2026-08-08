@@ -97,8 +97,8 @@ export async function migrateLegacyJson(db: SQLiteDatabase): Promise<void> {
       await tx.runAsync(
         `INSERT INTO artworks (
           id, owner_id, child_id, sketchpad_id, cutout_uri, photo_uri, width,
-          height, rotation, media_missing, added_at, updated_at, deleted_at
-        ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          height, rotation, title, notes, favorite, media_missing, added_at, updated_at, deleted_at
+        ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         ON CONFLICT(id) DO UPDATE SET
           child_id = excluded.child_id,
           sketchpad_id = excluded.sketchpad_id,
@@ -107,6 +107,9 @@ export async function migrateLegacyJson(db: SQLiteDatabase): Promise<void> {
           width = excluded.width,
           height = excluded.height,
           rotation = excluded.rotation,
+          title = excluded.title,
+          notes = excluded.notes,
+          favorite = excluded.favorite,
           media_missing = excluded.media_missing,
           added_at = excluded.added_at,
           updated_at = excluded.updated_at,
@@ -119,10 +122,45 @@ export async function migrateLegacyJson(db: SQLiteDatabase): Promise<void> {
         artwork.width,
         artwork.height,
         artwork.rotation,
+        artwork.title?.trim() || null,
+        artwork.notes?.trim() || null,
+        artwork.favorite ? 1 : 0,
         artwork.mediaMissing ? 1 : 0,
         artwork.addedAt,
-        now,
+        artwork.updatedAt ?? artwork.addedAt,
       );
+
+      for (const name of artwork.tags ?? []) {
+        const normalizedName = name.trim().toLocaleLowerCase();
+        if (!normalizedName) continue;
+        let tag = await tx.getFirstAsync<{ id: string }>(
+          `SELECT id FROM tags
+           WHERE owner_id IS NULL AND normalized_name = ? AND deleted_at IS NULL
+           LIMIT 1`,
+          normalizedName,
+        );
+        if (!tag) {
+          const id = `tag-${now}-${Math.random().toString(36).slice(2, 9)}`;
+          await tx.runAsync(
+            `INSERT INTO tags (
+              id, owner_id, name, normalized_name, created_at, updated_at, deleted_at
+            ) VALUES (?, NULL, ?, ?, ?, ?, NULL)`,
+            id,
+            name.trim(),
+            normalizedName,
+            now,
+            now,
+          );
+          tag = { id };
+        }
+        await tx.runAsync(
+          `INSERT OR IGNORE INTO artwork_tags (artwork_id, tag_id, created_at)
+           VALUES (?, ?, ?)`,
+          artwork.id,
+          tag.id,
+          now,
+        );
+      }
     }
 
     await tx.runAsync(

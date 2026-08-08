@@ -95,6 +95,19 @@ function ReadyApp() {
           name="account"
           options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
         />
+        <Stack.Screen
+          name="library"
+          options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
+        />
+        <Stack.Screen
+          name="artwork"
+          options={{
+            presentation: "formSheet",
+            animation: "slide_from_bottom",
+            sheetGrabberVisible: true,
+            sheetAllowedDetents: [0.86, 1],
+          }}
+        />
       </Stack>
       <ProPaywallHost />
       <ParentalGateHost />
