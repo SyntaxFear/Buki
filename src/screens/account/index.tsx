@@ -374,7 +374,14 @@ export function AccountCenter() {
             detail={capabilities.advancedOrganization ? "Search, tags, favorites, filters, and bulk actions" : "Browse all artwork; Pro unlocks advanced organization"}
             onPress={() => router.push("/library")}
           />
-          <SettingRow title="Single artwork or share card" detail="PNG, JPG, decorated card" onPress={() => void introducePro("exportData", "account_export_artwork")} />
+          <SettingRow
+            title="Single artwork or share card"
+            detail={capabilities.exportData ? "Open an artwork to export PNG, JPG, or a decorated card" : "PNG, JPG, decorated card · Buki Pro"}
+            onPress={() => {
+              if (capabilities.exportData) router.push("/library");
+              else void introducePro("exportData", "account_export_artwork");
+            }}
+          />
           <SettingRow title="Sketchpad PDF" detail="Preserve the selected layout" onPress={() => void introducePro("exportData", "account_export_pdf")} />
           <SettingRow title="Batch ZIP" detail="Images with JSON/CSV metadata" onPress={() => void introducePro("exportData", "account_export_zip")} />
           <SettingRow title="Buki archive" detail="Versioned backup and import" onPress={() => void introducePro("exportData", "account_export_archive")} />

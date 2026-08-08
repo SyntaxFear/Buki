@@ -59,6 +59,13 @@
       "expo-sqlite",
       "expo-secure-store",
       "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Buki accesses Photos only when an adult chooses artwork to import.",
+          "savePhotosPermission": "Buki adds an exported artwork image to Photos only when an adult taps Save to Photos."
+        }
+      ],
       "expo-apple-authentication"
     ],
     "experiments": {

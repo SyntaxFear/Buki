@@ -14,9 +14,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ArtworkExportSheet } from "@/components/artwork-export-sheet";
 import { useDrawings } from "@/store/drawings";
 import { useMembership } from "@/store/membership";
 import { confirmAdult } from "@/store/parental-gate";
+import { useProfiles } from "@/store/profiles";
 import { colors } from "@/theme";
 
 function firstParam(value: string | string[] | undefined): string | null {
@@ -58,10 +60,14 @@ export function ArtworkDetails() {
   const advancedOrganization = useMembership(
     (state) => state.capabilities.advancedOrganization,
   );
+  const exportData = useMembership((state) => state.capabilities.exportData);
+  const requestUpgrade = useMembership((state) => state.requestUpgrade);
+  const child = useProfiles((state) => state.children.find((item) => item.id === pad?.childId));
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [tagDraft, setTagDraft] = useState("");
   const [saved, setSaved] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     setTitle(drawing?.title ?? "");
@@ -161,6 +167,30 @@ export function ArtworkDetails() {
             <Text style={styles.metadataValue}>{pad?.name ?? "Buki"}</Text>
           </View>
         </View>
+
+        <Pressable
+          onPress={() => {
+            if (!exportData) {
+              requestUpgrade("exportData", "artwork_details_export");
+              return;
+            }
+            setExportOpen(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Export artwork"
+          style={({ pressed }) => [styles.exportButton, pressed && styles.pressed]}
+        >
+          <SymbolView name="square.and.arrow.up" size={18} tintColor={colors.titleTeal} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.exportTitle}>Export artwork</Text>
+            <Text style={styles.exportDetail}>Transparent PNG, JPG, or decorated share card</Text>
+          </View>
+          {!exportData ? (
+            <View style={styles.proBadge}>
+              <Text style={styles.proBadgeText}>PRO</Text>
+            </View>
+          ) : null}
+        </Pressable>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Story</Text>
@@ -273,6 +303,14 @@ export function ArtworkDetails() {
           <Text style={styles.deleteLabel}>Delete artwork</Text>
         </Pressable>
       </ScrollView>
+
+      <ArtworkExportSheet
+        visible={exportOpen}
+        drawing={drawing}
+        padName={pad?.name ?? "Buki"}
+        childName={child?.name}
+        onClose={() => setExportOpen(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -317,6 +355,9 @@ const styles = StyleSheet.create({
   metadataLine: { flexDirection: "row", gap: 12, paddingHorizontal: 4 },
   metadataLabel: { fontSize: 11, fontWeight: "800", color: colors.mutedText, textTransform: "uppercase" },
   metadataValue: { fontSize: 14, fontWeight: "800", color: colors.ink, marginTop: 3 },
+  exportButton: { minHeight: 64, paddingHorizontal: 15, paddingVertical: 11, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 19, borderCurve: "continuous", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  exportTitle: { fontSize: 15, fontWeight: "900", color: colors.ink },
+  exportDetail: { fontSize: 11.5, lineHeight: 16, color: colors.mutedText, marginTop: 2 },
   sectionCard: {
     padding: 16,
     gap: 10,
