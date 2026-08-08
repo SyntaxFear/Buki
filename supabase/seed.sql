@@ -1,0 +1,1 @@
+-- Buki does not seed production-like user data. Tests create isolated rows inside transactions.
