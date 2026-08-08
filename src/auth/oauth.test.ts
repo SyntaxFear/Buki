@@ -19,4 +19,10 @@ describe("OAuth callback parsing", () => {
       "access_denied",
     );
   });
+
+  it("parses an email-link token hash", () => {
+    expect(
+      parseOAuthCallback("buki://auth/callback?token_hash=hashed&type=magiclink"),
+    ).toMatchObject({ tokenHash: "hashed", type: "magiclink" });
+  });
 });

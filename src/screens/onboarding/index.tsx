@@ -41,6 +41,7 @@ export function OnboardingScreen() {
   const otpEmail = useAuth((state) => state.otpEmail);
   const sendEmailOtp = useAuth((state) => state.sendEmailOtp);
   const verifyEmailOtp = useAuth((state) => state.verifyEmailOtp);
+  const resetEmailOtp = useAuth((state) => state.resetEmailOtp);
   const signInWithApple = useAuth((state) => state.signInWithApple);
   const signInWithGoogle = useAuth((state) => state.signInWithGoogle);
   const refreshProfile = useAuth((state) => state.refreshProfile);
@@ -232,6 +233,16 @@ export function OnboardingScreen() {
                       busy={busy}
                       onPress={() => void verifyEmailOtp(otpEmail, otp)}
                     />
+                    <Pressable
+                      onPress={() => {
+                        resetEmailOtp();
+                        setOtp("");
+                      }}
+                      disabled={busy}
+                      style={styles.textButton}
+                    >
+                      <Text style={styles.textButtonLabel}>Use a different email</Text>
+                    </Pressable>
                   </>
                 ) : (
                   <PrimaryButton

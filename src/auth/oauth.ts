@@ -2,6 +2,8 @@ export interface OAuthCallback {
   code: string | null;
   accessToken: string | null;
   refreshToken: string | null;
+  tokenHash: string | null;
+  type: string | null;
   error: string | null;
 }
 
@@ -13,6 +15,8 @@ export function parseOAuthCallback(url: string): OAuthCallback {
     code: value("code"),
     accessToken: value("access_token"),
     refreshToken: value("refresh_token"),
+    tokenHash: value("token_hash"),
+    type: value("type"),
     error: value("error_description") ?? value("error"),
   };
 }

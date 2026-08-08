@@ -3,7 +3,7 @@ import { makeRedirectUri } from "expo-auth-session";
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import { create } from "zustand";
-import type { Session, User } from "@supabase/supabase-js";
+import type { EmailOtpType, Session, User } from "@supabase/supabase-js";
 
 import {
   activateBukiAccount,
@@ -46,6 +46,8 @@ interface AuthState {
   initialize: () => Promise<void>;
   sendEmailOtp: (email: string) => Promise<boolean>;
   verifyEmailOtp: (email: string, token: string) => Promise<boolean>;
+  resetEmailOtp: () => void;
+  completeAuthCallback: (url: string) => Promise<boolean>;
   signInWithApple: () => Promise<boolean>;
   signInWithGoogle: () => Promise<boolean>;
   refreshProfile: () => Promise<void>;
@@ -58,6 +60,7 @@ interface AuthState {
 
 const redirectTo = makeRedirectUri({ scheme: "buki", path: "auth/callback" });
 let initialization: Promise<void> | null = null;
+let initializationSucceeded = false;
 let listenerInstalled = false;
 let lastAppliedUserId: string | null | undefined;
 let sessionApplication: Promise<void> = Promise.resolve();
@@ -66,30 +69,54 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong. Please try again.";
 }
 
-async function applySessionNow(session: Session | null): Promise<void> {
-  if (!session?.user) {
-    disconnectAnalytics();
-    useCloudSync.getState().disconnectUser();
+async function resetAccountState(hydrateSignedOut: boolean): Promise<unknown> {
+  disconnectAnalytics();
+  useCloudSync.getState().disconnectUser();
+  let membershipError: unknown = null;
+  try {
     await useMembership.getState().disconnectUser();
-    await clearBukiAccount();
-    useDrawings.getState().resetForAccountSwitch();
-    useProfiles.getState().resetForAccountSwitch();
-    usePreferences.getState().resetForAccountSwitch();
+  } catch (error) {
+    membershipError = error;
+    useMembership.getState().resetMembership();
+  }
+  await clearBukiAccount();
+  useDrawings.getState().resetForAccountSwitch();
+  useProfiles.getState().resetForAccountSwitch();
+  usePreferences.getState().resetForAccountSwitch();
+  if (hydrateSignedOut) {
     await Promise.all([
       useDrawings.getState().hydrate(),
       useProfiles.getState().hydrate(),
       usePreferences.getState().hydrate(),
     ]);
+  }
+  return membershipError;
+}
+
+async function applySessionNow(session: Session | null): Promise<void> {
+  if (!session?.user) {
+    const membershipError = await resetAccountState(true);
     useAuth.setState({
       hydrated: true,
       status: "signedOut",
       session: null,
       user: null,
       profile: null,
+      otpEmail: null,
     });
+    if (membershipError) {
+      throw new Error(
+        "Buki signed out locally, but could not clear the previous purchase identity. Try again before signing in to another account.",
+      );
+    }
     return;
   }
 
+  const previousUserId = useAuth.getState().user?.id ?? lastAppliedUserId ?? null;
+  if (previousUserId && previousUserId !== session.user.id) {
+    await flushLibraryWrites();
+    await resetAccountState(false);
+  }
   await activateBukiAccount(session.user);
   const profile = await loadAdultProfile(session.user.id);
   useAuth.setState({
@@ -98,6 +125,7 @@ async function applySessionNow(session: Session | null): Promise<void> {
     session,
     user: session.user,
     profile,
+    otpEmail: null,
     error: null,
   });
   initializeAnalytics(session.user.id);
@@ -112,7 +140,26 @@ async function applySessionNow(session: Session | null): Promise<void> {
 async function applySession(session: Session | null): Promise<void> {
   const nextUserId = session?.user.id ?? null;
   const run = sessionApplication.catch(() => {}).then(async () => {
-    if (lastAppliedUserId === nextUserId && useAuth.getState().hydrated) return;
+    if (lastAppliedUserId === nextUserId && useAuth.getState().hydrated) {
+      if (session?.user) {
+        useAuth.setState({
+          status: "signedIn",
+          session,
+          user: session.user,
+          otpEmail: null,
+          error: null,
+        });
+      } else {
+        useAuth.setState({
+          status: "signedOut",
+          session: null,
+          user: null,
+          profile: null,
+          otpEmail: null,
+        });
+      }
+      return;
+    }
     await applySessionNow(session);
     lastAppliedUserId = nextUserId;
   });
@@ -126,6 +173,14 @@ async function completeOAuth(url: string): Promise<Session | null> {
   if (callback.error) throw new Error(callback.error);
   if (callback.code) {
     const { data, error } = await client.auth.exchangeCodeForSession(callback.code);
+    if (error) throw error;
+    return data.session;
+  }
+  if (callback.tokenHash && callback.type) {
+    const { data, error } = await client.auth.verifyOtp({
+      token_hash: callback.tokenHash,
+      type: callback.type as EmailOtpType,
+    });
     if (error) throw error;
     return data.session;
   }
@@ -151,23 +206,29 @@ export const useAuth = create<AuthState>((set, get) => ({
   error: null,
 
   initialize: async () => {
-    if (get().hydrated) return;
+    if (get().hydrated && initializationSucceeded) return;
     if (!initialization) {
-      initialization = (async () => {
+      const attempt = (async () => {
         try {
           const client = getSupabaseClient();
+          if (!listenerInstalled) {
+            client.auth.onAuthStateChange((_event, nextSession) => {
+              void applySession(nextSession)
+                .then(() => {
+                  initializationSucceeded = true;
+                })
+                .catch((listenerError) => {
+                  useAuth.setState({ error: errorMessage(listenerError) });
+                });
+            });
+            listenerInstalled = true;
+          }
           const { data, error } = await client.auth.getSession();
           if (error) throw error;
           await applySession(data.session);
-          if (!listenerInstalled) {
-            listenerInstalled = true;
-            client.auth.onAuthStateChange((_event, nextSession) => {
-              void applySession(nextSession).catch((listenerError) => {
-                useAuth.setState({ error: errorMessage(listenerError) });
-              });
-            });
-          }
+          initializationSucceeded = true;
         } catch (error) {
+          initializationSucceeded = false;
           useMembership.getState().resetMembership();
           set({
             hydrated: true,
@@ -176,8 +237,14 @@ export const useAuth = create<AuthState>((set, get) => ({
           });
         }
       })();
+      initialization = attempt;
     }
-    await initialization;
+    const currentInitialization = initialization;
+    try {
+      await currentInitialization;
+    } finally {
+      if (initialization === currentInitialization) initialization = null;
+    }
   },
 
   sendEmailOtp: async (email) => {
@@ -210,7 +277,24 @@ export const useAuth = create<AuthState>((set, get) => ({
       });
       if (error) throw error;
       await applySession(data.session);
+      set({ otpEmail: null });
       return Boolean(data.session);
+    } catch (error) {
+      set({ error: errorMessage(error) });
+      return false;
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  resetEmailOtp: () => set({ otpEmail: null, error: null }),
+
+  completeAuthCallback: async (url) => {
+    set({ busy: true, error: null });
+    try {
+      const session = await completeOAuth(url);
+      await applySession(session);
+      return Boolean(session);
     } catch (error) {
       set({ error: errorMessage(error) });
       return false;
@@ -226,6 +310,7 @@ export const useAuth = create<AuthState>((set, get) => ({
         throw new Error("Sign in with Apple is unavailable on this device.");
       }
       const rawNonce = Crypto.randomUUID();
+      const requestState = Crypto.randomUUID();
       const nonce = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, rawNonce);
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
@@ -233,7 +318,11 @@ export const useAuth = create<AuthState>((set, get) => ({
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
         nonce,
+        state: requestState,
       });
+      if (credential.state !== requestState) {
+        throw new Error("Apple sign-in response could not be verified.");
+      }
       if (!credential.identityToken) throw new Error("Apple did not return an identity token.");
       const { data, error } = await getSupabaseClient().auth.signInWithIdToken({
         provider: "apple",
@@ -387,3 +476,21 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 }));
+
+export function resetAuthStateForTests(): void {
+  initialization = null;
+  initializationSucceeded = false;
+  listenerInstalled = false;
+  lastAppliedUserId = undefined;
+  sessionApplication = Promise.resolve();
+  useAuth.setState({
+    hydrated: false,
+    busy: false,
+    status: "initializing",
+    session: null,
+    user: null,
+    profile: null,
+    otpEmail: null,
+    error: null,
+  });
+}

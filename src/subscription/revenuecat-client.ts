@@ -15,6 +15,7 @@ type CustomerInfoHandler = (ownerId: string, customerInfo: CustomerInfo) => void
 let activeOwnerId: string | null = null;
 let updateHandler: CustomerInfoHandler | null = null;
 let listenerInstalled = false;
+const REVENUECAT_LOGOUT_ATTEMPTS = 3;
 
 const customerInfoListener: CustomerInfoUpdateListener = (customerInfo) => {
   if (!activeOwnerId || !updateHandler) return;
@@ -23,6 +24,21 @@ const customerInfoListener: CustomerInfoUpdateListener = (customerInfo) => {
 
 function isAnonymousRevenueCatId(appUserId: string): boolean {
   return appUserId.startsWith("$RCAnonymousID:");
+}
+
+async function logOutRevenueCatUser(): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < REVENUECAT_LOGOUT_ATTEMPTS; attempt += 1) {
+    try {
+      await Purchases.logOut();
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Could not disconnect the RevenueCat user.");
 }
 
 async function ensureConfigured(ownerId: string): Promise<CustomerInfo | null> {
@@ -40,7 +56,7 @@ async function ensureConfigured(ownerId: string): Promise<CustomerInfo | null> {
   } else {
     const currentAppUserId = await Purchases.getAppUserID();
     if (currentAppUserId !== ownerId) {
-      if (!isAnonymousRevenueCatId(currentAppUserId)) await Purchases.logOut();
+      if (!isAnonymousRevenueCatId(currentAppUserId)) await logOutRevenueCatUser();
       const result = await Purchases.logIn(ownerId);
       return result.customerInfo;
     }
@@ -53,9 +69,9 @@ export async function connectRevenueCatUser(
   ownerId: string,
   handler: CustomerInfoHandler,
 ): Promise<CustomerInfo | null> {
+  const customerInfo = await ensureConfigured(ownerId);
   activeOwnerId = ownerId;
   updateHandler = handler;
-  const customerInfo = await ensureConfigured(ownerId);
   if (Platform.OS === "ios" && !listenerInstalled) {
     Purchases.addCustomerInfoUpdateListener(customerInfoListener);
     listenerInstalled = true;
@@ -110,10 +126,6 @@ export async function disconnectRevenueCatUser(): Promise<void> {
   activeOwnerId = null;
   updateHandler = null;
   if (Platform.OS !== "ios" || !(await Purchases.isConfigured())) return;
-  try {
-    const currentAppUserId = await Purchases.getAppUserID();
-    if (!isAnonymousRevenueCatId(currentAppUserId)) await Purchases.logOut();
-  } catch (error) {
-    console.warn("Could not disconnect the RevenueCat user", error);
-  }
+  const currentAppUserId = await Purchases.getAppUserID();
+  if (!isAnonymousRevenueCatId(currentAppUserId)) await logOutRevenueCatUser();
 }

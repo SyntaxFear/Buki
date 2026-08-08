@@ -106,6 +106,7 @@ function ReadyApp() {
         <Stack.Screen name="terms" />
         <Stack.Screen name="support" />
         <Stack.Screen name="delete-account" />
+        <Stack.Screen name="auth/callback" options={{ animation: "fade" }} />
       </Stack>
       <ProPaywallHost />
       <ParentalGateHost />
