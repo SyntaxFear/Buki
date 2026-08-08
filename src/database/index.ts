@@ -7,6 +7,7 @@ import { loadLibrary, saveLibrary } from "./library-repository";
 import { migrateDatabaseSchema } from "./schema";
 import {
   activateLocalAccount,
+  activeLocalOwnerId,
   clearActiveLocalAccount,
   getLocalAdultProfile,
   updateLocalAdultProfile,
@@ -33,10 +34,22 @@ import {
   saveLocalEntitlementSnapshot,
 } from "./entitlement-repository";
 import type { EntitlementSnapshot } from "@/subscription/access";
+import { notifySyncQueueChanged } from "@/sync/signals";
 import {
   mergeImportedArchive,
   type ImportedArchiveLibrary,
 } from "./archive-repository";
+import {
+  completeLocalSyncOperations,
+  enqueueLocalSyncOperation,
+  failLocalSyncOperation,
+  getOrCreateLocalSyncDeviceId,
+  loadLocalSyncSummary,
+  loadReadyLocalSyncOperations,
+  markLocalSyncCompleted,
+  setLocalAutomaticBackup,
+} from "./sync-repository";
+import { enqueueFullAccountSnapshot } from "./sync-serialization";
 
 export { BUKI_DATABASE_NAME };
 
@@ -54,8 +67,9 @@ export function requireBukiDatabase(): SQLiteDatabase {
   return activeDatabase;
 }
 
-export function activateBukiAccount(user: User): Promise<void> {
-  return activateLocalAccount(requireBukiDatabase(), user);
+export async function activateBukiAccount(user: User): Promise<void> {
+  await activateLocalAccount(requireBukiDatabase(), user);
+  notifySyncQueueChanged();
 }
 
 export function clearBukiAccount(): Promise<void> {
@@ -70,7 +84,9 @@ export function editAdultProfile(
   ownerId: string,
   updates: { displayName: string; avatarUri: string | null },
 ) {
-  return updateLocalAdultProfile(requireBukiDatabase(), ownerId, updates);
+  return updateLocalAdultProfile(requireBukiDatabase(), ownerId, updates).then(() => {
+    notifySyncQueueChanged();
+  });
 }
 
 export function loadBukiProfiles() {
@@ -78,21 +94,27 @@ export function loadBukiProfiles() {
 }
 
 export function finishBukiOnboarding(input: Parameters<typeof completeLocalOnboarding>[1]) {
-  return completeLocalOnboarding(requireBukiDatabase(), input);
+  return completeLocalOnboarding(requireBukiDatabase(), input).then(() => {
+    notifySyncQueueChanged();
+  });
 }
 
 export function addBukiChild(
   child: Omit<LocalChildProfile, "ownerId" | "sortOrder" | "createdAt">,
   defaultPadId: string,
 ) {
-  return createLocalChild(requireBukiDatabase(), child, defaultPadId);
+  return createLocalChild(requireBukiDatabase(), child, defaultPadId).then(() => {
+    notifySyncQueueChanged();
+  });
 }
 
 export function editBukiChild(
   childId: string,
   updates: Parameters<typeof updateLocalChild>[2],
 ) {
-  return updateLocalChild(requireBukiDatabase(), childId, updates);
+  return updateLocalChild(requireBukiDatabase(), childId, updates).then(() => {
+    notifySyncQueueChanged();
+  });
 }
 
 export function selectBukiChild(childId: string) {
@@ -100,11 +122,15 @@ export function selectBukiChild(childId: string) {
 }
 
 export function reorderBukiChildren(orderedIds: string[]) {
-  return reorderLocalChildren(requireBukiDatabase(), orderedIds);
+  return reorderLocalChildren(requireBukiDatabase(), orderedIds).then(() => {
+    notifySyncQueueChanged();
+  });
 }
 
 export function removeBukiChild(childId: string) {
-  return deleteLocalChild(requireBukiDatabase(), childId);
+  return deleteLocalChild(requireBukiDatabase(), childId).then(() => {
+    notifySyncQueueChanged();
+  });
 }
 
 export function replayBukiOnboarding() {
@@ -138,6 +164,7 @@ export function loadLibrarySnapshot(): Promise<StoreData> {
 export function enqueueLibrarySnapshot(data: StoreData): void {
   writeQueue = writeQueue
     .then(() => saveLibrary(requireBukiDatabase(), data))
+    .then(() => notifySyncQueueChanged())
     .catch((error) => {
       console.warn("Failed to persist Buki library", error);
     });
@@ -147,8 +174,60 @@ export async function flushLibraryWrites(): Promise<void> {
   await writeQueue;
 }
 
-export function importBukiLibraryArchive(imported: ImportedArchiveLibrary) {
-  return mergeImportedArchive(requireBukiDatabase(), imported);
+export async function importBukiLibraryArchive(imported: ImportedArchiveLibrary) {
+  const db = requireBukiDatabase();
+  const result = await mergeImportedArchive(db, imported);
+  const ownerId = await activeLocalOwnerId(db);
+  if (ownerId) await enqueueFullAccountSnapshot(db, ownerId);
+  notifySyncQueueChanged();
+  return result;
+}
+
+export function loadBukiSyncSummary(ownerId: string) {
+  return loadLocalSyncSummary(requireBukiDatabase(), ownerId);
+}
+
+export function loadReadyBukiSyncOperations(ownerId: string, now?: number, limit?: number) {
+  return loadReadyLocalSyncOperations(requireBukiDatabase(), ownerId, now, limit);
+}
+
+export function completeBukiSyncOperations(ownerId: string, ids: string[]) {
+  return completeLocalSyncOperations(requireBukiDatabase(), ownerId, ids);
+}
+
+export function failBukiSyncOperation(ownerId: string, id: string, error: unknown, now?: number) {
+  return failLocalSyncOperation(requireBukiDatabase(), ownerId, id, error, now);
+}
+
+export function saveBukiAutomaticBackup(ownerId: string, enabled: boolean) {
+  return setLocalAutomaticBackup(requireBukiDatabase(), ownerId, enabled);
+}
+
+export function markBukiSyncCompleted(ownerId: string, completedAt: string) {
+  return markLocalSyncCompleted(requireBukiDatabase(), ownerId, completedAt);
+}
+
+export function getOrCreateBukiSyncDeviceId(generatedId: string) {
+  return getOrCreateLocalSyncDeviceId(requireBukiDatabase(), generatedId);
+}
+
+export async function enqueueBukiSyncDevice(
+  ownerId: string,
+  input: { deviceId: string; appVersion: string | null; pushedAt: string },
+): Promise<void> {
+  await enqueueLocalSyncOperation(requireBukiDatabase(), {
+    ownerId,
+    operation: "upsert",
+    entityType: "sync_device",
+    entityId: input.deviceId,
+    payload: {
+      owner_id: ownerId,
+      device_id: input.deviceId,
+      platform: "ios",
+      app_version: input.appVersion,
+      last_pushed_at: input.pushedAt,
+    },
+  });
 }
 
 export type { ImportedArchiveLibrary };

@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(16);
+select plan(18);
 
 select has_table('public', 'adult_profiles', 'adult_profiles exists');
 select has_table('public', 'child_profiles', 'child_profiles exists');
@@ -28,6 +28,18 @@ select has_function(
 select ok(
   exists(select 1 from storage.buckets where id = 'buki-media' and public = false),
   'Buki media bucket is private'
+);
+select has_trigger(
+  'public',
+  'child_profiles',
+  'child_profiles_reject_tombstone',
+  'child profiles reject stale writes after deletion'
+);
+select has_trigger(
+  'public',
+  'tombstones',
+  'tombstones_keep_latest_delete',
+  'tombstone timestamps never move backwards'
 );
 
 select * from finish();

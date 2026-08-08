@@ -27,6 +27,7 @@ import { useMembership } from "@/store/membership";
 import { confirmAdult } from "@/store/parental-gate";
 import { usePreferences } from "@/store/preferences";
 import { useProfiles, type ChildProfile } from "@/store/profiles";
+import { useCloudSync } from "@/store/sync";
 import type { ProFeature } from "@/subscription/access";
 import { colors } from "@/theme";
 
@@ -54,6 +55,18 @@ function formatDate(value: string | null): string | null {
   const date = new Date(value);
   if (Number.isNaN(date.valueOf())) return null;
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date);
+}
+
+function formatSyncTime(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function adultAvatar(uri: string | null | undefined, name: string): { emoji: string; image: string | null } {
@@ -98,6 +111,13 @@ export function AccountCenter() {
   const requestUpgrade = useMembership((state) => state.requestUpgrade);
   const hapticsEnabled = usePreferences((state) => state.hapticsEnabled);
   const setHapticsEnabled = usePreferences((state) => state.setHapticsEnabled);
+  const automaticBackup = useCloudSync((state) => state.automaticBackup);
+  const syncStatus = useCloudSync((state) => state.status);
+  const pendingSyncCount = useCloudSync((state) => state.pendingCount);
+  const lastSyncedAt = useCloudSync((state) => state.lastSyncedAt);
+  const syncError = useCloudSync((state) => state.error);
+  const setAutomaticBackup = useCloudSync((state) => state.setAutomaticBackup);
+  const syncNow = useCloudSync((state) => state.syncNow);
   const [usage, setUsage] = useState({ localBytes: 0, cloudBytes: 0 });
   const [adultEditorOpen, setAdultEditorOpen] = useState(false);
   const [childDraft, setChildDraft] = useState<ChildDraft | null>(null);
@@ -119,6 +139,21 @@ export function AccountCenter() {
   const renewalDate = formatDate(entitlement.expiresAt);
   const avatar = adultAvatar(profile?.avatarUri, profile?.displayName ?? "Parent");
   const cloudProgress = Math.min(1, usage.cloudBytes / CLOUD_LIMIT);
+  const syncDetail = !capabilities.cloudBackup
+    ? "Buki Pro required"
+    : !automaticBackup
+      ? "Paused on this device"
+      : syncStatus === "syncing"
+        ? `Backing up ${pendingSyncCount || "recent"} change${pendingSyncCount === 1 ? "" : "s"}…`
+        : syncStatus === "offline"
+          ? `Waiting for internet${pendingSyncCount ? ` · ${pendingSyncCount} pending` : ""}`
+          : syncStatus === "error"
+            ? syncError ?? "Backup will retry automatically"
+            : pendingSyncCount
+              ? `${pendingSyncCount} change${pendingSyncCount === 1 ? "" : "s"} waiting to upload`
+              : lastSyncedAt
+                ? `Last backup ${formatSyncTime(lastSyncedAt) ?? "recently"}`
+                : "Ready to back up this library";
 
   useEffect(() => {
     void loadBukiUsage().then(setUsage).catch(() => {});
@@ -360,11 +395,27 @@ export function AccountCenter() {
         <Section title="Cloud Backup" caption="Pro keeps this account’s library available for restore and future devices.">
           <SettingRow
             title="Automatic backup"
-            detail={capabilities.cloudBackup ? "Cloud connection is the next implementation phase" : "Buki Pro required"}
-            right={<Switch value={false} disabled />}
-            onPress={() => void introducePro("cloudBackup", "account_backup_toggle")}
+            detail={syncDetail}
+            right={
+              <Switch
+                value={automaticBackup && capabilities.cloudBackup}
+                disabled={!capabilities.cloudBackup}
+                onValueChange={(value) => void setAutomaticBackup(value)}
+              />
+            }
+            onPress={!capabilities.cloudBackup
+              ? () => void introducePro("cloudBackup", "account_backup_toggle")
+              : undefined}
           />
-          <SettingRow title="Sync now" detail="Not connected yet" onPress={() => void introducePro("cloudBackup", "account_sync_now")} />
+          <SettingRow
+            title="Sync now"
+            detail={pendingSyncCount ? `${pendingSyncCount} pending change${pendingSyncCount === 1 ? "" : "s"}` : "Back up recent changes now"}
+            right={syncStatus === "syncing" ? <ActivityIndicator color={colors.titleTeal} /> : undefined}
+            onPress={() => {
+              if (capabilities.cloudBackup) void syncNow();
+              else void introducePro("cloudBackup", "account_sync_now");
+            }}
+          />
           <SettingRow title="Restore this device" detail="No cloud restore has run" onPress={() => void introducePro("cloudBackup", "account_restore")} />
         </Section>
 

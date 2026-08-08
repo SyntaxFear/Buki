@@ -165,6 +165,21 @@ ALTER TABLE sketchpads ADD COLUMN border TEXT NOT NULL DEFAULT 'none';
 ALTER TABLE sketchpads ADD COLUMN decoration TEXT NOT NULL DEFAULT 'none';
 `;
 
+const SCHEMA_V3 = `
+DELETE FROM sync_queue
+WHERE rowid NOT IN (
+  SELECT MAX(rowid)
+  FROM sync_queue
+  GROUP BY owner_id, entity_type, entity_id
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS sync_queue_owner_entity_idx
+ON sync_queue(owner_id, entity_type, entity_id);
+
+CREATE INDEX IF NOT EXISTS sync_queue_owner_ready_idx
+ON sync_queue(owner_id, available_at, created_at);
+`;
+
 export async function migrateDatabaseSchema(db: SQLiteDatabase): Promise<void> {
   await db.execAsync("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   const current = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
@@ -181,6 +196,13 @@ export async function migrateDatabaseSchema(db: SQLiteDatabase): Promise<void> {
     await db.withExclusiveTransactionAsync(async (tx) => {
       await tx.execAsync(SCHEMA_V2);
       await tx.execAsync("PRAGMA user_version = 2");
+    });
+  }
+
+  if (currentVersion < 3) {
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      await tx.execAsync(SCHEMA_V3);
+      await tx.execAsync("PRAGMA user_version = 3");
     });
   }
 

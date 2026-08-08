@@ -2,6 +2,12 @@ import type { SQLiteDatabase } from "expo-sqlite";
 
 import { getPadDesign } from "@/pad-designs";
 import { activeLocalOwnerId, activePadPreferenceKey } from "./account-repository";
+import {
+  enqueueCurrentAdultProfile,
+  enqueueCurrentChildProfile,
+  enqueueCurrentSketchpad,
+  enqueueEntityDeletion,
+} from "./sync-serialization";
 
 export interface LocalChildProfile {
   id: string;
@@ -166,6 +172,9 @@ export async function completeLocalOnboarding(
         now,
       );
     }
+    await enqueueCurrentAdultProfile(tx, ownerId);
+    await enqueueCurrentChildProfile(tx, ownerId, childId);
+    await enqueueCurrentSketchpad(tx, ownerId, activePadId);
   });
 }
 
@@ -212,6 +221,8 @@ export async function createLocalChild(
       now,
       now,
     );
+    await enqueueCurrentChildProfile(tx, ownerId, child.id);
+    await enqueueCurrentSketchpad(tx, ownerId, defaultPadId);
   });
 }
 
@@ -234,19 +245,22 @@ export async function updateLocalChild(
     ownerId,
   );
   if (!current) throw new Error("Child profile not found.");
-  await db.runAsync(
-    `UPDATE child_profiles SET
-      name = ?, avatar_color = ?, avatar_uri = ?, birth_month = ?, birth_year = ?, updated_at = ?
-     WHERE id = ? AND owner_id = ?`,
-    updates.name ?? current.name,
-    updates.avatarColor ?? current.avatar_color,
-    updates.avatarUri === undefined ? current.avatar_uri : updates.avatarUri,
-    updates.birthMonth === undefined ? current.birth_month : updates.birthMonth,
-    updates.birthYear === undefined ? current.birth_year : updates.birthYear,
-    Date.now(),
-    childId,
-    ownerId,
-  );
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.runAsync(
+      `UPDATE child_profiles SET
+        name = ?, avatar_color = ?, avatar_uri = ?, birth_month = ?, birth_year = ?, updated_at = ?
+       WHERE id = ? AND owner_id = ?`,
+      updates.name ?? current.name,
+      updates.avatarColor ?? current.avatar_color,
+      updates.avatarUri === undefined ? current.avatar_uri : updates.avatarUri,
+      updates.birthMonth === undefined ? current.birth_month : updates.birthMonth,
+      updates.birthYear === undefined ? current.birth_year : updates.birthYear,
+      Date.now(),
+      childId,
+      ownerId,
+    );
+    await enqueueCurrentChildProfile(tx, ownerId, childId);
+  });
 }
 
 export async function setActiveLocalChild(db: SQLiteDatabase, childId: string): Promise<void> {
@@ -274,6 +288,7 @@ export async function reorderLocalChildren(db: SQLiteDatabase, orderedIds: strin
         childId,
         ownerId,
       );
+      await enqueueCurrentChildProfile(tx, ownerId, childId);
     }
   });
 }
@@ -287,6 +302,7 @@ export async function deleteLocalChild(db: SQLiteDatabase, childId: string): Pro
   );
   if ((count?.count ?? 0) <= 1) throw new Error("Buki must keep at least one child profile.");
   await db.withExclusiveTransactionAsync(async (tx) => {
+    await enqueueEntityDeletion(tx, ownerId, "child_profile", childId);
     await tx.runAsync("DELETE FROM child_profiles WHERE id = ? AND owner_id = ?", childId, ownerId);
     const next = await tx.getFirstAsync<{ id: string }>(
       `SELECT id FROM child_profiles

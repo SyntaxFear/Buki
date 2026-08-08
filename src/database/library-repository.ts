@@ -4,6 +4,14 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { migrateStoreData, type Drawing, type StoreData } from "@/store/migrate";
 import { DEFAULT_CHILD_ID } from "./constants";
 import { activeLocalOwnerId, activePadPreferenceKey } from "./account-repository";
+import {
+  artworkTagEntityId,
+  enqueueCurrentArtwork,
+  enqueueCurrentArtworkTag,
+  enqueueCurrentSketchpad,
+  enqueueCurrentTag,
+  enqueueEntityDeletion,
+} from "./sync-serialization";
 
 interface SketchpadRow {
   id: string;
@@ -140,6 +148,27 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
   const now = Date.now();
   const ownerId = await activeLocalOwnerId(db);
   await db.withExclusiveTransactionAsync(async (tx) => {
+    const existingPadIds = ownerId
+      ? new Set((await tx.getAllAsync<{ id: string }>("SELECT id FROM sketchpads WHERE owner_id = ?", ownerId)).map((row) => row.id))
+      : new Set<string>();
+    const existingArtworkIds = ownerId
+      ? new Set((await tx.getAllAsync<{ id: string }>("SELECT id FROM artworks WHERE owner_id = ?", ownerId)).map((row) => row.id))
+      : new Set<string>();
+    const existingTagIds = ownerId
+      ? new Set((await tx.getAllAsync<{ id: string }>("SELECT id FROM tags WHERE owner_id = ?", ownerId)).map((row) => row.id))
+      : new Set<string>();
+    const existingRelations = ownerId
+      ? await tx.getAllAsync<{ artwork_id: string; tag_id: string }>(
+          `SELECT artwork_tags.artwork_id, artwork_tags.tag_id
+           FROM artwork_tags
+           JOIN artworks ON artworks.id = artwork_tags.artwork_id
+           JOIN tags ON tags.id = artwork_tags.tag_id
+           WHERE artworks.owner_id = ? AND tags.owner_id = ?`,
+          ownerId,
+          ownerId,
+        )
+      : [];
+    const nextRelationIds = new Set<string>();
     const artworkIds: string[] = [];
     for (const [sortOrder, pad] of data.pads.entries()) {
       await tx.runAsync(
@@ -173,6 +202,7 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
         pad.createdAt,
         now,
       );
+      if (ownerId) await enqueueCurrentSketchpad(tx, ownerId, pad.id);
 
       for (const drawing of data.drawingsByPad[pad.id] ?? []) {
         artworkIds.push(drawing.id);
@@ -213,8 +243,40 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
           drawing.updatedAt ?? drawing.addedAt,
         );
 
-        await replaceArtworkTags(tx, drawing, ownerId, now);
+        const tagIds = await replaceArtworkTags(tx, drawing, ownerId, now);
         await upsertMediaRows(tx, drawing, ownerId, now);
+        if (ownerId) {
+          await enqueueCurrentArtwork(tx, ownerId, drawing.id);
+          for (const tagId of tagIds) {
+            nextRelationIds.add(artworkTagEntityId(drawing.id, tagId));
+            await enqueueCurrentTag(tx, ownerId, tagId);
+            await enqueueCurrentArtworkTag(tx, ownerId, drawing.id, tagId);
+          }
+        }
+      }
+    }
+
+    if (ownerId) {
+      const nextArtworkIds = new Set(artworkIds);
+      for (const artworkId of existingArtworkIds) {
+        if (!nextArtworkIds.has(artworkId)) {
+          await enqueueEntityDeletion(tx, ownerId, "artwork", artworkId);
+        }
+      }
+      const nextPadIds = new Set(data.pads.map((pad) => pad.id));
+      for (const padId of existingPadIds) {
+        if (!nextPadIds.has(padId)) {
+          await enqueueEntityDeletion(tx, ownerId, "sketchpad", padId);
+        }
+      }
+      for (const relation of existingRelations) {
+        const relationId = artworkTagEntityId(relation.artwork_id, relation.tag_id);
+        if (!nextRelationIds.has(relationId)) {
+          await enqueueEntityDeletion(tx, ownerId, "artwork_tag", relationId, {
+            artwork_id: relation.artwork_id,
+            tag_id: relation.tag_id,
+          });
+        }
       }
     }
 
@@ -258,6 +320,17 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
       ownerId,
       ownerId,
     );
+
+    if (ownerId) {
+      const remainingTagIds = new Set(
+        (await tx.getAllAsync<{ id: string }>("SELECT id FROM tags WHERE owner_id = ?", ownerId)).map((row) => row.id),
+      );
+      for (const tagId of existingTagIds) {
+        if (!remainingTagIds.has(tagId)) {
+          await enqueueEntityDeletion(tx, ownerId, "tag", tagId);
+        }
+      }
+    }
   });
 }
 
@@ -266,7 +339,8 @@ async function replaceArtworkTags(
   drawing: Drawing,
   ownerId: string | null,
   now: number,
-): Promise<void> {
+): Promise<string[]> {
+  const tagIds: string[] = [];
   await db.runAsync("DELETE FROM artwork_tags WHERE artwork_id = ?", drawing.id);
   for (const name of drawing.tags ?? []) {
     const normalizedName = name.trim().toLocaleLowerCase();
@@ -303,7 +377,9 @@ async function replaceArtworkTags(
       tag.id,
       now,
     );
+    tagIds.push(tag.id);
   }
+  return tagIds;
 }
 
 async function upsertMediaRows(

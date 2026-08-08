@@ -1,6 +1,8 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 import type { User } from "@supabase/supabase-js";
 
+import { enqueueCurrentAdultProfile, enqueueFullAccountSnapshot } from "./sync-serialization";
+
 export const ACTIVE_OWNER_KEY = "active_owner_id";
 
 export function activePadPreferenceKey(ownerId: string | null): string {
@@ -63,6 +65,7 @@ export async function activateLocalAccount(db: SQLiteDatabase, user: User): Prom
         now,
       );
     }
+    await enqueueFullAccountSnapshot(tx, user.id);
   });
 }
 
@@ -101,13 +104,16 @@ export async function updateLocalAdultProfile(
   ownerId: string,
   updates: { displayName: string; avatarUri: string | null },
 ): Promise<void> {
-  await db.runAsync(
-    `UPDATE adult_profiles
-     SET display_name = ?, avatar_uri = ?, updated_at = ?
-     WHERE id = ?`,
-    updates.displayName,
-    updates.avatarUri,
-    Date.now(),
-    ownerId,
-  );
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.runAsync(
+      `UPDATE adult_profiles
+       SET display_name = ?, avatar_uri = ?, updated_at = ?
+       WHERE id = ?`,
+      updates.displayName,
+      updates.avatarUri,
+      Date.now(),
+      ownerId,
+    );
+    await enqueueCurrentAdultProfile(tx, ownerId);
+  });
 }

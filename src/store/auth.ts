@@ -17,6 +17,7 @@ import { useDrawings } from "@/store/drawings";
 import { useMembership } from "@/store/membership";
 import { useProfiles } from "@/store/profiles";
 import { usePreferences } from "@/store/preferences";
+import { useCloudSync } from "@/store/sync";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -59,6 +60,7 @@ function errorMessage(error: unknown): string {
 
 async function applySession(session: Session | null): Promise<void> {
   if (!session?.user) {
+    useCloudSync.getState().disconnectUser();
     await useMembership.getState().disconnectUser();
     await clearBukiAccount();
     useAuth.setState({
@@ -89,6 +91,7 @@ async function applySession(session: Session | null): Promise<void> {
   await useProfiles.getState().reloadForAccount();
   usePreferences.getState().resetForAccountSwitch();
   await usePreferences.getState().hydrate();
+  await useCloudSync.getState().initializeForUser(session.user.id);
 }
 
 async function completeOAuth(url: string): Promise<Session | null> {
