@@ -53,16 +53,26 @@ interface AuthState {
 const redirectTo = makeRedirectUri({ scheme: "buki", path: "auth/callback" });
 let initialization: Promise<void> | null = null;
 let listenerInstalled = false;
+let lastAppliedUserId: string | null | undefined;
+let sessionApplication: Promise<void> = Promise.resolve();
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong. Please try again.";
 }
 
-async function applySession(session: Session | null): Promise<void> {
+async function applySessionNow(session: Session | null): Promise<void> {
   if (!session?.user) {
     useCloudSync.getState().disconnectUser();
     await useMembership.getState().disconnectUser();
     await clearBukiAccount();
+    useDrawings.getState().resetForAccountSwitch();
+    useProfiles.getState().resetForAccountSwitch();
+    usePreferences.getState().resetForAccountSwitch();
+    await Promise.all([
+      useDrawings.getState().hydrate(),
+      useProfiles.getState().hydrate(),
+      usePreferences.getState().hydrate(),
+    ]);
     useAuth.setState({
       hydrated: true,
       status: "signedOut",
@@ -70,9 +80,6 @@ async function applySession(session: Session | null): Promise<void> {
       user: null,
       profile: null,
     });
-    useDrawings.getState().resetForAccountSwitch();
-    useProfiles.getState().resetForAccountSwitch();
-    usePreferences.getState().resetForAccountSwitch();
     return;
   }
 
@@ -92,6 +99,17 @@ async function applySession(session: Session | null): Promise<void> {
   usePreferences.getState().resetForAccountSwitch();
   await usePreferences.getState().hydrate();
   await useCloudSync.getState().initializeForUser(session.user.id);
+}
+
+async function applySession(session: Session | null): Promise<void> {
+  const nextUserId = session?.user.id ?? null;
+  const run = sessionApplication.catch(() => {}).then(async () => {
+    if (lastAppliedUserId === nextUserId && useAuth.getState().hydrated) return;
+    await applySessionNow(session);
+    lastAppliedUserId = nextUserId;
+  });
+  sessionApplication = run;
+  await run;
 }
 
 async function completeOAuth(url: string): Promise<Session | null> {
