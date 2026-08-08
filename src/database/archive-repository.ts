@@ -23,6 +23,7 @@ export interface ImportedArchiveLibrary {
 export async function mergeImportedArchive(
   db: SQLiteDatabase,
   imported: ImportedArchiveLibrary,
+  assertImportAllowed: () => void,
 ): Promise<StoreData> {
   const ownerId = await activeLocalOwnerId(db);
   if (!ownerId) throw new Error("Sign in before importing a Buki archive.");
@@ -35,26 +36,6 @@ export async function mergeImportedArchive(
     ownerId,
   );
 
-  await db.withExclusiveTransactionAsync(async (tx) => {
-    for (const [index, child] of imported.children.entries()) {
-      await tx.runAsync(
-        `INSERT INTO child_profiles (
-          id, owner_id, name, avatar_color, avatar_uri, birth_month, birth_year,
-          sort_order, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)`,
-        child.id,
-        ownerId,
-        child.name,
-        child.avatarColor,
-        child.birthMonth,
-        child.birthYear,
-        (count?.count ?? 0) + index,
-        child.createdAt,
-        now,
-      );
-    }
-  });
-
   const next: StoreData = {
     version: 5,
     activePadId: current.activePadId,
@@ -63,7 +44,29 @@ export async function mergeImportedArchive(
   };
 
   try {
-    await saveLibrary(db, next);
+    assertImportAllowed();
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      assertImportAllowed();
+      for (const [index, child] of imported.children.entries()) {
+        await tx.runAsync(
+          `INSERT INTO child_profiles (
+            id, owner_id, name, avatar_color, avatar_uri, birth_month, birth_year,
+            sort_order, created_at, updated_at, deleted_at
+          ) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NULL)`,
+          child.id,
+          ownerId,
+          child.name,
+          child.avatarColor,
+          child.birthMonth,
+          child.birthYear,
+          (count?.count ?? 0) + index,
+          child.createdAt,
+          now,
+        );
+      }
+    });
+    assertImportAllowed();
+    await saveLibrary(db, next, assertImportAllowed);
     await db.withExclusiveTransactionAsync(async (tx) => {
       for (const [artworkId, checksums] of Object.entries(imported.mediaChecksums)) {
         await tx.runAsync(

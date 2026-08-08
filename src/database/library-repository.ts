@@ -145,7 +145,11 @@ export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
   );
 }
 
-export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<void> {
+export async function saveLibrary(
+  db: SQLiteDatabase,
+  data: StoreData,
+  assertWriteAllowed?: () => void,
+): Promise<void> {
   const now = Date.now();
   const ownerId = await activeLocalOwnerId(db);
   await db.withExclusiveTransactionAsync(async (tx) => {
@@ -172,6 +176,7 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
           ownerId,
         )
       : [];
+    assertWriteAllowed?.();
     const nextRelationIds = new Set<string>();
     const nextMediaIds = new Set<string>();
     const artworkIds: string[] = [];

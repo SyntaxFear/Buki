@@ -342,5 +342,6 @@ export const useMembership = create<MembershipState>((set, get) => ({
 }));
 
 export function currentCapabilities(): Capabilities {
-  return useMembership.getState().capabilities;
+  const current = entitlementAtTime(useMembership.getState().entitlement);
+  return resolveCapabilities(tierForEntitlement(current.status));
 }

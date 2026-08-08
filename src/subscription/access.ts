@@ -96,11 +96,20 @@ export function entitlementAtTime(
   snapshot: EntitlementSnapshot,
   now: number = Date.now(),
 ): EntitlementSnapshot {
-  if (
-    (snapshot.status === "active" || snapshot.status === "grace") &&
-    snapshot.expiresAt &&
-    Date.parse(snapshot.expiresAt) <= now
-  ) {
+  if (snapshot.status !== "active" && snapshot.status !== "grace") return snapshot;
+
+  if (!snapshot.expiresAt) {
+    if (snapshot.product === "monthly" || snapshot.product === "yearly") {
+      return { ...snapshot, status: "unknown", willRenew: false };
+    }
+    return snapshot;
+  }
+
+  const expiration = Date.parse(snapshot.expiresAt);
+  if (!Number.isFinite(expiration)) {
+    return { ...snapshot, status: "unknown", willRenew: false };
+  }
+  if (expiration <= now) {
     return { ...snapshot, status: "expired", willRenew: false };
   }
   return snapshot;

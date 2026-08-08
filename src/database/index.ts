@@ -191,9 +191,13 @@ export async function flushLibraryWrites(): Promise<void> {
   await writeQueue;
 }
 
-export async function importBukiLibraryArchive(imported: ImportedArchiveLibrary) {
+export async function importBukiLibraryArchive(
+  imported: ImportedArchiveLibrary,
+  assertImportAllowed: () => void,
+) {
+  assertImportAllowed();
   const db = requireBukiDatabase();
-  const result = await mergeImportedArchive(db, imported);
+  const result = await mergeImportedArchive(db, imported, assertImportAllowed);
   const ownerId = await activeLocalOwnerId(db);
   if (ownerId) await enqueueFullAccountSnapshot(db, ownerId);
   notifySyncQueueChanged();

@@ -69,6 +69,36 @@ describe("Buki access capabilities", () => {
     ).toMatchObject({ status: "expired", willRenew: false });
   });
 
+  it.each(["monthly", "yearly"] as const)(
+    "fails a cached %s subscription closed when its expiration is missing",
+    (product) => {
+      expect(
+        entitlementAtTime({
+          product,
+          status: "active",
+          expiresAt: null,
+          willRenew: true,
+          checkedAt: "2026-08-08T00:00:00Z",
+        }),
+      ).toMatchObject({ status: "unknown", willRenew: false });
+    },
+  );
+
+  it.each(["monthly", "yearly", "lifetime"] as const)(
+    "fails a cached %s entitlement closed when its expiration is malformed",
+    (product) => {
+      expect(
+        entitlementAtTime({
+          product,
+          status: "active",
+          expiresAt: "not-a-store-date",
+          willRenew: true,
+          checkedAt: "2026-08-08T00:00:00Z",
+        }),
+      ).toMatchObject({ status: "unknown", willRenew: false });
+    },
+  );
+
   it("keeps lifetime access active without an expiration date", () => {
     expect(
       entitlementAtTime(
