@@ -1,14 +1,15 @@
+import { Image } from "expo-image";
 import { SymbolView } from "expo-symbols";
 import { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  cancelAnimation,
   Easing,
   interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,6 +18,13 @@ import { Glass } from "@/components/glass";
 import type { Drawing } from "@/store/drawings";
 import { colors } from "@/theme";
 import { fitRect, type Rect } from "@/utils/book-layout";
+import {
+  clampViewerTransform,
+  getDoubleTapViewerTarget,
+} from "@/utils/image-viewer-transform";
+
+const TRANSFORM_MS = 200;
+const SETTLE_MS = 160;
 
 interface Props {
   drawing: Drawing;
@@ -57,58 +65,104 @@ export function DrawingViewer({ drawing, originRect, onClose }: Props) {
 
   useEffect(() => {
     photoFade.value = withTiming(mode === "photo" ? 1 : 0, { duration: 240 });
-  }, [mode, photoFade]);
+    cancelAnimation(scale);
+    cancelAnimation(tx);
+    cancelAnimation(ty);
+    const config = { duration: TRANSFORM_MS, easing: Easing.out(Easing.cubic) };
+    scale.value = withTiming(1, config);
+    tx.value = withTiming(0, config);
+    ty.value = withTiming(0, config);
+  }, [mode, photoFade, scale, tx, ty]);
 
   const close = () => {
-    scale.value = withTiming(1, { duration: 160 });
-    tx.value = withTiming(0, { duration: 160 });
-    ty.value = withTiming(0, { duration: 160 });
+    cancelAnimation(scale);
+    cancelAnimation(tx);
+    cancelAnimation(ty);
+    const config = { duration: SETTLE_MS, easing: Easing.out(Easing.cubic) };
+    scale.value = withTiming(1, config);
+    tx.value = withTiming(0, config);
+    ty.value = withTiming(0, config);
     open.value = withTiming(0, { duration: 280, easing: Easing.in(Easing.cubic) }, (finished) => {
       if (finished) runOnJS(onClose)();
     });
   };
 
-  const clampBack = () => {
+  const settleToBounds = () => {
     "worklet";
-    if (scale.value < 1) {
-      scale.value = withSpring(1, { damping: 18, stiffness: 220 });
-      tx.value = withSpring(0, { damping: 18, stiffness: 220 });
-      ty.value = withSpring(0, { damping: 18, stiffness: 220 });
-    }
+    const target = clampViewerTransform(
+      { scale: scale.value, x: tx.value, y: ty.value },
+      { width: destRect.width, height: destRect.height },
+    );
+    const config = { duration: SETTLE_MS, easing: Easing.out(Easing.cubic) };
+    scale.value = withTiming(target.scale, config);
+    tx.value = withTiming(target.x, config);
+    ty.value = withTiming(target.y, config);
   };
 
   const pinch = Gesture.Pinch()
     .onStart(() => {
+      cancelAnimation(scale);
+      cancelAnimation(tx);
+      cancelAnimation(ty);
       savedScale.value = scale.value;
-    })
-    .onUpdate((e) => {
-      scale.value = Math.min(6, savedScale.value * e.scale);
-    })
-    .onEnd(clampBack);
-
-  const pan = Gesture.Pan()
-    .onStart(() => {
       savedTx.value = tx.value;
       savedTy.value = ty.value;
     })
     .onUpdate((e) => {
-      tx.value = savedTx.value + e.translationX;
-      ty.value = savedTy.value + e.translationY;
+      const target = clampViewerTransform(
+        {
+          scale: savedScale.value * e.scale,
+          x: savedTx.value,
+          y: savedTy.value,
+        },
+        { width: destRect.width, height: destRect.height },
+      );
+      scale.value = target.scale;
+      tx.value = target.x;
+      ty.value = target.y;
     })
-    .onEnd(() => {
-      clampBack();
-    });
+    .onEnd(settleToBounds);
+
+  const pan = Gesture.Pan()
+    .onStart(() => {
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      savedTx.value = tx.value;
+      savedTy.value = ty.value;
+    })
+    .onUpdate((e) => {
+      const target = clampViewerTransform(
+        {
+          scale: scale.value,
+          x: savedTx.value + e.translationX,
+          y: savedTy.value + e.translationY,
+        },
+        { width: destRect.width, height: destRect.height },
+      );
+      tx.value = target.x;
+      ty.value = target.y;
+    })
+    .onEnd(settleToBounds);
 
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
-    .onEnd(() => {
-      if (scale.value > 1.05) {
-        scale.value = withSpring(1, { damping: 16, stiffness: 200 });
-        tx.value = withSpring(0, { damping: 16, stiffness: 200 });
-        ty.value = withSpring(0, { damping: 16, stiffness: 200 });
-      } else {
-        scale.value = withSpring(2.4, { damping: 16, stiffness: 200 });
-      }
+    .maxDuration(400)
+    .maxDelay(350)
+    .maxDistance(16)
+    .onEnd((e, success) => {
+      if (!success) return;
+      cancelAnimation(scale);
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      const target = getDoubleTapViewerTarget(
+        { scale: scale.value, x: tx.value, y: ty.value },
+        { x: e.x, y: e.y },
+        { width: destRect.width, height: destRect.height },
+      );
+      const config = { duration: TRANSFORM_MS, easing: Easing.out(Easing.cubic) };
+      scale.value = withTiming(target.scale, config);
+      tx.value = withTiming(target.x, config);
+      ty.value = withTiming(target.y, config);
     });
 
   const gestures = Gesture.Simultaneous(pinch, pan, doubleTap);
@@ -145,12 +199,24 @@ export function DrawingViewer({ drawing, originRect, onClose }: Props) {
 
       <GestureDetector gesture={gestures}>
         <Animated.View style={imageStyle}>
-          <Animated.View style={[StyleSheet.absoluteFill, drawingOpacity]}>
-            <Image source={{ uri: drawing.uri }} style={styles.img} resizeMode="contain" />
+          <Animated.View style={[StyleSheet.absoluteFill, styles.drawingCard, drawingOpacity]}>
+            <Image
+              source={{ uri: drawing.uri }}
+              style={styles.img}
+              contentFit="contain"
+              accessible={mode === "drawing"}
+              accessibilityLabel="Scanned drawing cutout"
+            />
           </Animated.View>
           {drawing.photoUri ? (
             <Animated.View style={[StyleSheet.absoluteFill, styles.photoCard, photoOpacity]}>
-              <Image source={{ uri: drawing.photoUri }} style={styles.img} resizeMode="contain" />
+              <Image
+                source={{ uri: drawing.photoUri }}
+                style={styles.img}
+                contentFit="contain"
+                accessible={mode === "photo"}
+                accessibilityLabel="Original camera photo"
+              />
             </Animated.View>
           ) : null}
         </Animated.View>
@@ -160,6 +226,9 @@ export function DrawingViewer({ drawing, originRect, onClose }: Props) {
         <Glass tint="#1E1A16" fallbackColor="rgba(255,247,238,0.18)" style={styles.closeBtn}>
           <Pressable
             onPress={close}
+            accessibilityRole="button"
+            accessibilityLabel="Close image viewer"
+            hitSlop={8}
             style={({ pressed }) => [StyleSheet.absoluteFill, styles.closeBtnTouchable, pressed && { opacity: 0.8 }]}
           >
             <SymbolView name="xmark" size={17} tintColor="#F5F2ED" />
@@ -170,22 +239,25 @@ export function DrawingViewer({ drawing, originRect, onClose }: Props) {
       {drawing.photoUri ? (
         <Animated.View style={[styles.togglePillWrap, { bottom: insets.bottom + 30 }, chromeStyle]}>
           <Glass tint="#1E1A16" fallbackColor="rgba(255,247,238,0.14)" style={styles.togglePill}>
-          {(
-            [
-              { key: "drawing", label: "Drawing" },
-              { key: "photo", label: "Photo" },
-            ] as const
-          ).map((opt) => (
-            <Pressable
-              key={opt.key}
-              onPress={() => setMode(opt.key)}
-              style={[styles.toggleOpt, mode === opt.key && styles.toggleOptActive]}
-            >
-              <Text style={[styles.toggleText, mode === opt.key && styles.toggleTextActive]}>
-                {opt.label}
-              </Text>
-            </Pressable>
-          ))}
+            {(
+              [
+                { key: "drawing", label: "Drawing" },
+                { key: "photo", label: "Photo" },
+              ] as const
+            ).map((opt) => (
+              <Pressable
+                key={opt.key}
+                onPress={() => setMode(opt.key)}
+                accessibilityRole="button"
+                accessibilityLabel={`Show ${opt.label.toLowerCase()}`}
+                accessibilityState={{ selected: mode === opt.key }}
+                style={[styles.toggleOpt, mode === opt.key && styles.toggleOptActive]}
+              >
+                <Text style={[styles.toggleText, mode === opt.key && styles.toggleTextActive]}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            ))}
           </Glass>
         </Animated.View>
       ) : null}
@@ -201,8 +273,15 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  drawingCard: {
+    borderRadius: 14,
+    borderCurve: "continuous",
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
+  },
   photoCard: {
     borderRadius: 14,
+    borderCurve: "continuous",
     overflow: "hidden",
     backgroundColor: "#0E0C0A",
   },

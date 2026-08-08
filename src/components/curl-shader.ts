@@ -1,31 +1,53 @@
-import { Skia, type SkImage } from "@shopify/react-native-skia";
+import { PaintStyle, Skia, type SkImage } from "@shopify/react-native-skia";
 
 import type { Drawing } from "@/store/drawings";
 import { colors } from "@/theme";
 import { fitRect, type Rect } from "@/utils/book-layout";
+import { PAD_GEOMETRY } from "@/pad-designs";
+
+export const PAGE_FACE_RADIUS = PAD_GEOMETRY.pageRadius;
+export const PAGE_DOT_INSET = 12;
+export const PAGE_DOT_END_INSET = 6;
+export const PAGE_DOT_STEP = 17;
+export const PAGE_DOT_RADIUS = 0.9;
 
 /**
- * Page curl as a cylinder roll. Generalized over the roll axis: `transpose 0`
- * rolls left/right around a vertical axis at the spine (horizontal spread
- * book), `transpose 1` rolls up/down around the top binding (vertical flip
- * pad). `u` runs along the roll direction from the spine/binding; `v` runs
- * across it. Front/back faces are sampled from child shaders in natural
- * screen orientation; output is transparent wherever the page has peeled
- * away so the underlying page shows through.
+ * A soft, two-sided page fold inspired by StPageFlip's geometry: the free
+ * corner leads the motion, a diagonal crease travels toward the binding, and
+ * separate inner/outer shadows preserve the sense of paper thickness. The
+ * same canonical shader is transposed for top-bound pads.
  */
-const CURL_SKSL = `
+const PAGE_FLIP_SKSL = `
 uniform shader page;
 uniform shader back;
+uniform shader underLeft;
+uniform shader underRight;
 uniform float2 origin;
 uniform float2 size;
 uniform float t;
 uniform float transposed;
 uniform float spineOff;
-uniform float hasBack;
+uniform float curl;
+uniform float hasLeftBase;
 
 half4 sampleFront(float s, float v) {
   float2 c = transposed > 0.5 ? float2(v, s) : float2(s, v);
   return page.eval(c);
+}
+
+half4 sampleBack(float s, float v, float pw) {
+  float2 c = transposed > 0.5 ? float2(v, pw - s) : float2(pw - s, v);
+  return back.eval(c);
+}
+
+half4 sampleUnderLeft(float s, float v) {
+  float2 c = transposed > 0.5 ? float2(v, s) : float2(s, v);
+  return underLeft.eval(c);
+}
+
+half4 sampleUnderRight(float s, float v) {
+  float2 c = transposed > 0.5 ? float2(v, s) : float2(s, v);
+  return underRight.eval(c);
 }
 
 half4 main(float2 xy) {
@@ -40,66 +62,82 @@ half4 main(float2 xy) {
     return half4(0.0);
   }
 
-  float R = pw * 0.16;
-  float c = pw - t * (pw + PI * R + R);
-  float fade = 1.0 - smoothstep(0.86, 1.0, t);
-  float dx = u - c;
+  float progress = clamp(t, 0.0, 1.0);
+  float bend = sin(progress * PI);
+  float anchor = clamp(curl, 0.08, 0.92);
+  float cross = clamp(v / max(ph, 1.0), 0.0, 1.0);
+  float side = anchor < 0.5 ? 1.0 : -1.0;
 
-  // Soft shadow cast on the page underneath, just ahead of the roll
-  if (dx > R && dx <= R * 2.4) {
-    float k = 1.0 - (dx - R) / (R * 1.4);
-    return half4(0.0, 0.0, 0.0, 0.26 * k * k) * fade;
+  // The crease is straight at rest and at landing, but diagonal while the
+  // selected corner is leading. Its free edge travels from +pw to -pw, which
+  // is the same 50% completion geometry used by StPageFlip.
+  float tilt = pw * 0.42 * bend;
+  float crease = pw * (1.0 - progress) + side * tilt * (cross - anchor);
+  float tip = 2.0 * crease - pw;
+  float shadowWidth = max(8.0, pw * (0.05 + 0.13 * bend));
+
+  // Paint the stationary pages inside this same shader pass. This makes the
+  // first and last frames visually complete even if React mounts or removes
+  // the flip node one frame earlier/later under load.
+  half4 result = half4(0.0);
+  if (u >= 0.0 && u <= pw) {
+    result = sampleUnderRight(u, v);
+  } else if (hasLeftBase > 0.5 && u >= -pw && u < 0.0) {
+    result = sampleUnderLeft(u + pw, v);
   }
 
-  // The roll itself: two layers wrap the cylinder; the far side is on top
-  if (dx > 0.0 && dx <= R) {
-    float ratio = clamp(dx / R, 0.0, 1.0);
-    float a1 = asin(ratio);
-    float a2 = PI - a1;
-    float s2 = c + R * a2;
-    if (s2 >= 0.0 && s2 <= pw) {
-      half4 col = sampleFront(s2, v);
-      float shade = 0.72 + 0.28 * ratio;
-      return half4(col.rgb * shade, col.a) * fade;
-    }
-    float s1 = c + R * a1;
-    if (s1 >= 0.0 && s1 <= pw) {
-      half4 col = sampleFront(s1, v);
-      float shade = 0.86 + 0.14 * (1.0 - ratio);
-      return half4(col.rgb * shade, col.a) * fade;
-    }
-    return half4(0.0);
+  // Flat portion still attached to the binding.
+  if (u >= 0.0 && u <= pw && u <= crease) {
+    half4 front = sampleFront(u, v);
+    float nearCrease = 1.0 - clamp((crease - u) / shadowWidth, 0.0, 1.0);
+    float shade = 1.0 - 0.18 * bend * nearCrease;
+    result = half4(front.rgb * shade, front.a);
   }
 
-  if (u <= c) {
-    // Back of the page, laid over whatever is behind the roll
-    float sBack = 2.0 * c + PI * R - u;
-    if (sBack >= 0.0 && sBack <= pw && u >= -pw - spineOff) {
-      float edge = clamp((c - u) / (R * 1.5), 0.0, 1.0);
-      float shade = 0.90 + 0.08 * edge;
-      half3 cream = half3(0.985, 0.964, 0.925);
-      half3 rgb = cream;
-      if (hasBack > 0.5) {
-        float2 bc = transposed > 0.5 ? float2(v, pw - sBack) : float2(pw - sBack, v);
-        half4 bcol = back.eval(bc);
-        rgb = mix(cream, bcol.rgb, bcol.a);
-      }
-      return half4(rgb * shade, 1.0) * fade;
-    }
-    // Still-flat part of the page, attached at the spine
-    if (u >= 0.0 && u <= pw) {
-      half4 col = sampleFront(u, v);
-      float sh = 1.0 - 0.22 * exp(-abs(c - u) / max(R * 0.8, 1.0));
-      return half4(col.rgb * sh, col.a);
+  // Shadow on the page being uncovered, directly beyond the travelling fold.
+  if (u > crease && u <= crease + shadowWidth) {
+    float falloff = 1.0 - (u - crease) / shadowWidth;
+    float shade = 0.24 * bend * falloff * falloff;
+    result = half4(result.rgb * (1.0 - shade), result.a);
+  }
+
+  // The free edge needs only a narrow contact shadow. Tying this width to the
+  // page-sized crease shadow made tall pads produce a second triangular end.
+  float tipShadowWidth = 2.0 + 5.0 * bend;
+  if (u < tip && u >= tip - tipShadowWidth) {
+    float falloff = 1.0 - (tip - u) / tipShadowWidth;
+    float shade = 0.10 * bend * falloff * falloff;
+    result = half4(result.rgb * (1.0 - shade), result.a);
+  }
+
+  // Folded portion. Mirroring across the crease preserves the sheet's length;
+  // the back snapshot is sampled in display orientation for the receiving page.
+  if (crease < pw && u >= tip && u <= crease) {
+    float source = 2.0 * crease - u;
+    if (source >= 0.0 && source <= pw) {
+      half4 folded = sampleBack(source, v, pw);
+      float foldSpan = max(crease - tip, 1.0);
+      float foldPosition = clamp((crease - u) / foldSpan, 0.0, 1.0);
+      float creaseShade = smoothstep(0.02, 0.72, foldPosition);
+      float rim = 1.0 - smoothstep(0.0, 0.16, foldPosition);
+      float freeEdge = smoothstep(0.88, 1.0, foldPosition);
+      float curvedShade = 0.76 + 0.22 * creaseShade + 0.08 * rim;
+      float shade = mix(1.0, curvedShade, bend);
+      shade *= 1.0 - 0.06 * bend * freeEdge;
+      float tipAlpha = smoothstep(tip - 1.2, tip + 1.2, u);
+      float creaseAlpha = 1.0 - smoothstep(crease, crease + 1.2, u);
+      float alpha = tipAlpha * creaseAlpha * folded.a;
+      result = mix(result, half4(folded.rgb * shade, folded.a), alpha);
     }
   }
-  return half4(0.0);
+
+  return result;
 }
 `;
 
-export const CURL_EFFECT = Skia.RuntimeEffect.Make(CURL_SKSL);
-if (!CURL_EFFECT) {
-  console.warn("Buki: page-curl shader failed to compile, using fold fallback");
+export const PAGE_FLIP_EFFECT = Skia.RuntimeEffect.Make(PAGE_FLIP_SKSL);
+if (!PAGE_FLIP_EFFECT) {
+  console.warn("Buki: page-flip shader failed to compile");
 }
 
 export interface FaceItem {
@@ -110,17 +148,22 @@ export interface FaceItem {
 }
 
 /**
- * Render one page face — cream rounded page, dot grid, and any drawings
+ * Render one page face — rounded paper, dot grid, and any drawings
  * fitted into their slots — as an offscreen image in natural screen
- * orientation (pageW × pageH points, 2x supersampled).
+ * orientation (pageW × pageH points, 3x supersampled).
  */
 export function buildFaceSnapshot(
   pageW: number,
   pageH: number,
   items: FaceItem[],
   pageColor: string = colors.page,
+  dotColor: string = colors.gridDot,
+  guideRects: Rect[] = [],
+  guideColor: string = colors.slotBorder,
 ): SkImage | null {
-  const SS = 2;
+  // Match modern 3x iPhone screens so curved page edges remain smooth while
+  // the sheet is moving through the shader.
+  const SS = 3;
   const surface = Skia.Surface.Make(Math.ceil(pageW * SS), Math.ceil(pageH * SS));
   if (!surface) return null;
   const canvas = surface.getCanvas();
@@ -128,13 +171,50 @@ export function buildFaceSnapshot(
 
   const pagePaint = Skia.Paint();
   pagePaint.setColor(Skia.Color(pageColor));
-  canvas.drawRRect(Skia.RRectXY(Skia.XYWHRect(0, 0, pageW, pageH), 8, 8), pagePaint);
+  canvas.drawRRect(
+    Skia.RRectXY(
+      Skia.XYWHRect(0, 0, pageW, pageH),
+      PAGE_FACE_RADIUS,
+      PAGE_FACE_RADIUS,
+    ),
+    pagePaint,
+  );
+
+  const borderPaint = Skia.Paint();
+  borderPaint.setColor(Skia.Color(colors.border));
+  borderPaint.setStyle(PaintStyle.Stroke);
+  borderPaint.setStrokeWidth(1);
+  canvas.drawRRect(
+    Skia.RRectXY(
+      Skia.XYWHRect(2, 2, pageW - 4, pageH - 4),
+      PAGE_FACE_RADIUS - 2,
+      PAGE_FACE_RADIUS - 2,
+    ),
+    borderPaint,
+  );
 
   const dotPaint = Skia.Paint();
-  dotPaint.setColor(Skia.Color("rgba(120,100,70,0.09)"));
-  for (let y = 12; y < pageH - 6; y += 17) {
-    for (let x = 12; x < pageW - 6; x += 17) {
-      canvas.drawCircle(x, y, 0.9, dotPaint);
+  dotPaint.setColor(Skia.Color(dotColor));
+  for (let y = PAGE_DOT_INSET; y < pageH - PAGE_DOT_END_INSET; y += PAGE_DOT_STEP) {
+    for (let x = PAGE_DOT_INSET; x < pageW - PAGE_DOT_END_INSET; x += PAGE_DOT_STEP) {
+      canvas.drawCircle(x, y, PAGE_DOT_RADIUS, dotPaint);
+    }
+  }
+
+  if (guideRects.length > 0) {
+    const guidePaint = Skia.Paint();
+    guidePaint.setColor(Skia.Color(guideColor));
+    guidePaint.setStyle(PaintStyle.Stroke);
+    guidePaint.setStrokeWidth(1.25);
+    for (const guide of guideRects) {
+      canvas.drawRRect(
+        Skia.RRectXY(
+          Skia.XYWHRect(guide.x, guide.y, guide.width, guide.height),
+          PAD_GEOMETRY.slotRadius,
+          PAD_GEOMETRY.slotRadius,
+        ),
+        guidePaint,
+      );
     }
   }
 

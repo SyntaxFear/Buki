@@ -1,11 +1,9 @@
 import {
   Blur,
   Canvas,
-  DashPathEffect,
   Group,
   Image as SkiaImage,
   ImageShader,
-  Line,
   LinearGradient,
   Path,
   Rect,
@@ -15,15 +13,26 @@ import {
   vec,
   type SkImage,
 } from "@shopify/react-native-skia";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { StyleSheet, useWindowDimensions } from "react-native";
 import { useDerivedValue, type SharedValue } from "react-native-reanimated";
 
-import { buildFaceSnapshot, CURL_EFFECT } from "@/components/curl-shader";
+import {
+  buildFaceSnapshot,
+  PAGE_FLIP_EFFECT,
+  PAGE_DOT_END_INSET,
+  PAGE_DOT_INSET,
+  PAGE_DOT_RADIUS,
+  PAGE_DOT_STEP,
+  PAGE_FACE_RADIUS,
+} from "@/components/curl-shader";
+import { BindingRing, PadStampMark, PadTab } from "@/components/pad-ornaments";
+import { getPadDesign, PAD_GEOMETRY, type PadDesignId } from "@/pad-designs";
 import type { Drawing } from "@/store/drawings";
 import { colors, padDarkColor } from "@/theme";
 import { useImageCache } from "@/utils/image-cache";
 import { fitRect, type BookLayout, type Rect as LayoutRect } from "@/utils/book-layout";
+import { logPageFlip } from "@/utils/page-flip";
 
 export interface FlipState {
   from: number;
@@ -37,8 +46,10 @@ interface Props {
   spread: number;
   flip: FlipState | null;
   flipAnim: SharedValue<number>;
+  flipCurl: SharedValue<number>;
   coverColor?: string;
   pageColor?: string;
+  design?: PadDesignId;
 }
 
 function DrawingOnPage({
@@ -65,48 +76,23 @@ function DrawingOnPage({
   );
 }
 
-/** Short colored sparkle ticks, like the accents around the original's pages. */
-function Confetti({ cx, cy, seed }: { cx: number; cy: number; seed: number }) {
-  const ticks = useMemo(() => {
-    const out: { x1: number; y1: number; x2: number; y2: number; color: string }[] = [];
-    for (let i = 0; i < 6; i++) {
-      const angle = ((seed * 37 + i * 61) % 360) * (Math.PI / 180);
-      const r0 = 6 + ((seed + i * 13) % 5);
-      const len = 7 + ((seed * 3 + i * 7) % 6);
-      out.push({
-        x1: cx + Math.cos(angle) * r0,
-        y1: cy + Math.sin(angle) * r0,
-        x2: cx + Math.cos(angle) * (r0 + len),
-        y2: cy + Math.sin(angle) * (r0 + len),
-        color: colors.confetti[(seed + i) % colors.confetti.length],
-      });
-    }
-    return out;
-  }, [cx, cy, seed]);
-
-  return (
-    <>
-      {ticks.map((t, i) => (
-        <Line
-          key={i}
-          p1={vec(t.x1, t.y1)}
-          p2={vec(t.x2, t.y2)}
-          color={t.color}
-          strokeWidth={2.6}
-          strokeCap="round"
-          opacity={0.95}
-        />
-      ))}
-    </>
-  );
-}
-
-export function Scrapbook({ layout, drawings, spread, flip, flipAnim, coverColor, pageColor }: Props) {
+export function Scrapbook({
+  layout,
+  drawings,
+  spread,
+  flip,
+  flipAnim,
+  flipCurl,
+  coverColor,
+  pageColor,
+  design,
+}: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { book, leftPage, rightPage, leftSlot, rightSlot, spineX } = layout;
-  const cover = coverColor ?? colors.bookBorder;
-  const paper = pageColor ?? colors.page;
-  const coverDark = padDarkColor(cover);
+  const palette = getPadDesign(design, coverColor);
+  const cover = coverColor ?? palette.cover;
+  const paper = pageColor ?? palette.paper;
+  const coverDark = cover === palette.cover ? palette.coverDark : padDarkColor(cover);
 
   const dir = flip ? Math.sign(flip.to - flip.from) : 1;
   const fromIdx = flip ? flip.from : spread;
@@ -115,12 +101,14 @@ export function Scrapbook({ layout, drawings, spread, flip, flipAnim, coverColor
   // Which drawings play which role during a flip (see design note in
   // curl-shader.ts): the turning page's front is the outgoing right page and
   // its back is the incoming left page.
-  const staticLeft = flip ? (dir > 0 ? drawings[2 * fromIdx] : drawings[2 * toIdx]) : drawings[2 * spread];
-  const underRight = flip
+  const staticLeft = drawings[2 * spread];
+  const staticRight = drawings[2 * spread + 1];
+  const baseLeft = flip ? (dir > 0 ? drawings[2 * fromIdx] : drawings[2 * toIdx]) : staticLeft;
+  const baseRight = flip
     ? dir > 0
       ? drawings[2 * toIdx + 1]
       : drawings[2 * fromIdx + 1]
-    : drawings[2 * spread + 1];
+    : staticRight;
   const frontFace = flip ? (dir > 0 ? drawings[2 * fromIdx + 1] : drawings[2 * toIdx + 1]) : undefined;
   const backFace = flip ? (dir > 0 ? drawings[2 * toIdx] : drawings[2 * fromIdx]) : undefined;
 
@@ -132,22 +120,29 @@ export function Scrapbook({ layout, drawings, spread, flip, flipAnim, coverColor
 
   const dotsPath = useMemo(() => {
     const p = Skia.Path.Make();
-    for (let y = leftPage.y + 12; y < leftPage.y + leftPage.height - 6; y += 17) {
-      for (let x = leftPage.x + 12; x < rightPage.x + rightPage.width - 6; x += 17) {
-        p.addCircle(x, y, 0.9);
+    for (
+      let y = leftPage.y + PAGE_DOT_INSET;
+      y < leftPage.y + leftPage.height - PAGE_DOT_END_INSET;
+      y += PAGE_DOT_STEP
+    ) {
+      for (
+        let x = leftPage.x + PAGE_DOT_INSET;
+        x < rightPage.x + rightPage.width - PAGE_DOT_END_INSET;
+        x += PAGE_DOT_STEP
+      ) {
+        p.addCircle(x, y, PAGE_DOT_RADIUS);
       }
     }
     return p;
   }, [leftPage, rightPage]);
 
-  const spinePath = useMemo(() => {
-    const p = Skia.Path.Make();
-    p.moveTo(spineX, book.y + 16);
-    p.lineTo(spineX, book.y + book.height - 16);
-    return p;
-  }, [spineX, book]);
+  const spineRings = useMemo(() => {
+    const out: number[] = [];
+    for (let y = book.y + 30; y < book.y + book.height - 22; y += 38) out.push(y);
+    return out;
+  }, [book]);
 
-  const slotLocal = useMemo(
+  const rightSlotLocal = useMemo(
     () => ({
       x: rightSlot.x - rightPage.x,
       y: rightSlot.y - rightPage.y,
@@ -157,63 +152,174 @@ export function Scrapbook({ layout, drawings, spread, flip, flipAnim, coverColor
     [rightSlot, rightPage],
   );
 
+  const leftSlotLocal = useMemo(
+    () => ({
+      x: leftSlot.x - leftPage.x,
+      y: leftSlot.y - leftPage.y,
+      width: leftSlot.width,
+      height: leftSlot.height,
+    }),
+    [leftSlot, leftPage],
+  );
+
   const frontImage = imageFor(frontFace);
   const backImage = imageFor(backFace);
 
   const frontSnapshot = useMemo(() => {
-    if (!flip || !CURL_EFFECT) return null;
-    const items = frontFace ? [{ drawing: frontFace, image: frontImage, slotLocal }] : [];
-    return buildFaceSnapshot(rightPage.width, rightPage.height, items, paper);
-  }, [flip, frontFace, frontImage, rightPage, slotLocal]);
+    if (!flip || !PAGE_FLIP_EFFECT) return null;
+    const items = frontFace ? [{ drawing: frontFace, image: frontImage, slotLocal: rightSlotLocal }] : [];
+    return buildFaceSnapshot(rightPage.width, rightPage.height, items, paper, palette.gridDot);
+  }, [flip, frontFace, frontImage, paper, palette.gridDot, rightPage, rightSlotLocal]);
 
   const backSnapshot = useMemo(() => {
-    if (!flip || !CURL_EFFECT) return null;
-    const items = backFace ? [{ drawing: backFace, image: backImage, slotLocal }] : [];
-    return buildFaceSnapshot(rightPage.width, rightPage.height, items, paper);
-  }, [flip, backFace, backImage, rightPage, slotLocal]);
+    if (!flip || !PAGE_FLIP_EFFECT) return null;
+    const items = backFace ? [{ drawing: backFace, image: backImage, slotLocal: leftSlotLocal }] : [];
+    return buildFaceSnapshot(rightPage.width, rightPage.height, items, paper, palette.gridDot);
+  }, [flip, backFace, backImage, paper, palette.gridDot, rightPage, leftSlotLocal]);
 
-  const curlUniforms = useDerivedValue(() => ({
+  const baseLeftSnapshot = useMemo(() => {
+    if (!flip || !PAGE_FLIP_EFFECT) return null;
+    const image = imageFor(baseLeft);
+    const items = baseLeft ? [{ drawing: baseLeft, image, slotLocal: leftSlotLocal }] : [];
+    return buildFaceSnapshot(leftPage.width, leftPage.height, items, paper, palette.gridDot);
+  }, [baseLeft, flip, leftPage, leftSlotLocal, lookup, paper, palette.gridDot]);
+
+  const baseRightSnapshot = useMemo(() => {
+    if (!flip || !PAGE_FLIP_EFFECT) return null;
+    const image = imageFor(baseRight);
+    const items = baseRight ? [{ drawing: baseRight, image, slotLocal: rightSlotLocal }] : [];
+    return buildFaceSnapshot(rightPage.width, rightPage.height, items, paper, palette.gridDot);
+  }, [baseRight, flip, lookup, paper, palette.gridDot, rightPage, rightSlotLocal]);
+
+  useEffect(() => {
+    if (!flip) return;
+    logPageFlip("renderer-ready", {
+      mode: "spread",
+      from: flip.from,
+      to: flip.to,
+      shader: Boolean(PAGE_FLIP_EFFECT),
+      front: Boolean(frontSnapshot),
+      back: Boolean(backSnapshot),
+      underLeft: Boolean(baseLeftSnapshot),
+      underRight: Boolean(baseRightSnapshot),
+    });
+  }, [backSnapshot, baseLeftSnapshot, baseRightSnapshot, flip, frontSnapshot]);
+
+  const flipUniforms = useDerivedValue(() => ({
     origin: [leftPage.x, rightPage.y],
     size: [rightPage.width, rightPage.height],
     t: dir > 0 ? flipAnim.value : 1 - flipAnim.value,
     transposed: 0,
     spineOff: rightPage.width,
-    hasBack: 1,
+    curl: flipCurl.value,
+    hasLeftBase: 1,
   }));
 
-  const pageRadius = 8;
+  const bindingOverlayOpacity = useDerivedValue(() => {
+    const turn = dir > 0 ? flipAnim.value : 1 - flipAnim.value;
+    const endpoint = Math.abs(turn - 0.5) * 2;
+    const x = Math.max(0, Math.min(1, (endpoint - 0.68) / 0.22));
+    return x * x * (3 - 2 * x);
+  });
+
+  const pageRadius = PAGE_FACE_RADIUS;
 
   return (
     <Canvas style={[StyleSheet.absoluteFill, { width: screenW, height: screenH }]} pointerEvents="none">
-      {/* soft drop shadow under the book */}
+      {/* Warm studio shadow. */}
       <RoundedRect
-        x={book.x + 2}
+        x={book.x + 3}
         y={book.y + 10}
-        width={book.width - 4}
-        height={book.height}
-        r={16}
-        color="rgba(90,70,50,0.30)"
+        width={book.width - 6}
+        height={book.height - 1}
+        r={PAD_GEOMETRY.shellRadius}
+        color={colors.pageShadow}
       >
-        <Blur blur={14} />
+        <Blur blur={18} />
       </RoundedRect>
 
-      {/* cover + stitched edge */}
-      <RoundedRect x={book.x} y={book.y} width={book.width} height={book.height} r={14} color={cover} />
+      {/* Section tabs remain inside the same visual gutter as single-page pads. */}
+      <PadTab
+        x={book.x - PAD_GEOMETRY.tabProtrusion}
+        y={book.y + book.height * 0.61}
+        width={36}
+        height={58}
+        color={palette.tabs[0].color}
+        glyph={palette.tabs[0].glyph}
+        glyphColor={palette.tabs[0].glyphColor}
+        side="left"
+      />
+      <PadTab
+        x={book.x + book.width - 22}
+        y={book.y + book.height * 0.5}
+        width={36}
+        height={58}
+        color={palette.tabs[1].color}
+        glyph={palette.tabs[1].glyph}
+        glyphColor={palette.tabs[1].glyphColor}
+        side="right"
+      />
+      <PadTab
+        x={book.x + book.width - 22}
+        y={book.y + book.height * 0.5 + 64}
+        width={36}
+        height={58}
+        color={palette.tabs[2].color}
+        glyph={palette.tabs[2].glyph}
+        glyphColor={palette.tabs[2].glyphColor}
+        side="right"
+      />
+
+      {/* Smooth molded shell. */}
       <RoundedRect
-        x={book.x + 5}
-        y={book.y + 5}
-        width={book.width - 10}
-        height={book.height - 10}
-        r={11}
+        x={book.x}
+        y={book.y}
+        width={book.width}
+        height={book.height}
+        r={PAD_GEOMETRY.shellRadius}
+        color={cover}
+      />
+      <RoundedRect
+        x={book.x + 4}
+        y={book.y + 4}
+        width={book.width - 8}
+        height={book.height - 8}
+        r={PAD_GEOMETRY.shellRadius - 4}
         style="stroke"
-        strokeWidth={1.8}
+        strokeWidth={2}
+        color="rgba(255,255,255,0.30)"
+      />
+      <RoundedRect
+        x={book.x + 1}
+        y={book.y + 1}
+        width={book.width - 2}
+        height={book.height - 2}
+        r={PAD_GEOMETRY.shellRadius - 1}
+        style="stroke"
+        strokeWidth={1.4}
         color={coverDark}
-        opacity={0.65}
-      >
-        <DashPathEffect intervals={[7, 5]} />
-      </RoundedRect>
+        opacity={0.42}
+      />
 
-      {/* pages */}
+      {/* Visible paper stack under the open spread. */}
+      <RoundedRect
+        x={leftPage.x + 2}
+        y={leftPage.y + 7}
+        width={rightPage.x + rightPage.width - leftPage.x - 4}
+        height={leftPage.height - 4}
+        r={PAGE_FACE_RADIUS}
+        color={palette.pageEdge}
+      />
+      <RoundedRect
+        x={leftPage.x + 1}
+        y={leftPage.y + 3}
+        width={rightPage.x + rightPage.width - leftPage.x - 2}
+        height={leftPage.height - 2}
+        r={PAGE_FACE_RADIUS}
+        color={palette.pageStack}
+      />
+
+      {/* Cream spread with a quiet dot grid. */}
       <RoundedRect
         x={leftPage.x}
         y={leftPage.y}
@@ -222,37 +328,63 @@ export function Scrapbook({ layout, drawings, spread, flip, flipAnim, coverColor
         r={pageRadius}
         color={paper}
       />
-      <Path path={dotsPath} color="rgba(120,100,70,0.09)" />
+      <RoundedRect
+        x={leftPage.x + 2}
+        y={leftPage.y + 2}
+        width={rightPage.x + rightPage.width - leftPage.x - 4}
+        height={leftPage.height - 4}
+        r={pageRadius - 2}
+        style="stroke"
+        strokeWidth={1}
+        color={colors.border}
+      />
+      <Path path={dotsPath} color={palette.gridDot} />
 
       {/* center crease shading */}
-      <Rect x={spineX - 26} y={leftPage.y} width={52} height={leftPage.height} opacity={0.16}>
+      <Rect x={spineX - 22} y={leftPage.y} width={44} height={leftPage.height} opacity={0.12}>
         <LinearGradient
-          start={vec(spineX - 26, 0)}
-          end={vec(spineX + 26, 0)}
-          colors={["transparent", "rgba(90,70,50,0.55)", "transparent"]}
+          start={vec(spineX - 22, 0)}
+          end={vec(spineX + 22, 0)}
+          colors={["transparent", "rgba(40,67,90,0.5)", "transparent"]}
         />
       </Rect>
-
-      {/* dotted spine */}
-      <Path path={spinePath} style="stroke" strokeWidth={2.6} strokeCap="round" color={colors.spineDot}>
-        <DashPathEffect intervals={[0.1, 9]} />
-      </Path>
 
       {/* left page drawing (static through a flip until the page lands) */}
       {staticLeft ? <DrawingOnPage drawing={staticLeft} image={imageFor(staticLeft)} slot={leftSlot} /> : null}
 
       {/* right page drawing being revealed (or the settled one) */}
-      {underRight ? <DrawingOnPage drawing={underRight} image={imageFor(underRight)} slot={rightSlot} /> : null}
+      {staticRight ? <DrawingOnPage drawing={staticRight} image={imageFor(staticRight)} slot={rightSlot} /> : null}
 
-      {/* flipping page */}
-      {flip && CURL_EFFECT && frontSnapshot && backSnapshot ? (
+      {/*
+       * The center binding belongs above the open spread but behind a loose
+       * turning sheet. This prevents the rings from floating over the fold.
+       */}
+      {spineRings.map((y) => (
+        <BindingRing
+          key={y}
+          cx={spineX}
+          cy={y}
+          orientation="horizontal"
+          ring={palette.ring}
+          ringDark={palette.ringDark}
+          hole={palette.ringHole}
+        />
+      ))}
+
+      {/* One soft, two-sided sheet turning around the center binding. */}
+      {flip &&
+      PAGE_FLIP_EFFECT &&
+      frontSnapshot &&
+      backSnapshot &&
+      baseLeftSnapshot &&
+      baseRightSnapshot ? (
         <Rect
           x={leftPage.x}
           y={rightPage.y}
           width={leftPage.width + rightPage.width}
           height={rightPage.height}
         >
-          <Shader source={CURL_EFFECT} uniforms={curlUniforms}>
+          <Shader source={PAGE_FLIP_EFFECT} uniforms={flipUniforms}>
             <ImageShader
               image={frontSnapshot}
               fit="fill"
@@ -263,32 +395,42 @@ export function Scrapbook({ layout, drawings, spread, flip, flipAnim, coverColor
               fit="fill"
               rect={{ x: 0, y: 0, width: rightPage.width, height: rightPage.height }}
             />
+            <ImageShader
+              image={baseLeftSnapshot}
+              fit="fill"
+              rect={{ x: 0, y: 0, width: leftPage.width, height: leftPage.height }}
+            />
+            <ImageShader
+              image={baseRightSnapshot}
+              fit="fill"
+              rect={{ x: 0, y: 0, width: rightPage.width, height: rightPage.height }}
+            />
           </Shader>
         </Rect>
       ) : null}
 
-      {/* washi tapes */}
-      <Group transform={[{ rotate: -0.21 }]} origin={{ x: leftPage.x + 34, y: book.y + 6 }}>
-        <RoundedRect x={leftPage.x + 6} y={book.y - 4} width={58} height={20} r={3} color={colors.tapeTeal} opacity={0.92} />
-      </Group>
-      <Group
-        transform={[{ rotate: 0.18 }]}
-        origin={{ x: rightPage.x + rightPage.width - 36, y: book.y + book.height - 8 }}
-      >
-        <RoundedRect
-          x={rightPage.x + rightPage.width - 66}
-          y={book.y + book.height - 18}
-          width={58}
-          height={20}
-          r={3}
-          color={colors.tapeYellow}
-          opacity={0.92}
-        />
-      </Group>
+      {flip ? (
+        <Group opacity={bindingOverlayOpacity}>
+          {spineRings.map((y) => (
+            <BindingRing
+              key={`overlay-${y}`}
+              cx={spineX}
+              cy={y}
+              orientation="horizontal"
+              ring={palette.ring}
+              ringDark={palette.ringDark}
+              hole={palette.ringHole}
+            />
+          ))}
+        </Group>
+      ) : null}
 
-      {/* sparkle accents */}
-      <Confetti cx={rightPage.x + rightPage.width - 26} cy={rightPage.y + 22} seed={3} />
-      <Confetti cx={leftPage.x + 24} cy={leftPage.y + leftPage.height - 26} seed={11} />
+      <PadStampMark
+        cx={leftPage.x + 27}
+        cy={leftPage.y + leftPage.height - 27}
+        stamp={palette.stamp}
+        color={palette.stampColor}
+      />
     </Canvas>
   );
 }

@@ -1,16 +1,16 @@
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { SymbolView } from "expo-symbols";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { Easing, runOnJS, useSharedValue, withTiming } from "react-native-reanimated";
+import { cancelAnimation, Easing, runOnJS, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DrawingViewer } from "@/components/drawing-viewer";
 import { FlyingCutout } from "@/components/flying-cutout";
-import { Glass } from "@/components/glass";
 import { HandwrittenTitle } from "@/components/handwritten-title";
+import { PagePagination } from "@/components/page-pagination";
 import { PadDrawer } from "@/components/pad-drawer";
 import { FlipPad } from "@/components/flip-pad";
 import { Scrapbook, type FlipState } from "@/components/scrapbook";
@@ -25,8 +25,14 @@ import {
   unitForIndex,
   type Rect,
 } from "@/utils/book-layout";
-
-const FLIP_MS = 680;
+import {
+  PAGE_FLIP_AUTO_DURATION,
+  logPageFlip,
+  pageFlipProgress,
+  pageFlipSettleDuration,
+  shouldCompletePageFlip,
+  type PageFlipDirection,
+} from "@/utils/page-flip";
 
 export function Home() {
   const router = useRouter();
@@ -41,21 +47,52 @@ export function Home() {
   const clearActivePad = useDrawings((s) => s.clearActivePad);
 
   const style = pad?.style ?? "spread";
-  // Title canvas (64) + the sketchpad pill row below it
-  const headerBottom = insets.top + 92;
-  const fabReserve = insets.bottom + 104;
-  const spreadLayout = getBookLayout(W, H, headerBottom);
-  const padLayout = getPadPageLayout(style === "spread" ? "vertical" : style, W, H, headerBottom, fabReserve);
+  // Garden Path title canvas (82) + the 44pt sketchpad selector below it.
+  const headerBottom = insets.top + 122;
+  const fabReserve = insets.bottom + (H < 720 ? 128 : 108);
+  const spreadLayout = useMemo(
+    () => getBookLayout(W, H, headerBottom),
+    [H, W, headerBottom],
+  );
+  const padLayout = useMemo(
+    () => getPadPageLayout(style === "spread" ? "vertical" : style, W, H, headerBottom, fabReserve),
+    [H, W, fabReserve, headerBottom, style],
+  );
   const bookRect = style === "spread" ? spreadLayout.book : padLayout.book;
   const horizontalFlip = style === "spread" || style === "album";
+  const pageExtent =
+    style === "spread"
+      ? spreadLayout.rightPage.width
+      : horizontalFlip
+        ? padLayout.page.width
+        : padLayout.page.height;
+  const crossAxisOffset = horizontalFlip
+    ? (style === "spread" ? spreadLayout.rightPage.y : padLayout.page.y) - bookRect.y
+    : padLayout.page.x - bookRect.x;
+  const crossAxisExtent = horizontalFlip
+    ? style === "spread"
+      ? spreadLayout.rightPage.height
+      : padLayout.page.height
+    : padLayout.page.width;
 
   const [unit, setUnit] = useState(0);
   const [flip, setFlip] = useState<FlipState | null>(null);
+  const [flipHandoffTarget, setFlipHandoffTarget] = useState<number | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [viewing, setViewing] = useState<{ drawing: Drawing; rect: Rect } | null>(null);
   const flipAnim = useSharedValue(0);
+  const flipCurl = useSharedValue(0.82);
+  const flipLocked = useSharedValue(0);
+  const flipMounted = useSharedValue(0);
+  const gestureDirection = useSharedValue(0);
+  const gestureProgress = useSharedValue(0);
+  const gestureTarget = useSharedValue(0);
+  const gestureSettling = useSharedValue(0);
+  const gestureCrest = useSharedValue(0);
   const flipBusy = useRef(false);
+  const autoFlipTarget = useRef<number | null>(null);
   const touredRef = useRef(false);
+  const activePadIdRef = useRef<string | null>(null);
   const unitRef = useRef(0);
 
   const maxUnit = unitCount(drawings.length, style) - 1;
@@ -67,27 +104,138 @@ export function Home() {
 
   const finishFlip = useCallback(
     (to: number) => {
+      logPageFlip("commit-request", {
+        from: unitRef.current,
+        to,
+        progress: flipAnim.value,
+      });
       jumpToUnit(to);
-      setFlip(null);
-      flipAnim.value = 0;
-      flipBusy.current = false;
+      setFlipHandoffTarget(to);
     },
     [flipAnim, jumpToUnit],
   );
 
+  // Keep the completed shader frame mounted until React has committed the
+  // target page underneath it. Removing both in one update intermittently
+  // exposed a blank/stale Skia frame on slower commits.
+  useEffect(() => {
+    if (flipHandoffTarget === null || unit !== flipHandoffTarget || !flip) return;
+    logPageFlip("handoff-committed", {
+      from: flip.from,
+      to: flip.to,
+      progress: flipAnim.value,
+    });
+    const releaseTimer = setTimeout(() => {
+      logPageFlip("renderer-release", {
+        to: flipHandoffTarget,
+        progress: flipAnim.value,
+      });
+      setFlip(null);
+      setFlipHandoffTarget(null);
+    }, 34);
+    return () => clearTimeout(releaseTimer);
+  }, [flip, flipAnim, flipHandoffTarget, unit]);
+
   const flipTo = useCallback(
     (to: number) => {
       if (flipBusy.current) return;
+      const from = unitRef.current;
+      if (to === from || to < 0 || to > maxUnit || Math.abs(to - from) !== 1) {
+        logPageFlip("auto-skip-invalid-target", { from, to, maxUnit });
+        return;
+      }
       flipBusy.current = true;
-      setFlip({ from: unitRef.current, to });
+      flipLocked.value = 1;
+      flipMounted.value = 0;
+      flipCurl.value = 0.82;
+      gestureProgress.value = 0;
+      autoFlipTarget.current = to;
+      logPageFlip("auto-request", { from, to });
+      setFlip({ from, to });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      cancelAnimation(flipAnim);
       flipAnim.value = 0;
-      flipAnim.value = withTiming(1, { duration: FLIP_MS, easing: Easing.inOut(Easing.cubic) }, (finished) => {
-        if (finished) runOnJS(finishFlip)(to);
-      });
     },
-    [flipAnim, finishFlip],
+    [flipAnim, flipCurl, flipLocked, flipMounted, gestureProgress, maxUnit],
   );
+
+  // Every turn is armed only after React has committed the two page snapshots.
+  // Interactive progress is buffered on the UI thread until this handshake.
+  useEffect(() => {
+    if (!flip) return;
+    const isAuto = autoFlipTarget.current === flip.to;
+    const to = flip.to;
+    if (isAuto) autoFlipTarget.current = null;
+    const frame = requestAnimationFrame(() => {
+      if (isAuto) {
+        flipMounted.value = 1;
+        logPageFlip("auto-animation-start", {
+          from: flip.from,
+          to,
+          progress: flipAnim.value,
+        });
+        flipAnim.value = withTiming(
+          1,
+          {
+            duration: PAGE_FLIP_AUTO_DURATION,
+            easing: Easing.bezier(0.22, 0.61, 0.36, 1),
+          },
+          (finished) => {
+            if (finished) runOnJS(finishFlip)(to);
+          },
+        );
+      } else {
+        const bufferedProgress = gestureProgress.value;
+        const alreadySettling = gestureSettling.value > 0;
+        if (!alreadySettling) {
+          flipAnim.value = bufferedProgress;
+          flipMounted.value = 1;
+        }
+        logPageFlip("gesture-renderer-armed", {
+          from: flip.from,
+          to,
+          bufferedProgress,
+          alreadySettling,
+        });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [finishFlip, flip, flipAnim, flipMounted, gestureProgress, gestureSettling]);
+
+  // This is deliberately post-commit. Resetting progress in finishFlip makes
+  // the still-mounted shader draw its starting face for one frame (the blink).
+  useEffect(() => {
+    logPageFlip("react-commit", {
+      unit,
+      from: flip?.from,
+      to: flip?.to,
+      mounted: Boolean(flip),
+      progress: flipAnim.value,
+    });
+    if (flip) return;
+
+    const previousProgress = flipAnim.value;
+    cancelAnimation(flipAnim);
+    flipAnim.value = 0;
+    flipLocked.value = 0;
+    flipMounted.value = 0;
+    gestureDirection.value = 0;
+    gestureProgress.value = 0;
+    gestureSettling.value = 0;
+    gestureCrest.value = 0;
+    flipBusy.current = false;
+    logPageFlip("renderer-unmounted-reset", { unit, previousProgress, resetTo: 0 });
+  }, [
+    flip,
+    flipAnim,
+    flipLocked,
+    flipMounted,
+    gestureCrest,
+    gestureDirection,
+    gestureProgress,
+    gestureSettling,
+    unit,
+  ]);
 
   // Launch tour: flip through the saved collection, ending on the empty unit
   useEffect(() => {
@@ -102,7 +250,7 @@ export function Home() {
       if (next > tourStops) return;
       flipTo(next);
       next += 1;
-      timer = setTimeout(step, FLIP_MS + 240);
+      timer = setTimeout(step, PAGE_FLIP_AUTO_DURATION + 240);
     };
     let timer = setTimeout(step, 1400);
     return () => {
@@ -115,10 +263,17 @@ export function Home() {
   // Switching sketchpads: land on the newest (partially filled or empty) unit
   useEffect(() => {
     if (!pad) return;
+    autoFlipTarget.current = null;
+    setFlipHandoffTarget(null);
+    cancelAnimation(flipAnim);
     setFlip(null);
-    flipAnim.value = 0;
-    flipBusy.current = false;
-    jumpToUnit(unitCount(activeDrawingsOf(useDrawings.getState()).length, pad.style) - 1);
+    const isInitialPad = activePadIdRef.current === null;
+    activePadIdRef.current = pad.id;
+    jumpToUnit(
+      isInitialPad
+        ? 0
+        : unitCount(activeDrawingsOf(useDrawings.getState()).length, pad.style) - 1,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pad?.id]);
 
@@ -129,6 +284,8 @@ export function Home() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending]);
+
+  useEffect(() => () => cancelAnimation(flipAnim), [flipAnim]);
 
   const handleLanded = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -147,92 +304,134 @@ export function Home() {
         : spreadLayout.leftSlot
       : padLayout.slots[slotIndexForIndex(nextIndex, style)];
 
-  // ---- Interactive page drag: the finger drives the curl like real paper ----
-  const dragState = useRef({ active: false, settling: false, dir: 1 as 1 | -1, to: 0, crest: false });
-  const maxUnitRef = useRef(maxUnit);
-  maxUnitRef.current = maxUnit;
-
   const settleFlip = useCallback(
     (to: number, completed: boolean) => {
-      const d = dragState.current;
-      d.active = false;
-      d.settling = false;
-      d.crest = false;
       if (completed) {
-        // the page lands
+        logPageFlip("settle-finished", { to, completed, progress: flipAnim.value });
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(() => {});
         finishFlip(to);
       } else {
-        setFlip(null);
-        flipAnim.value = 0;
-        flipBusy.current = false;
+        logPageFlip("settle-finished", { to, completed, progress: flipAnim.value });
+        setFlipHandoffTarget(unitRef.current);
       }
     },
     [finishFlip, flipAnim],
   );
 
-  const releaseDrag = useCallback(
-    (velocity: number) => {
-      const d = dragState.current;
-      if (!d.active || d.settling) return;
-      d.settling = true;
-      const fling = d.dir > 0 ? velocity < -420 : velocity > 420;
-      const p = flipAnim.value;
-      const complete = fling || p > 0.34;
-      const remaining = complete ? 1 - p : p;
-      const to = d.to;
-      flipAnim.value = withTiming(
-        complete ? 1 : 0,
-        { duration: 90 + 240 * remaining, easing: Easing.out(Easing.cubic) },
-        (finished) => {
-          if (finished) runOnJS(settleFlip)(to, complete);
-        },
-      );
-    },
-    [flipAnim, settleFlip],
-  );
+  const beginInteractiveFlip = useCallback((to: number) => {
+    if (flipBusy.current) return;
+    flipBusy.current = true;
+    autoFlipTarget.current = null;
+    logPageFlip("gesture-start", { from: unitRef.current, to });
+    setFlip({ from: unitRef.current, to });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }, []);
 
+  const playCrestHaptic = useCallback(() => {
+    Haptics.selectionAsync().catch(() => {});
+  }, []);
+  const pageFlipBlocked = Boolean(pending) || drawerOpen;
+
+  // Interactive updates stay on the UI thread. JS only mounts/unmounts the
+  // page snapshots and fires sparse haptics at grab, crest, and landing.
   const pan = Gesture.Pan()
-    .runOnJS(true)
     .minDistance(6)
     .onUpdate((e) => {
-      const d = dragState.current;
       const delta = horizontalFlip ? e.translationX : e.translationY;
-      if (!d.active) {
-        if (flipBusy.current || pending || drawerOpen || Math.abs(delta) < 6) return;
-        const dir: 1 | -1 = delta < 0 ? 1 : -1;
-        const to = unitRef.current + dir;
-        if (to < 0 || to > maxUnitRef.current) return;
-        flipBusy.current = true;
-        d.active = true;
-        d.settling = false;
-        d.dir = dir;
-        d.to = to;
-        d.crest = false;
-        setFlip({ from: unitRef.current, to });
-        // fingertip grabs the page
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-        return;
+      if (gestureDirection.value === 0) {
+        if (flipLocked.value > 0 || pageFlipBlocked || Math.abs(delta) < 6) return;
+        const dir: PageFlipDirection = delta < 0 ? 1 : -1;
+        const to = unit + dir;
+        if (to < 0 || to > maxUnit) return;
+
+        const crossPosition = horizontalFlip ? e.y : e.x;
+        flipCurl.value = Math.min(
+          0.92,
+          Math.max(0.08, (crossPosition - crossAxisOffset) / Math.max(1, crossAxisExtent)),
+        );
+        flipLocked.value = 1;
+        flipMounted.value = 0;
+        gestureDirection.value = dir;
+        gestureProgress.value = 0;
+        gestureTarget.value = to;
+        gestureSettling.value = 0;
+        gestureCrest.value = 0;
+        flipAnim.value = 0;
+        runOnJS(beginInteractiveFlip)(to);
       }
-      if (d.settling) return;
-      const span = (horizontalFlip ? bookRect.width : bookRect.height) * 0.9;
-      const raw = (d.dir > 0 ? -delta : delta) / span;
-      flipAnim.value = Math.min(1, Math.max(0, raw));
-      // the paper crests over the spine
-      if (!d.crest && flipAnim.value > 0.5) {
-        d.crest = true;
-        Haptics.selectionAsync().catch(() => {});
-      } else if (d.crest && flipAnim.value < 0.42) {
-        d.crest = false;
-        Haptics.selectionAsync().catch(() => {});
+      if (gestureSettling.value > 0) return;
+
+      const crossPosition = horizontalFlip ? e.y : e.x;
+      flipCurl.value = Math.min(
+        0.92,
+        Math.max(0.08, (crossPosition - crossAxisOffset) / Math.max(1, crossAxisExtent)),
+      );
+      const progress = pageFlipProgress(
+        delta,
+        pageExtent,
+        gestureDirection.value as PageFlipDirection,
+      );
+      gestureProgress.value = progress;
+      if (flipMounted.value > 0) flipAnim.value = progress;
+
+      if (gestureCrest.value === 0 && progress >= 0.5) {
+        gestureCrest.value = 1;
+        runOnJS(playCrestHaptic)();
+      } else if (gestureCrest.value === 1 && progress < 0.44) {
+        gestureCrest.value = 0;
       }
     })
     .onEnd((e) => {
-      releaseDrag(horizontalFlip ? e.velocityX : e.velocityY);
+      const directionValue = gestureDirection.value;
+      if (directionValue === 0 || gestureSettling.value > 0) return;
+      const direction = directionValue as PageFlipDirection;
+      gestureSettling.value = 1;
+      const progress = gestureProgress.value;
+      const velocity = horizontalFlip ? e.velocityX : e.velocityY;
+      const complete = shouldCompletePageFlip(progress, velocity, direction);
+      const target = gestureTarget.value;
+      runOnJS(logPageFlip)("settle-request", {
+        to: target,
+        progress,
+        velocity: Math.round(velocity),
+        completed: complete,
+      });
+      flipMounted.value = 1;
+      flipAnim.value = withTiming(
+        complete ? 1 : 0,
+        {
+          duration: pageFlipSettleDuration(progress, complete),
+          easing: Easing.out(Easing.cubic),
+        },
+        (finished) => {
+          if (finished) runOnJS(settleFlip)(target, complete);
+        },
+      );
     })
     .onFinalize(() => {
-      // safety: if the gesture was cancelled before onEnd, settle from here
-      releaseDrag(0);
+      const directionValue = gestureDirection.value;
+      if (directionValue === 0 || gestureSettling.value > 0) return;
+      const direction = directionValue as PageFlipDirection;
+      gestureSettling.value = 1;
+      const progress = gestureProgress.value;
+      const complete = shouldCompletePageFlip(progress, 0, direction);
+      const target = gestureTarget.value;
+      runOnJS(logPageFlip)("settle-finalize", {
+        to: target,
+        progress,
+        completed: complete,
+      });
+      flipMounted.value = 1;
+      flipAnim.value = withTiming(
+        complete ? 1 : 0,
+        {
+          duration: pageFlipSettleDuration(progress, complete),
+          easing: Easing.out(Easing.cubic),
+        },
+        (finished) => {
+          if (finished) runOnJS(settleFlip)(target, complete);
+        },
+      );
     });
 
   const tap = Gesture.Tap()
@@ -266,24 +465,23 @@ export function Home() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <HandwrittenTitle width={W} />
 
-      {/* active sketchpad pill — Pressable is Glass's child, not its parent: the
-          native glass view sits between a Pressable ancestor and a touch,
-          so it must never be a Pressable's *ancestor* or it swallows the
-          gesture. Glass merely paints the background behind normal-flow
-          content, matching how the viewer's toggle pill already works. */}
       <View style={styles.padPillWrap}>
-        <Glass fallbackColor="rgba(255,253,246,0.85)" style={styles.padPillGlass}>
-          <Pressable
-            onPress={() => setDrawerOpen(true)}
-            style={({ pressed }) => [styles.padPill, pressed && { opacity: 0.7 }]}
-          >
-            <SymbolView name="books.vertical.fill" size={14} tintColor={pad?.coverColor ?? colors.bookBorder} />
-            <Text style={styles.padPillText} numberOfLines={1}>
-              {pad?.name ?? ""}
-            </Text>
-            <SymbolView name="chevron.down" size={10} tintColor="#8D8271" />
-          </Pressable>
-        </Glass>
+        <Pressable
+          onPress={() => setDrawerOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`Choose sketchpad. Current sketchpad: ${pad?.name ?? "My Book"}`}
+          accessibilityHint="Opens your sketchpad collection"
+          hitSlop={4}
+          style={({ pressed }) => [styles.padPill, pressed && styles.padPillPressed]}
+        >
+          <View style={[styles.padPillIcon, { backgroundColor: pad?.coverColor ?? colors.bookBorder }]}>
+            <SymbolView name="books.vertical.fill" size={15} tintColor={colors.page} />
+          </View>
+          <Text style={styles.padPillText} numberOfLines={1}>
+            {pad?.name ?? ""}
+          </Text>
+          <SymbolView name="chevron.down" size={12} tintColor={colors.titleTeal} />
+        </Pressable>
       </View>
 
       {style === "spread" ? (
@@ -293,8 +491,10 @@ export function Home() {
           spread={unit}
           flip={flip}
           flipAnim={flipAnim}
+          flipCurl={flipCurl}
           coverColor={pad?.coverColor}
           pageColor={pad?.pageColor}
+          design={pad?.design}
         />
       ) : (
         <FlipPad
@@ -304,10 +504,21 @@ export function Home() {
           page={unit}
           flip={flip}
           flipAnim={flipAnim}
+          flipCurl={flipCurl}
           coverColor={pad?.coverColor}
           pageColor={pad?.pageColor}
+          design={pad?.design}
         />
       )}
+
+      <PagePagination
+        currentUnit={unit}
+        drawingCount={drawings.length}
+        style={style}
+        top={bookRect.y + bookRect.height + 10}
+        coverColor={pad?.coverColor}
+        design={pad?.design}
+      />
 
       {/* gesture surface over the book */}
       <GestureDetector gesture={bookGesture}>
@@ -324,25 +535,41 @@ export function Home() {
 
       {/* left-edge swipe opens the drawer */}
       <GestureDetector gesture={edgeOpen}>
-        <View style={{ position: "absolute", left: 0, top: insets.top + 90, bottom: 0, width: 24 }} />
+        <View style={{ position: "absolute", left: 0, top: headerBottom, bottom: 0, width: 24 }} />
       </GestureDetector>
 
       {pending ? <FlyingCutout pending={pending} targetSlot={flySlot} onLanded={handleLanded} /> : null}
 
       <View style={[styles.fabWrap, { bottom: insets.bottom + 26 }]}>
-        <Glass tint={colors.fab} fallbackColor={colors.fab} style={styles.fab}>
+        <View style={styles.fabShell}>
           <Pressable
             onPress={() => router.push("/scan")}
             onLongPress={() => {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-              clearActivePad();
-              jumpToUnit(0);
+              Alert.alert(
+                `Clear “${pad?.name ?? "this sketchpad"}”?`,
+                "This removes every saved drawing from this sketchpad.",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Clear",
+                    style: "destructive",
+                    onPress: () => {
+                      clearActivePad();
+                      jumpToUnit(0);
+                    },
+                  },
+                ],
+              );
             }}
-            style={({ pressed }) => [StyleSheet.absoluteFill, styles.fabTouchable, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Scan a drawing"
+            accessibilityHint="Opens the camera. Long-press to clear this sketchpad."
+            style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
           >
-            <SymbolView name="camera.fill" size={26} tintColor="#FFF7EE" />
+            <SymbolView name="camera.fill" size={27} tintColor={colors.page} />
           </Pressable>
-        </Glass>
+        </View>
       </View>
 
       <PadDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
@@ -366,40 +593,71 @@ const styles = StyleSheet.create({
   padPillWrap: {
     alignSelf: "flex-start",
     marginLeft: 20,
-    marginTop: -6,
-    maxWidth: 220,
-  },
-  // Shape only — Glass auto-sizes to its normal-flow Pressable child below.
-  padPillGlass: {
-    borderRadius: 16,
+    marginTop: -8,
+    maxWidth: 236,
   },
   padPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    gap: 8,
+    minHeight: 44,
+    paddingLeft: 8,
+    paddingRight: 12,
+    paddingVertical: 6,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: "#75624B",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+  },
+  padPillPressed: {
+    opacity: 0.76,
+    transform: [{ scale: 0.985 }],
+  },
+  padPillIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   padPillText: {
-    fontSize: 13.5,
+    flexShrink: 1,
+    fontSize: 14,
     fontWeight: "700",
-    color: "#5A4F41",
+    color: colors.ink,
   },
   fabWrap: {
     position: "absolute",
     alignSelf: "center",
-    shadowColor: "#7A4A38",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    shadowColor: "#7A543B",
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+  },
+  fabShell: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: "rgba(255,118,94,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   fab: {
     width: 64,
     height: 64,
     borderRadius: 32,
-  },
-  fabTouchable: {
+    backgroundColor: colors.fab,
     alignItems: "center",
     justifyContent: "center",
+  },
+  fabPressed: {
+    backgroundColor: colors.fabPressed,
+    transform: [{ scale: 0.96 }],
   },
 });
