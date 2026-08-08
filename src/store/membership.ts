@@ -38,6 +38,7 @@ interface MembershipState {
   initializeForUser: (ownerId: string) => Promise<void>;
   refreshMembership: () => Promise<void>;
   disconnectUser: () => Promise<void>;
+  acceptCustomerInfo: (customerInfo: CustomerInfo) => Promise<void>;
   setEntitlement: (entitlement: EntitlementSnapshot) => void;
   requestUpgrade: (feature: ProFeature, source: string) => void;
   clearUpgradeRequest: () => void;
@@ -163,6 +164,12 @@ export const useMembership = create<MembershipState>((set, get) => ({
       upgradeRequest: null,
     });
     await disconnectRevenueCatUser();
+  },
+
+  acceptCustomerInfo: async (customerInfo) => {
+    const ownerId = get().ownerId;
+    if (!ownerId) return;
+    await applyCustomerInfo(ownerId, customerInfo);
   },
 
   setEntitlement: (entitlement) => {

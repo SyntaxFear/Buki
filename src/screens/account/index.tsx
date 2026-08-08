@@ -132,12 +132,7 @@ export function AccountCenter() {
   };
 
   const introducePro = async (feature: ProFeature, source: string) => {
-    if (!(await confirmAdult("Buki Pro purchases and subscription controls are for grown-ups."))) return;
     requestUpgrade(feature, source);
-    Alert.alert(
-      "Buki Pro",
-      "The Buki Pro purchase screen is the next setup step. Your current library stays safe while purchases are being connected.",
-    );
   };
 
   const guardedFutureAction = async (title: string, body: string) => {

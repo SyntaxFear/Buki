@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { BUKI_DATABASE_NAME, initializeBukiDatabase } from "@/database";
 import { ParentalGateHost } from "@/components/parental-gate";
+import { ProPaywallHost } from "@/components/pro-paywall";
 import { useDrawings } from "@/store/drawings";
 import { useAuth } from "@/store/auth";
 import { useProfiles } from "@/store/profiles";
@@ -95,6 +96,7 @@ function ReadyApp() {
           options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
         />
       </Stack>
+      <ProPaywallHost />
       <ParentalGateHost />
     </GestureHandlerRootView>
   );

@@ -3,6 +3,9 @@ import Purchases, {
   LOG_LEVEL,
   type CustomerInfo,
   type CustomerInfoUpdateListener,
+  type MakePurchaseResult,
+  type PurchasesOffering,
+  type PurchasesPackage,
 } from "react-native-purchases";
 
 import { getPublicAppConfig } from "@/config/env";
@@ -63,6 +66,40 @@ export async function connectRevenueCatUser(
 export async function refreshRevenueCatCustomerInfo(): Promise<CustomerInfo | null> {
   if (Platform.OS !== "ios" || !activeOwnerId) return null;
   return Purchases.getCustomerInfo();
+}
+
+export async function loadRevenueCatOffering(): Promise<PurchasesOffering> {
+  const offerings = await Purchases.getOfferings();
+  if (!offerings.current) throw new Error("Buki Pro plans are temporarily unavailable.");
+  await Purchases.trackCustomPaywallImpression({ offering: offerings.current }).catch(() => {});
+  return offerings.current;
+}
+
+export async function isRevenueCatIntroEligible(
+  productIdentifier: string,
+): Promise<boolean> {
+  try {
+    const result = await Purchases.checkTrialOrIntroductoryPriceEligibility([productIdentifier]);
+    return (
+      result[productIdentifier]?.status ===
+      Purchases.INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function purchaseRevenueCatPackage(aPackage: PurchasesPackage): Promise<MakePurchaseResult> {
+  return Purchases.purchasePackage(aPackage);
+}
+
+export function isRevenueCatPurchaseCancelled(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === Purchases.PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR
+  );
 }
 
 export async function disconnectRevenueCatUser(): Promise<void> {

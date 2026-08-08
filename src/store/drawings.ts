@@ -6,6 +6,7 @@ import { enqueueLibrarySnapshot, loadLibrarySnapshot } from "@/database";
 import { getPadDesign, type PadDesignId } from "@/pad-designs";
 import { canCreateContent, type ContentCounts } from "@/subscription/access";
 import { currentCapabilities, useMembership } from "@/store/membership";
+import { usePreferences } from "@/store/preferences";
 import {
   makePad,
   migrateStoreData,
@@ -99,6 +100,18 @@ function deleteDrawingFiles(drawings: Drawing[]): void {
   }
 }
 
+function introduceProAfterFirstArtwork(attempt = 0): void {
+  const membership = useMembership.getState();
+  if (!membership.ownerId) return;
+  if (membership.loading && attempt < 5) {
+    setTimeout(() => introduceProAfterFirstArtwork(attempt + 1), 1000);
+    return;
+  }
+  if (membership.tier !== "free" || usePreferences.getState().proIntroductionShown) return;
+  void usePreferences.getState().markProIntroductionShown().catch(() => {});
+  membership.requestUpgrade("premiumVisuals", "first_artwork");
+}
+
 export const useDrawings = create<DrawingsState>((set, get) => ({
   hydrated: false,
   pads: [],
@@ -169,9 +182,11 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       addedAt: Date.now(),
       photoUri: pending.photoUri,
     };
+    const isFirstArtwork = Object.values(drawingsByPad).every((drawings) => drawings.length === 0);
     const nextByPad = { ...drawingsByPad, [activePadId]: [...current, drawing] };
     set({ drawingsByPad: nextByPad, pending: null });
     persist({ activePadId, pads, drawingsByPad: nextByPad });
+    if (isFirstArtwork) setTimeout(() => introduceProAfterFirstArtwork(), 700);
     return true;
   },
 
