@@ -48,6 +48,7 @@ export function Scan() {
   const insets = useSafeAreaInsets();
   const { width: W, height: H } = useWindowDimensions();
   const setPending = useDrawings((s) => s.setPending);
+  const requestArtworkCreation = useDrawings((s) => s.requestArtworkCreation);
 
   const isDevice = Device.isDevice;
   const [permission, requestPermission] = useCameraPermissions();
@@ -84,6 +85,7 @@ export function Scan() {
   };
 
   const process = async (uri: string) => {
+    if (!requestArtworkCreation("artwork_limit")) return;
     setPhase("busy");
     try {
       // Let the busy state paint before the pixel crunch
@@ -115,6 +117,7 @@ export function Scan() {
 
   const shoot = async () => {
     if (phase !== "aim") return;
+    if (!requestArtworkCreation("artwork_limit")) return;
     if (isDevice) {
       if (!permission?.granted) {
         askForCamera();
@@ -134,6 +137,7 @@ export function Scan() {
       setSampleIdx((i) => (i + 1) % SAMPLE_PHOTOS.length);
       return;
     }
+    if (!requestArtworkCreation("artwork_limit")) return;
     const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 });
     const uri = picked.assets?.[0]?.uri;
     if (uri) process(uri);

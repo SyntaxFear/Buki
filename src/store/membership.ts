@@ -216,6 +216,8 @@ export const useMembership = create<MembershipState>((set, get) => ({
         }
       } catch (error) {
         if (get().ownerId !== ownerId) return;
+        // Keep a time-valid cached entitlement while offline. Cloud operations still require
+        // authoritative server verification, and entitlementAtTime expires this cache locally.
         set({
           ...resolvedState(cached ?? EMPTY_ENTITLEMENT),
           hydrated: true,

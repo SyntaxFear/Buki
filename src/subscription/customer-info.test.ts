@@ -5,7 +5,10 @@ import {
   snapshotFromCustomerInfo,
 } from "./customer-info";
 
-function customerInfo(entitlement: Partial<PurchasesEntitlementInfo> | null = {}): CustomerInfo {
+function customerInfo(
+  entitlement: Partial<PurchasesEntitlementInfo> | null = {},
+  verification: CustomerInfo["entitlements"]["verification"] = "NOT_REQUESTED" as never,
+): CustomerInfo {
   const pro = entitlement
     ? ({
         identifier: "pro",
@@ -22,7 +25,7 @@ function customerInfo(entitlement: Partial<PurchasesEntitlementInfo> | null = {}
     entitlements: {
       all: pro ? { pro } : {},
       active: pro?.isActive ? { pro } : {},
-      verification: "NOT_REQUESTED",
+      verification,
     },
   } as CustomerInfo;
 }
@@ -63,6 +66,16 @@ describe("RevenueCat customer info mapping", () => {
   it("removes Pro after a refund or revocation", () => {
     expect(snapshotFromCustomerInfo(customerInfo({ isActive: false }))).toMatchObject({
       status: "expired",
+    });
+  });
+
+  it("fails closed when RevenueCat cannot verify the entitlement response", () => {
+    const info = customerInfo({ verification: "FAILED" as never }, "FAILED" as never);
+
+    expect(snapshotFromCustomerInfo(info)).toMatchObject({
+      product: "yearly",
+      status: "unknown",
+      willRenew: false,
     });
   });
 

@@ -15,7 +15,6 @@ import type { PurchasesOffering, PurchasesPackage } from "react-native-purchases
 
 import { getPublicAppConfig } from "@/config/env";
 import { useAuth } from "@/store/auth";
-import { useDrawings } from "@/store/drawings";
 import { useMembership, type UpgradeRequest } from "@/store/membership";
 import { confirmAdult } from "@/store/parental-gate";
 import {
@@ -227,7 +226,6 @@ export function ProPaywallHost() {
     try {
       const result = await purchaseRevenueCatPackage(selectedPlan.aPackage);
       await acceptCustomerInfo(result.customerInfo);
-      const source = request?.source;
       void trackAnalyticsEvent(user?.id, {
         name: "purchase_completed",
         source: analyticsSource,
@@ -245,9 +243,6 @@ export function ProPaywallHost() {
         });
       }
       clearRequest();
-      if (source === "artwork_limit") {
-        setTimeout(() => useDrawings.getState().commitPending(), 250);
-      }
       Alert.alert("Buki Pro is ready", "Every Pro feature is now unlocked for this Buki account.");
     } catch (purchaseError) {
       if (isRevenueCatPurchaseCancelled(purchaseError)) {

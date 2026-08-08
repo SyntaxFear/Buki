@@ -29,7 +29,7 @@ import { confirmAdult } from "@/store/parental-gate";
 import { usePreferences } from "@/store/preferences";
 import { useProfiles, type ChildProfile } from "@/store/profiles";
 import { useCloudSync } from "@/store/sync";
-import type { ProFeature } from "@/subscription/access";
+import { canCreateContent, type ProFeature } from "@/subscription/access";
 import { colors } from "@/theme";
 
 const ADULT_AVATARS = ["🌻", "🦊", "🐻", "🌈", "⭐️"] as const;
@@ -202,7 +202,13 @@ export function AccountCenter() {
   };
 
   const beginCreateChild = () => {
-    if (!capabilities.maxChildren || children.length >= capabilities.maxChildren) {
+    if (
+      !canCreateContent(
+        "children",
+        { children: children.length, sketchpads: pads.length, artworks: artworkCount },
+        capabilities,
+      )
+    ) {
       void introducePro("children", "account_children");
       return;
     }

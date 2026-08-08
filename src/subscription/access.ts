@@ -35,6 +35,25 @@ export interface ContentCounts {
   artworks: number;
 }
 
+export class ContentLimitReachedError extends Error {
+  readonly code = "CONTENT_LIMIT_REACHED";
+
+  constructor(readonly resource: ContentResource) {
+    super(`The ${resource} limit has been reached.`);
+    this.name = "ContentLimitReachedError";
+  }
+}
+
+export function isContentLimitReachedError(
+  error: unknown,
+  resource?: ContentResource,
+): error is ContentLimitReachedError {
+  return (
+    error instanceof ContentLimitReachedError &&
+    (resource === undefined || error.resource === resource)
+  );
+}
+
 export const FREE_LIMITS = {
   children: 1,
   sketchpads: 1,

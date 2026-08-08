@@ -28,6 +28,10 @@ describe("membership account switching", () => {
     mockDisconnectRevenueCat.mockResolvedValue(undefined);
   });
 
+  afterEach(() => {
+    useMembership.getState().resetMembership();
+  });
+
   it("drops the previous Pro tier before loading the next adult account", async () => {
     let resolveLoad: (value: null) => void = () => {};
     mockLoadEntitlement.mockReturnValue(
@@ -70,5 +74,25 @@ describe("membership account switching", () => {
 
     expect(useMembership.getState()).toMatchObject({ ownerId: null, tier: "free" });
     await expect(disconnection).rejects.toThrow("logout failed");
+  });
+
+  it("keeps a time-valid cached entitlement while the device is temporarily offline", async () => {
+    mockLoadEntitlement.mockResolvedValue({
+      product: "yearly",
+      status: "active",
+      expiresAt: "2099-08-08T00:00:00.000Z",
+      willRenew: true,
+      checkedAt: "2026-08-08T00:00:00.000Z",
+    });
+    mockConnectRevenueCat.mockRejectedValue(new Error("subscription unavailable"));
+
+    await useMembership.getState().initializeForUser("adult-a");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    expect(useMembership.getState()).toMatchObject({
+      ownerId: "adult-a",
+      tier: "pro",
+      error: "subscription unavailable",
+    });
   });
 });

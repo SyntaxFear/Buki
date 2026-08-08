@@ -26,13 +26,24 @@ function statusForEntitlement(
   return entitlement.billingIssueDetectedAt ? "grace" : "active";
 }
 
+function verificationFailed(
+  customerInfo: CustomerInfo,
+  entitlement: PurchasesEntitlementInfo | undefined,
+): boolean {
+  return (
+    customerInfo.entitlements.verification === "FAILED" ||
+    entitlement?.verification === "FAILED"
+  );
+}
+
 export function snapshotFromCustomerInfo(customerInfo: CustomerInfo): EntitlementSnapshot {
   const entitlement = customerInfo.entitlements.all[PRO_ENTITLEMENT_ID];
+  const trusted = !verificationFailed(customerInfo, entitlement);
   return {
     product: productFromIdentifier(entitlement?.productIdentifier),
-    status: statusForEntitlement(entitlement),
+    status: trusted ? statusForEntitlement(entitlement) : "unknown",
     expiresAt: entitlement?.expirationDate ?? null,
-    willRenew: entitlement?.willRenew ?? false,
+    willRenew: trusted ? (entitlement?.willRenew ?? false) : false,
     checkedAt: customerInfo.requestDate || new Date().toISOString(),
   };
 }

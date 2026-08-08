@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from "expo-sqlite";
 
 import { getPadDesign } from "@/pad-designs";
+import { ContentLimitReachedError, type Capabilities } from "@/subscription/access";
 import { activeLocalOwnerId, activePadPreferenceKey } from "./account-repository";
 import {
   enqueueCurrentAdultProfile,
@@ -182,16 +183,27 @@ export async function createLocalChild(
   db: SQLiteDatabase,
   child: Omit<LocalChildProfile, "ownerId" | "sortOrder" | "createdAt">,
   defaultPadId: string,
+  limits: Pick<Capabilities, "maxChildren" | "maxSketchpads">,
 ): Promise<void> {
   const ownerId = await activeLocalOwnerId(db);
   if (!ownerId) throw new Error("Sign in before creating a child profile.");
   const now = Date.now();
   const design = getPadDesign("sunshine");
   await db.withExclusiveTransactionAsync(async (tx) => {
-    const count = await tx.getFirstAsync<{ count: number }>(
+    const childCount = await tx.getFirstAsync<{ count: number }>(
       "SELECT COUNT(*) AS count FROM child_profiles WHERE owner_id = ? AND deleted_at IS NULL",
       ownerId,
     );
+    if ((childCount?.count ?? 0) >= limits.maxChildren) {
+      throw new ContentLimitReachedError("children");
+    }
+    const sketchpadCount = await tx.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM sketchpads WHERE owner_id = ? AND deleted_at IS NULL",
+      ownerId,
+    );
+    if ((sketchpadCount?.count ?? 0) >= limits.maxSketchpads) {
+      throw new ContentLimitReachedError("sketchpads");
+    }
     await tx.runAsync(
       `INSERT INTO child_profiles (
         id, owner_id, name, avatar_color, avatar_uri, birth_month, birth_year,
@@ -204,7 +216,7 @@ export async function createLocalChild(
       child.avatarUri,
       child.birthMonth,
       child.birthYear,
-      count?.count ?? 0,
+      childCount?.count ?? 0,
       now,
       now,
     );

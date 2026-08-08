@@ -40,6 +40,7 @@ interface DrawingsState {
   hydrate: () => Promise<void>;
   reloadForAccount: () => Promise<void>;
   resetForAccountSwitch: () => void;
+  requestArtworkCreation: (source?: string) => boolean;
   setPending: (cutout: ProcessedCutout) => void;
   /** Land the pending cutout in the active pad and persist it. */
   commitPending: () => boolean;
@@ -114,9 +115,9 @@ function persist(s: { activePadId: string; pads: Sketchpad[]; drawingsByPad: Rec
   enqueueLibrarySnapshot(data);
 }
 
-function deleteDrawingFiles(drawings: Drawing[]): void {
-  for (const d of drawings) {
-    for (const uri of [d.uri, d.photoUri]) {
+function deleteMediaFiles(items: Array<{ uri: string; photoUri?: string }>): void {
+  for (const item of items) {
+    for (const uri of [item.uri, item.photoUri]) {
       if (!uri) continue;
       try {
         const f = new File(uri);
@@ -204,6 +205,15 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
   resetForAccountSwitch: () =>
     set({ hydrated: false, pads: [], activePadId: "", drawingsByPad: {}, pending: null }),
 
+  requestArtworkCreation: (source = "artwork_limit") => {
+    const { pads, drawingsByPad } = get();
+    if (canCreateContent("artworks", contentCountsOf({ pads, drawingsByPad }), currentCapabilities())) {
+      return true;
+    }
+    useMembership.getState().requestUpgrade("artworks", source);
+    return false;
+  },
+
   setPending: (cutout) => {
     set({
       pending: { ...cutout, rotation: (Math.random() - 0.5) * 10 },
@@ -218,8 +228,9 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       set({ pending: null });
       return true;
     }
-    if (!canCreateContent("artworks", contentCountsOf({ pads, drawingsByPad }), currentCapabilities())) {
-      useMembership.getState().requestUpgrade("artworks", "artwork_limit");
+    if (!get().requestArtworkCreation("artwork_limit")) {
+      deleteMediaFiles([pending]);
+      set({ pending: null });
       return false;
     }
     const drawing: Drawing = {
@@ -246,7 +257,7 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
 
   clearActivePad: () => {
     const { drawingsByPad, activePadId, pads } = get();
-    deleteDrawingFiles(drawingsByPad[activePadId] ?? []);
+    deleteMediaFiles(drawingsByPad[activePadId] ?? []);
     const nextByPad = { ...drawingsByPad, [activePadId]: [] };
     set({ drawingsByPad: nextByPad, pending: null });
     persist({ activePadId, pads, drawingsByPad: nextByPad });
@@ -310,7 +321,7 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       ]),
     );
     if (removed.length === 0) return false;
-    deleteDrawingFiles(removed);
+    deleteMediaFiles(removed);
     set({ drawingsByPad: nextByPad });
     persist({ activePadId, pads, drawingsByPad: nextByPad });
     return true;
@@ -406,7 +417,7 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       ]),
     );
     if (removed.length === 0) return false;
-    deleteDrawingFiles(removed);
+    deleteMediaFiles(removed);
     set({ drawingsByPad: nextByPad });
     persist({ activePadId, pads, drawingsByPad: nextByPad });
     return true;
@@ -487,7 +498,7 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     const { pads, drawingsByPad, activePadId } = get();
     const target = pads.find((pad) => pad.id === id);
     if (!target || pads.filter((pad) => pad.childId === target.childId).length <= 1) return;
-    deleteDrawingFiles(drawingsByPad[id] ?? []);
+    deleteMediaFiles(drawingsByPad[id] ?? []);
     const nextPads = pads.filter((p) => p.id !== id);
     const nextByPad = { ...drawingsByPad };
     delete nextByPad[id];
@@ -516,7 +527,7 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
   removeChildContent: (childId) => {
     const { pads, drawingsByPad, activePadId } = get();
     const removedPads = pads.filter((pad) => pad.childId === childId);
-    for (const pad of removedPads) deleteDrawingFiles(drawingsByPad[pad.id] ?? []);
+    for (const pad of removedPads) deleteMediaFiles(drawingsByPad[pad.id] ?? []);
     const removedIds = new Set(removedPads.map((pad) => pad.id));
     const nextPads = pads.filter((pad) => !removedIds.has(pad.id));
     const nextByPad = { ...drawingsByPad };

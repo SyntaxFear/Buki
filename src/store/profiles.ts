@@ -12,7 +12,7 @@ import {
   replayBukiOnboarding,
   selectBukiChild,
 } from "@/database";
-import { canCreateContent } from "@/subscription/access";
+import { canCreateContent, isContentLimitReachedError } from "@/subscription/access";
 import { useDrawings } from "@/store/drawings";
 import { currentCapabilities, useMembership } from "@/store/membership";
 import type { LocalChildProfile } from "@/database/profile-repository";
@@ -132,13 +132,20 @@ export const useProfiles = create<ProfilesState>((set, get) => ({
     const name = input.name.trim();
     if (!name) return null;
     const { children } = get();
-    const allowed = canCreateContent(
+    const capabilities = currentCapabilities();
+    const pads = useDrawings.getState().pads;
+    const counts = { children: children.length, sketchpads: pads.length, artworks: 0 };
+    const childAllowed = canCreateContent(
       "children",
-      { children: children.length, sketchpads: 0, artworks: 0 },
-      currentCapabilities(),
+      counts,
+      capabilities,
     );
-    if (!allowed) {
+    if (!childAllowed) {
       useMembership.getState().requestUpgrade("children", "child_limit");
+      return null;
+    }
+    if (!canCreateContent("sketchpads", counts, capabilities)) {
+      useMembership.getState().requestUpgrade("sketchpads", "sketchpad_limit");
       return null;
     }
     set({ busy: true, error: null });
@@ -154,11 +161,26 @@ export const useProfiles = create<ProfilesState>((set, get) => ({
           birthYear: input.birthYear ?? null,
         },
         Crypto.randomUUID(),
+        {
+          maxChildren: capabilities.maxChildren,
+          maxSketchpads: capabilities.maxSketchpads,
+        },
       );
       await useDrawings.getState().reloadForAccount();
       await get().reloadForAccount();
       return id;
     } catch (error) {
+      if (isContentLimitReachedError(error)) {
+        useMembership
+          .getState()
+          .requestUpgrade(
+            error.resource,
+            error.resource === "children" ? "child_limit" : "sketchpad_limit",
+          );
+        await useDrawings.getState().reloadForAccount();
+        await get().reloadForAccount();
+        return null;
+      }
       set({ error: message(error) });
       return null;
     } finally {

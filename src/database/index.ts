@@ -118,8 +118,9 @@ export function finishBukiOnboarding(input: Parameters<typeof completeLocalOnboa
 export function addBukiChild(
   child: Omit<LocalChildProfile, "ownerId" | "sortOrder" | "createdAt">,
   defaultPadId: string,
+  limits: Parameters<typeof createLocalChild>[3],
 ) {
-  return createLocalChild(requireBukiDatabase(), child, defaultPadId).then(() => {
+  return createLocalChild(requireBukiDatabase(), child, defaultPadId, limits).then(() => {
     notifySyncQueueChanged();
   });
 }

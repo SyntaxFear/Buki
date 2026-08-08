@@ -46,6 +46,7 @@ export function Home() {
   const pending = useDrawings((s) => s.pending);
   const hydrated = useDrawings((s) => s.hydrated);
   const commitPending = useDrawings((s) => s.commitPending);
+  const requestArtworkCreation = useDrawings((s) => s.requestArtworkCreation);
   const clearActivePad = useDrawings((s) => s.clearActivePad);
   const adultProfile = useAuth((s) => s.profile);
 
@@ -582,7 +583,9 @@ export function Home() {
       <View style={[styles.fabWrap, { bottom: insets.bottom + 26 }]}>
         <View style={styles.fabShell}>
           <Pressable
-            onPress={() => router.push("/scan")}
+            onPress={() => {
+              if (requestArtworkCreation("artwork_limit")) router.push("/scan");
+            }}
             onLongPress={() => {
               notificationHaptic(Haptics.NotificationFeedbackType.Warning);
               void (async () => {
