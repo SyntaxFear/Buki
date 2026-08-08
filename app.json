@@ -12,7 +12,22 @@
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UTExportedTypeDeclarations": [
+          {
+            "UTTypeIdentifier": "com.parastashvili.buki.archive",
+            "UTTypeDescription": "Buki Library Archive",
+            "UTTypeConformsTo": [
+              "public.zip-archive"
+            ],
+            "UTTypeTagSpecification": {
+              "public.filename-extension": [
+                "buki"
+              ],
+              "public.mime-type": "application/vnd.buki.archive"
+            }
+          }
+        ]
       }
     },
     "android": {

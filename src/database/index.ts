@@ -33,6 +33,10 @@ import {
   saveLocalEntitlementSnapshot,
 } from "./entitlement-repository";
 import type { EntitlementSnapshot } from "@/subscription/access";
+import {
+  mergeImportedArchive,
+  type ImportedArchiveLibrary,
+} from "./archive-repository";
 
 export { BUKI_DATABASE_NAME };
 
@@ -142,3 +146,9 @@ export function enqueueLibrarySnapshot(data: StoreData): void {
 export async function flushLibraryWrites(): Promise<void> {
   await writeQueue;
 }
+
+export function importBukiLibraryArchive(imported: ImportedArchiveLibrary) {
+  return mergeImportedArchive(requireBukiDatabase(), imported);
+}
+
+export type { ImportedArchiveLibrary };

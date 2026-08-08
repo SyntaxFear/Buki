@@ -1,3 +1,4 @@
+import * as DocumentPicker from "expo-document-picker";
 import * as Sharing from "expo-sharing";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -12,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { createBukiArchive, importBukiArchive } from "@/archive/buki-archive";
 import { createSketchpadPdf } from "@/export/sketchpad-pdf";
 import { createSketchpadZip } from "@/export/sketchpad-zip";
 import { useDrawings } from "@/store/drawings";
@@ -21,7 +23,8 @@ import { useProfiles } from "@/store/profiles";
 import type { PadStyle } from "@/store/migrate";
 import { colors } from "@/theme";
 
-type ExportKind = "pdf" | "zip";
+type SketchpadExportKind = "pdf" | "zip";
+type ExportKind = SketchpadExportKind | "archive" | "import";
 
 const STYLE_LABELS: Record<PadStyle, string> = {
   spread: "Open spread",
@@ -72,7 +75,7 @@ export function ExportsScreen() {
   const drawings = selectedPad ? drawingsByPad[selectedPad.id] ?? [] : [];
   const childName = children.find((child) => child.id === activeChildId)?.name;
 
-  const exportSketchpad = async (kind: ExportKind) => {
+  const exportSketchpad = async (kind: SketchpadExportKind) => {
     if (!canExport) {
       requestUpgrade("exportData", kind === "pdf" ? "account_export_pdf" : "account_export_zip");
       return;
@@ -108,12 +111,69 @@ export function ExportsScreen() {
     }
   };
 
+  const exportFullArchive = async () => {
+    if (!canExport) {
+      requestUpgrade("exportData", "account_export_archive");
+      return;
+    }
+    if (!(await confirmAdult("Creating a full Buki archive opens Apple’s system share sheet."))) return;
+    setBusy("archive");
+    try {
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert("Sharing unavailable", "This device cannot open Apple’s share sheet right now.");
+        return;
+      }
+      const result = await createBukiArchive();
+      if (!(await confirmIncompleteExport(result.missingMedia))) return;
+      await Sharing.shareAsync(result.uri, {
+        mimeType: "application/vnd.buki.archive",
+        UTI: "com.parastashvili.buki.archive",
+        dialogTitle: result.filename,
+      });
+    } catch (error) {
+      Alert.alert("Could not create Buki archive", error instanceof Error ? error.message : "Please try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const importFullArchive = async () => {
+    if (!canExport) {
+      requestUpgrade("exportData", "account_import_archive");
+      return;
+    }
+    if (!(await confirmAdult("Importing a Buki archive adds child profiles, sketchpads, and artwork to this account."))) return;
+    try {
+      const selection = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (selection.canceled) return;
+      setBusy("import");
+      const result = await importBukiArchive(selection.assets[0].uri);
+      const added = result.childrenAdded + result.sketchpadsAdded + result.artworksAdded;
+      Alert.alert(
+        added > 0 ? "Buki archive imported" : "Nothing new to import",
+        [
+          `${result.childrenAdded} child profile${result.childrenAdded === 1 ? "" : "s"}, ${result.sketchpadsAdded} sketchpad${result.sketchpadsAdded === 1 ? "" : "s"}, and ${result.artworksAdded} artwork${result.artworksAdded === 1 ? "" : "s"} added.`,
+          result.duplicatesSkipped ? `${result.duplicatesSkipped} duplicate artwork${result.duplicatesSkipped === 1 ? " was" : "s were"} skipped.` : "",
+          result.missingSkipped ? `${result.missingSkipped} artwork${result.missingSkipped === 1 ? " had" : "s had"} no restorable cutout and were skipped.` : "",
+        ].filter(Boolean).join("\n"),
+      );
+    } catch (error) {
+      Alert.alert("Could not import Buki archive", error instanceof Error ? error.message : "Please choose a valid .buki file.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <View style={styles.root}>
       <View style={[styles.navigation, { paddingTop: insets.top + 8 }]}>
         <View>
           <Text style={styles.eyebrow}>BUKI PRO</Text>
-          <Text style={styles.title}>Export Sketchpad</Text>
+          <Text style={styles.title}>Export & Backup</Text>
         </View>
         <Pressable
           onPress={() => router.back()}
@@ -131,7 +191,7 @@ export function ExportsScreen() {
           <View style={styles.introCopy}>
             <Text style={styles.introTitle}>A portable copy of their creativity</Text>
             <Text style={styles.introDetail}>
-              PDF recreates the sketchpad layout. ZIP keeps images, available originals, and complete metadata together.
+              Share one sketchpad as PDF or ZIP, or protect the complete local library with a versioned Buki archive.
             </Text>
           </View>
         </View>
@@ -176,23 +236,46 @@ export function ExportsScreen() {
             </Pressable>
           </View>
         ) : (
-          <View style={styles.exportGrid}>
-            <ExportCard
-              badge="PDF"
-              title="Sketchpad PDF"
-              detail="A print-ready book that follows the selected spread, page, grid, or strip layout."
-              busy={busy === "pdf"}
-              disabled={busy !== null || !selectedPad}
-              onPress={() => void exportSketchpad("pdf")}
-            />
-            <ExportCard
-              badge="ZIP"
-              title="Images + metadata"
-              detail="Transparent images, available originals, JSON, CSV, and missing-media records."
-              busy={busy === "zip"}
-              disabled={busy !== null || !selectedPad}
-              onPress={() => void exportSketchpad("zip")}
-            />
+          <View style={styles.proContent}>
+            <View style={styles.exportGrid}>
+              <ExportCard
+                badge="PDF"
+                title="Sketchpad PDF"
+                detail="A print-ready book that follows the selected spread, page, grid, or strip layout."
+                busy={busy === "pdf"}
+                disabled={busy !== null || !selectedPad}
+                onPress={() => void exportSketchpad("pdf")}
+              />
+              <ExportCard
+                badge="ZIP"
+                title="Images + metadata"
+                detail="Transparent images, available originals, JSON, CSV, and missing-media records."
+                busy={busy === "zip"}
+                disabled={busy !== null || !selectedPad}
+                onPress={() => void exportSketchpad("zip")}
+              />
+            </View>
+
+            <Text style={styles.sectionTitle}>Full library archive</Text>
+            <View style={styles.exportGrid}>
+              <ExportCard
+                badge=".BUKI"
+                title="Create full archive"
+                detail="All child profile fields, sketchpads, artwork metadata, checksums, and available media. No credentials or subscription data."
+                busy={busy === "archive"}
+                disabled={busy !== null}
+                onPress={() => void exportFullArchive()}
+              />
+              <ExportCard
+                badge="IMPORT"
+                title="Restore from archive"
+                detail="Validates the archive and every checksum, skips duplicate artwork, and never overwrites existing content."
+                actionLabel="Choose Archive"
+                busy={busy === "import"}
+                disabled={busy !== null}
+                onPress={() => void importFullArchive()}
+              />
+            </View>
           </View>
         )}
 
@@ -211,6 +294,7 @@ function ExportCard({
   busy,
   disabled,
   onPress,
+  actionLabel = "Create & Share",
 }: {
   badge: string;
   title: string;
@@ -218,6 +302,7 @@ function ExportCard({
   busy: boolean;
   disabled: boolean;
   onPress: () => void;
+  actionLabel?: string;
 }) {
   return (
     <Pressable
@@ -230,7 +315,7 @@ function ExportCard({
       <Text style={styles.exportTitle}>{title}</Text>
       <Text style={styles.exportDetail}>{detail}</Text>
       <View style={styles.exportAction}>
-        {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.exportActionLabel}>Create & Share</Text>}
+        {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.exportActionLabel}>{actionLabel}</Text>}
       </View>
     </Pressable>
   );
@@ -271,6 +356,7 @@ const styles = StyleSheet.create({
   radioSelected: { borderColor: colors.titleTeal },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.titleTeal },
   exportGrid: { gap: 13 },
+  proContent: { gap: 18 },
   exportCard: { padding: 18, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, shadowColor: "#6B5A48", shadowOpacity: 0.08, shadowRadius: 13, shadowOffset: { width: 0, height: 5 } },
   fileBadge: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.backgroundDeep },
   fileBadgeText: { color: colors.titleCoral, fontSize: 12, fontWeight: "900", letterSpacing: 1 },

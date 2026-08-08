@@ -398,7 +398,14 @@ export function AccountCenter() {
               else void introducePro("exportData", "account_export_zip");
             }}
           />
-          <SettingRow title="Buki archive" detail="Versioned backup and import" onPress={() => void introducePro("exportData", "account_export_archive")} />
+          <SettingRow
+            title="Buki archive"
+            detail={capabilities.exportData ? "Versioned full-library backup and duplicate-safe import" : "Versioned backup and import · Buki Pro"}
+            onPress={() => {
+              if (capabilities.exportData) router.push("/exports");
+              else void introducePro("exportData", "account_export_archive");
+            }}
+          />
         </Section>
 
         <Section title="Preferences">
