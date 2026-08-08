@@ -6,6 +6,7 @@ import { enqueueLibrarySnapshot, loadLibrarySnapshot } from "@/database";
 import { getPadDesign, type PadDesignId } from "@/pad-designs";
 import { canCreateContent, type ContentCounts } from "@/subscription/access";
 import { currentCapabilities, useMembership } from "@/store/membership";
+import { useProfiles } from "@/store/profiles";
 import {
   makePad,
   migrateStoreData,
@@ -183,7 +184,9 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       useMembership.getState().requestUpgrade("sketchpads", "sketchpad_limit");
       return null;
     }
-    const pad = makePad(name, style, design, Date.now(), undefined, pageColor);
+    const childId = useProfiles.getState().activeChildId;
+    if (!childId) return null;
+    const pad = makePad(name, style, design, Date.now(), undefined, pageColor, childId);
     const nextPads = [...pads, pad];
     const nextByPad = { ...drawingsByPad, [pad.id]: [] };
     set({ pads: nextPads, drawingsByPad: nextByPad, activePadId: pad.id });

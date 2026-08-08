@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BUKI_DATABASE_NAME, initializeBukiDatabase } from "@/database";
 import { useDrawings } from "@/store/drawings";
 import { useAuth } from "@/store/auth";
+import { useProfiles } from "@/store/profiles";
 import { colors, PATRICK_HAND } from "@/theme";
 
 // Module scope, unawaited: called any later (e.g. inside the component) risks
@@ -36,19 +37,22 @@ function ReadyApp() {
   const hydrate = useDrawings((s) => s.hydrate);
   const authHydrated = useAuth((s) => s.hydrated);
   const initializeAuth = useAuth((s) => s.initialize);
+  const profilesHydrated = useProfiles((s) => s.hydrated);
+  const hydrateProfiles = useProfiles((s) => s.hydrate);
   const [splashHidden, setSplashHidden] = useState(false);
 
   useEffect(() => {
     void (async () => {
       await initializeAuth();
+      await hydrateProfiles();
       await hydrate();
     })();
-  }, [hydrate, initializeAuth]);
+  }, [hydrate, hydrateProfiles, initializeAuth]);
 
   // The native splash stays up until every readiness signal — fonts for the
   // title/UI, and the sketchpad store — has actually landed, so it never
   // hands off to a still-loading frame.
-  const ready = fontsLoaded && hydrated && authHydrated;
+  const ready = fontsLoaded && hydrated && authHydrated && profilesHydrated;
 
   useEffect(() => {
     if (ready && !splashHidden) {

@@ -13,6 +13,7 @@ import {
 import { getSupabaseClient } from "@/auth/supabase";
 import { parseOAuthCallback } from "@/auth/oauth";
 import { useDrawings } from "@/store/drawings";
+import { useProfiles } from "@/store/profiles";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -62,6 +63,7 @@ async function applySession(session: Session | null): Promise<void> {
       profile: null,
     });
     useDrawings.getState().resetForAccountSwitch();
+    useProfiles.getState().resetForAccountSwitch();
     return;
   }
 
@@ -76,6 +78,7 @@ async function applySession(session: Session | null): Promise<void> {
     error: null,
   });
   await useDrawings.getState().reloadForAccount();
+  await useProfiles.getState().reloadForAccount();
 }
 
 async function completeOAuth(url: string): Promise<Session | null> {
