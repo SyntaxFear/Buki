@@ -11,13 +11,15 @@ interface LegacySource {
   raw: unknown;
 }
 
-function readLegacySource(): LegacySource {
+export function readLegacySource(): LegacySource {
   for (const name of ["buki.json", "bloombook.json"] as const) {
+    const file = new File(Paths.document, name);
+    if (!file.exists) continue;
     try {
-      const file = new File(Paths.document, name);
-      if (file.exists) return { name, raw: JSON.parse(file.textSync()) };
+      return { name, raw: JSON.parse(file.textSync()) };
     } catch (error) {
       console.warn(`Failed to read legacy ${name}`, error);
+      throw new Error(`Legacy ${name} could not be parsed`);
     }
   }
   return { name: "none", raw: null };

@@ -32,7 +32,7 @@ export function buildLegacyMigrationRecords(
   const firstCreatedAt = Math.min(...data.pads.map((pad) => pad.createdAt), Date.now());
   const sketchpads = data.pads.map((pad, sortOrder) => ({
     ...pad,
-    childId: pad.childId || DEFAULT_CHILD_ID,
+    childId: DEFAULT_CHILD_ID,
     sortOrder,
   }));
   const padById = new Map(sketchpads.map((pad) => [pad.id, pad]));

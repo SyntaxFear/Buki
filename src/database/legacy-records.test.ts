@@ -66,6 +66,20 @@ describe("legacy SQLite migration records", () => {
     });
   });
 
+  it("assigns parser-supported legacy child IDs to the single default child", () => {
+    const records = buildLegacyMigrationRecords(
+      {
+        ...legacy,
+        pads: legacy.pads.map((pad) => ({ ...pad, childId: "legacy-child" })),
+      },
+      () => true,
+    );
+
+    expect(records.child.id).toBe("child-default");
+    expect(records.sketchpads[0].childId).toBe("child-default");
+    expect(records.artworks[0].childId).toBe("child-default");
+  });
+
   it("keeps artwork metadata when its source image is missing", () => {
     const records = buildLegacyMigrationRecords(legacy, () => false);
     expect(records.artworks).toHaveLength(1);
