@@ -1,7 +1,8 @@
-import { File, Paths } from "expo-file-system";
+import { File } from "expo-file-system";
 import { create } from "zustand";
 
 import type { ProcessedCutout } from "@/utils/imageio";
+import { enqueueLibrarySnapshot, loadLibrarySnapshot } from "@/database";
 import { getPadDesign, type PadDesignId } from "@/pad-designs";
 import { canCreateContent, type ContentCounts } from "@/subscription/access";
 import { currentCapabilities, useMembership } from "@/store/membership";
@@ -27,7 +28,7 @@ interface DrawingsState {
   activePadId: string;
   drawingsByPad: Record<string, Drawing[]>;
   pending: PendingDrawing | null;
-  hydrate: () => void;
+  hydrate: () => Promise<void>;
   setPending: (cutout: ProcessedCutout) => void;
   /** Land the pending cutout in the active pad and persist it. */
   commitPending: () => boolean;
@@ -66,15 +67,6 @@ export function activePadOf(s: { pads: Sketchpad[]; activePadId: string }): Sket
   return s.pads.find((p) => p.id === s.activePadId);
 }
 
-function indexFile(): File {
-  return new File(Paths.document, "buki.json");
-}
-
-/** Pre-rebrand index file; migrated on first hydrate after the Buki update. */
-function legacyIndexFile(): File {
-  return new File(Paths.document, "bloombook.json");
-}
-
 function persist(s: { activePadId: string; pads: Sketchpad[]; drawingsByPad: Record<string, Drawing[]> }): void {
   const data: StoreData = {
     version: 3,
@@ -82,11 +74,7 @@ function persist(s: { activePadId: string; pads: Sketchpad[]; drawingsByPad: Rec
     pads: s.pads,
     drawingsByPad: s.drawingsByPad,
   };
-  try {
-    indexFile().write(JSON.stringify(data));
-  } catch (e) {
-    console.warn("Failed to persist sketchpads", e);
-  }
+  enqueueLibrarySnapshot(data);
 }
 
 function deleteDrawingFiles(drawings: Drawing[]): void {
@@ -108,44 +96,25 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
   drawingsByPad: {},
   pending: null,
 
-  hydrate: () => {
+  hydrate: async () => {
     if (get().hydrated) return;
-    let raw: unknown = null;
-    let sourceWasLegacy = false;
     try {
-      let file = indexFile();
-      if (!file.exists && legacyIndexFile().exists) {
-        file = legacyIndexFile();
-        sourceWasLegacy = true;
-      }
-      if (file.exists) raw = JSON.parse(file.textSync());
-    } catch (e) {
-      console.warn("Failed to read sketchpads", e);
-    }
-
-    const data = migrateStoreData(raw, Date.now());
-    // Drop index entries whose PNG vanished from disk
-    for (const pad of data.pads) {
-      data.drawingsByPad[pad.id] = (data.drawingsByPad[pad.id] ?? []).filter((d) => {
-        try {
-          return new File(d.uri).exists;
-        } catch {
-          return false;
-        }
+      const data = await loadLibrarySnapshot();
+      set({
+        hydrated: true,
+        pads: data.pads,
+        activePadId: data.activePadId,
+        drawingsByPad: data.drawingsByPad,
       });
-    }
-
-    set({
-      hydrated: true,
-      pads: data.pads,
-      activePadId: data.activePadId,
-      drawingsByPad: data.drawingsByPad,
-    });
-    persist(data);
-    if (sourceWasLegacy) {
-      try {
-        legacyIndexFile().delete();
-      } catch {}
+    } catch (error) {
+      console.warn("Failed to hydrate Buki library", error);
+      const data = migrateStoreData(null, Date.now());
+      set({
+        hydrated: true,
+        pads: data.pads,
+        activePadId: data.activePadId,
+        drawingsByPad: data.drawingsByPad,
+      });
     }
   },
 

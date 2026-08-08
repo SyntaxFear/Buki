@@ -1,10 +1,12 @@
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
+import { SQLiteProvider } from "expo-sqlite";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
+import { BUKI_DATABASE_NAME, initializeBukiDatabase } from "@/database";
 import { useDrawings } from "@/store/drawings";
 import { colors, PATRICK_HAND } from "@/theme";
 
@@ -20,13 +22,21 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  return (
+    <SQLiteProvider databaseName={BUKI_DATABASE_NAME} onInit={initializeBukiDatabase}>
+      <ReadyApp />
+    </SQLiteProvider>
+  );
+}
+
+function ReadyApp() {
   const [fontsLoaded] = useFonts({ PatrickHand: PATRICK_HAND });
   const hydrated = useDrawings((s) => s.hydrated);
   const hydrate = useDrawings((s) => s.hydrate);
   const [splashHidden, setSplashHidden] = useState(false);
 
   useEffect(() => {
-    hydrate();
+    void hydrate();
   }, [hydrate]);
 
   // The native splash stays up until every readiness signal — fonts for the

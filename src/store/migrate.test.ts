@@ -29,6 +29,7 @@ describe("migrateStoreData", () => {
     expect(out.pads).toHaveLength(1);
     expect(out.pads[0].style).toBe("spread");
     expect(out.pads[0].name).toBe("My Book");
+    expect(out.pads[0].childId).toBe("child-default");
     expect(out.pads[0].design).toBe("sunshine");
     expect(out.activePadId).toBe(out.pads[0].id);
     expect(out.drawingsByPad[out.pads[0].id]).toHaveLength(2);
@@ -101,6 +102,7 @@ describe("migrateStoreData", () => {
     const out = migrateStoreData(v3, NOW);
     expect(out.version).toBe(3);
     expect(out.pads[0].design).toBe("sky");
+    expect(out.pads[0].childId).toBe("child-default");
     expect(out.pads[0].pageColor).toBe("#F8FCFF");
   });
 

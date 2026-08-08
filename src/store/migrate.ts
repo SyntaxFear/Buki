@@ -8,6 +8,7 @@ import {
   isPadDesignId,
   type PadDesignId,
 } from "@/pad-designs";
+import { DEFAULT_CHILD_ID } from "@/database/constants";
 
 export type PadStyle = "spread" | "vertical" | "album" | "grid" | "strip";
 
@@ -27,6 +28,7 @@ export interface Drawing {
 
 export interface Sketchpad {
   id: string;
+  childId: string;
   name: string;
   style: PadStyle;
   design: PadDesignId;
@@ -54,10 +56,12 @@ export function makePad(
   now: number,
   id?: string,
   pageColor?: string,
+  childId: string = DEFAULT_CHILD_ID,
 ): Sketchpad {
   const palette = getPadDesign(design);
   return {
     id: id ?? `pad-${now}-${Math.random().toString(36).slice(2, 8)}`,
+    childId,
     name: name.trim() || DEFAULT_PAD_NAME,
     style,
     design,
@@ -137,6 +141,7 @@ function normalizePad(value: unknown): Sketchpad | null {
 
   return {
     id: pad.id,
+    childId: typeof pad.childId === "string" ? pad.childId : DEFAULT_CHILD_ID,
     name: pad.name,
     style: pad.style as PadStyle,
     design,
