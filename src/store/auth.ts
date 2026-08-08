@@ -8,12 +8,14 @@ import type { Session, User } from "@supabase/supabase-js";
 import {
   activateBukiAccount,
   clearBukiAccount,
+  editAdultProfile,
   loadAdultProfile,
 } from "@/database";
 import { getSupabaseClient } from "@/auth/supabase";
 import { parseOAuthCallback } from "@/auth/oauth";
 import { useDrawings } from "@/store/drawings";
 import { useProfiles } from "@/store/profiles";
+import { usePreferences } from "@/store/preferences";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -40,6 +42,8 @@ interface AuthState {
   verifyEmailOtp: (email: string, token: string) => Promise<boolean>;
   signInWithApple: () => Promise<boolean>;
   signInWithGoogle: () => Promise<boolean>;
+  refreshProfile: () => Promise<void>;
+  updateProfile: (updates: { displayName: string; avatarUri: string | null }) => Promise<boolean>;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
@@ -64,6 +68,7 @@ async function applySession(session: Session | null): Promise<void> {
     });
     useDrawings.getState().resetForAccountSwitch();
     useProfiles.getState().resetForAccountSwitch();
+    usePreferences.getState().resetForAccountSwitch();
     return;
   }
 
@@ -79,6 +84,8 @@ async function applySession(session: Session | null): Promise<void> {
   });
   await useDrawings.getState().reloadForAccount();
   await useProfiles.getState().reloadForAccount();
+  usePreferences.getState().resetForAccountSwitch();
+  await usePreferences.getState().hydrate();
 }
 
 async function completeOAuth(url: string): Promise<Session | null> {
@@ -233,6 +240,35 @@ export const useAuth = create<AuthState>((set, get) => ({
       const session = await completeOAuth(result.url);
       await applySession(session);
       return Boolean(session);
+    } catch (error) {
+      set({ error: errorMessage(error) });
+      return false;
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  refreshProfile: async () => {
+    const user = get().user;
+    if (!user) return;
+    const profile = await loadAdultProfile(user.id);
+    set({ profile });
+  },
+
+  updateProfile: async (updates) => {
+    const user = get().user;
+    const displayName = updates.displayName.trim();
+    if (!user || !displayName) return false;
+    set({ busy: true, error: null });
+    try {
+      const { error } = await getSupabaseClient().auth.updateUser({
+        data: { full_name: displayName, avatar_url: updates.avatarUri },
+      });
+      if (error) throw error;
+      await editAdultProfile(user.id, { displayName, avatarUri: updates.avatarUri });
+      const profile = await loadAdultProfile(user.id);
+      set({ profile });
+      return true;
     } catch (error) {
       set({ error: errorMessage(error) });
       return false;

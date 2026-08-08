@@ -2,7 +2,7 @@ import { File } from "expo-file-system";
 import type { SQLiteDatabase } from "expo-sqlite";
 
 import { migrateStoreData, type Drawing, type StoreData } from "@/store/migrate";
-import { DEFAULT_CHILD_ID, DEFAULT_CHILD_NAME } from "./constants";
+import { DEFAULT_CHILD_ID } from "./constants";
 import { activeLocalOwnerId, activePadPreferenceKey } from "./account-repository";
 
 interface SketchpadRow {
@@ -32,6 +32,14 @@ function fileExists(uri: string): boolean {
     return new File(uri).exists;
   } catch {
     return false;
+  }
+}
+
+function fileSize(uri: string): number | null {
+  try {
+    return new File(uri).size;
+  } catch {
+    return null;
   }
 }
 
@@ -97,20 +105,6 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
   const now = Date.now();
   const ownerId = await activeLocalOwnerId(db);
   await db.withExclusiveTransactionAsync(async (tx) => {
-    await tx.runAsync(
-      `INSERT INTO child_profiles (
-        id, owner_id, name, avatar_color, sort_order, created_at, updated_at
-      ) VALUES (?, ?, ?, '#FFD65A', 0, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        owner_id = COALESCE(child_profiles.owner_id, excluded.owner_id),
-        updated_at = excluded.updated_at`,
-      DEFAULT_CHILD_ID,
-      ownerId,
-      DEFAULT_CHILD_NAME,
-      now,
-      now,
-    );
-
     const artworkIds: string[] = [];
     for (const [sortOrder, pad] of data.pads.entries()) {
       await tx.runAsync(
@@ -229,10 +223,11 @@ async function upsertMediaRows(
   for (const row of rows) {
     await db.runAsync(
       `INSERT INTO media_files (
-        id, owner_id, artwork_id, kind, local_uri, mime_type, upload_state, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 'local', ?, ?)
+        id, owner_id, artwork_id, kind, local_uri, byte_size, mime_type, upload_state, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'local', ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         local_uri = excluded.local_uri,
+        byte_size = excluded.byte_size,
         mime_type = excluded.mime_type,
         updated_at = excluded.updated_at`,
       row.id,
@@ -240,6 +235,7 @@ async function upsertMediaRows(
       drawing.id,
       row.kind,
       row.uri,
+      fileSize(row.uri),
       row.mime,
       drawing.addedAt,
       now,

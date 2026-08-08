@@ -6,7 +6,6 @@ import { enqueueLibrarySnapshot, loadLibrarySnapshot } from "@/database";
 import { getPadDesign, type PadDesignId } from "@/pad-designs";
 import { canCreateContent, type ContentCounts } from "@/subscription/access";
 import { currentCapabilities, useMembership } from "@/store/membership";
-import { useProfiles } from "@/store/profiles";
 import {
   makePad,
   migrateStoreData,
@@ -38,12 +37,20 @@ interface DrawingsState {
   clearPending: () => void;
   /** Wipe the active pad's drawings (long-press on the camera button). */
   clearActivePad: () => void;
-  createPad: (name: string, style: PadStyle, design: PadDesignId, pageColor?: string) => string | null;
+  createPad: (
+    name: string,
+    style: PadStyle,
+    design: PadDesignId,
+    pageColor?: string,
+    childId?: string,
+  ) => string | null;
   setPadDesign: (id: string, design: PadDesignId) => void;
   renamePad: (id: string, name: string) => void;
   /** Deletes the pad and its drawings from disk. No-op on the last pad. */
   deletePad: (id: string) => void;
   setActivePad: (id: string) => void;
+  setActiveChild: (childId: string) => void;
+  removeChildContent: (childId: string) => void;
 }
 
 const EMPTY_DRAWINGS: Drawing[] = [];
@@ -178,13 +185,12 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     persist({ activePadId, pads, drawingsByPad: nextByPad });
   },
 
-  createPad: (name, style, design, pageColor) => {
+  createPad: (name, style, design, pageColor, childId) => {
     const { pads, drawingsByPad } = get();
     if (!canCreateContent("sketchpads", contentCountsOf({ pads, drawingsByPad }), currentCapabilities())) {
       useMembership.getState().requestUpgrade("sketchpads", "sketchpad_limit");
       return null;
     }
-    const childId = useProfiles.getState().activeChildId;
     if (!childId) return null;
     const pad = makePad(name, style, design, Date.now(), undefined, pageColor, childId);
     const nextPads = [...pads, pad];
@@ -222,12 +228,15 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
 
   deletePad: (id) => {
     const { pads, drawingsByPad, activePadId } = get();
-    if (pads.length <= 1) return;
+    const target = pads.find((pad) => pad.id === id);
+    if (!target || pads.filter((pad) => pad.childId === target.childId).length <= 1) return;
     deleteDrawingFiles(drawingsByPad[id] ?? []);
     const nextPads = pads.filter((p) => p.id !== id);
     const nextByPad = { ...drawingsByPad };
     delete nextByPad[id];
-    const nextActive = activePadId === id ? nextPads[0].id : activePadId;
+    const nextActive = activePadId === id
+      ? (nextPads.find((pad) => pad.childId === target.childId)?.id ?? nextPads[0].id)
+      : activePadId;
     set({ pads: nextPads, drawingsByPad: nextByPad, activePadId: nextActive });
     persist({ activePadId: nextActive, pads: nextPads, drawingsByPad: nextByPad });
   },
@@ -237,5 +246,26 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     if (id === activePadId || !pads.some((p) => p.id === id)) return;
     set({ activePadId: id, pending: null });
     persist({ activePadId: id, pads, drawingsByPad });
+  },
+
+  setActiveChild: (childId) => {
+    const { pads, drawingsByPad, activePadId } = get();
+    const nextPad = pads.find((pad) => pad.childId === childId);
+    if (!nextPad || nextPad.id === activePadId) return;
+    set({ activePadId: nextPad.id, pending: null });
+    persist({ activePadId: nextPad.id, pads, drawingsByPad });
+  },
+
+  removeChildContent: (childId) => {
+    const { pads, drawingsByPad, activePadId } = get();
+    const removedPads = pads.filter((pad) => pad.childId === childId);
+    for (const pad of removedPads) deleteDrawingFiles(drawingsByPad[pad.id] ?? []);
+    const removedIds = new Set(removedPads.map((pad) => pad.id));
+    const nextPads = pads.filter((pad) => !removedIds.has(pad.id));
+    const nextByPad = { ...drawingsByPad };
+    for (const id of removedIds) delete nextByPad[id];
+    const nextActive = removedIds.has(activePadId) ? (nextPads[0]?.id ?? "") : activePadId;
+    set({ pads: nextPads, drawingsByPad: nextByPad, activePadId: nextActive, pending: null });
+    if (nextActive) persist({ activePadId: nextActive, pads: nextPads, drawingsByPad: nextByPad });
   },
 }));

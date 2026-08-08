@@ -16,6 +16,7 @@ import {
 
 import { getPublicAppConfig } from "@/config/env";
 import { useAuth } from "@/store/auth";
+import { confirmAdult } from "@/store/parental-gate";
 import { useProfiles } from "@/store/profiles";
 import { colors, PATRICK_HAND } from "@/theme";
 import { useFonts } from "expo-font";
@@ -23,7 +24,8 @@ import { useFonts } from "expo-font";
 const ADULT_AVATARS = ["🌻", "🦊", "🐻", "🌈", "⭐️"] as const;
 const CHILD_COLORS = ["#FFD65A", "#70D0BD", "#86B8EA", "#FFA7B9", "#A98BE6"] as const;
 
-function openExternal(url: string) {
+async function openExternal(url: string) {
+  if (!(await confirmAdult("This link opens outside Buki."))) return;
   Alert.alert("Open in your browser?", url, [
     { text: "Cancel", style: "cancel" },
     { text: "Open", onPress: () => void Linking.openURL(url) },
@@ -41,6 +43,7 @@ export function OnboardingScreen() {
   const verifyEmailOtp = useAuth((state) => state.verifyEmailOtp);
   const signInWithApple = useAuth((state) => state.signInWithApple);
   const signInWithGoogle = useAuth((state) => state.signInWithGoogle);
+  const refreshProfile = useAuth((state) => state.refreshProfile);
   const signOut = useAuth((state) => state.signOut);
   const children = useProfiles((state) => state.children);
   const profileBusy = useProfiles((state) => state.busy);
@@ -153,14 +156,17 @@ export function OnboardingScreen() {
             <PrimaryButton
               title="Create my Buki"
               busy={busy}
-              onPress={() =>
-                void completeOnboarding({
-                  adultName,
-                  adultAvatarUri: `emoji:${adultAvatar}`,
-                  childName,
-                  childAvatarColor: childColor,
-                })
-              }
+              onPress={() => {
+                void (async () => {
+                  const completed = await completeOnboarding({
+                    adultName,
+                    adultAvatarUri: `emoji:${adultAvatar}`,
+                    childName,
+                    childAvatarColor: childColor,
+                  });
+                  if (completed) await refreshProfile();
+                })();
+              }}
             />
             <Pressable onPress={() => void signOut()} disabled={busy} style={styles.textButton}>
               <Text style={styles.textButtonLabel}>Use a different account</Text>
@@ -251,13 +257,13 @@ export function OnboardingScreen() {
             Buki stores only the adult account details and the child profile information you choose to add. Artwork is not public.
           </Text>
           <View style={styles.linkRow}>
-            <Pressable onPress={() => openExternal(config.privacyUrl)}>
+            <Pressable onPress={() => void openExternal(config.privacyUrl)}>
               <Text style={styles.link}>Privacy</Text>
             </Pressable>
-            <Pressable onPress={() => openExternal(config.termsUrl)}>
+            <Pressable onPress={() => void openExternal(config.termsUrl)}>
               <Text style={styles.link}>Terms</Text>
             </Pressable>
-            <Pressable onPress={() => openExternal(config.supportUrl)}>
+            <Pressable onPress={() => void openExternal(config.supportUrl)}>
               <Text style={styles.link}>Support</Text>
             </Pressable>
           </View>

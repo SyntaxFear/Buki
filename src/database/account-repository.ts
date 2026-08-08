@@ -95,3 +95,19 @@ export async function getLocalAdultProfile(
     ? { id: row.id, displayName: row.display_name, email: row.email, avatarUri: row.avatar_uri }
     : null;
 }
+
+export async function updateLocalAdultProfile(
+  db: SQLiteDatabase,
+  ownerId: string,
+  updates: { displayName: string; avatarUri: string | null },
+): Promise<void> {
+  await db.runAsync(
+    `UPDATE adult_profiles
+     SET display_name = ?, avatar_uri = ?, updated_at = ?
+     WHERE id = ?`,
+    updates.displayName,
+    updates.avatarUri,
+    Date.now(),
+    ownerId,
+  );
+}

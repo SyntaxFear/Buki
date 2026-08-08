@@ -9,16 +9,25 @@ import {
   activateLocalAccount,
   clearActiveLocalAccount,
   getLocalAdultProfile,
+  updateLocalAdultProfile,
 } from "./account-repository";
 import type { User } from "@supabase/supabase-js";
 import {
   completeLocalOnboarding,
   createLocalChild,
+  deleteLocalChild,
   loadProfileState,
+  reorderLocalChildren,
+  replayLocalOnboarding,
   setActiveLocalChild,
   updateLocalChild,
   type LocalChildProfile,
 } from "./profile-repository";
+import {
+  getBooleanPreference,
+  getLocalUsage,
+  setBooleanPreference,
+} from "./settings-repository";
 
 export { BUKI_DATABASE_NAME };
 
@@ -48,6 +57,13 @@ export function loadAdultProfile(ownerId: string) {
   return getLocalAdultProfile(requireBukiDatabase(), ownerId);
 }
 
+export function editAdultProfile(
+  ownerId: string,
+  updates: { displayName: string; avatarUri: string | null },
+) {
+  return updateLocalAdultProfile(requireBukiDatabase(), ownerId, updates);
+}
+
 export function loadBukiProfiles() {
   return loadProfileState(requireBukiDatabase());
 }
@@ -58,8 +74,9 @@ export function finishBukiOnboarding(input: Parameters<typeof completeLocalOnboa
 
 export function addBukiChild(
   child: Omit<LocalChildProfile, "ownerId" | "sortOrder" | "createdAt">,
+  defaultPadId: string,
 ) {
-  return createLocalChild(requireBukiDatabase(), child);
+  return createLocalChild(requireBukiDatabase(), child, defaultPadId);
 }
 
 export function editBukiChild(
@@ -71,6 +88,30 @@ export function editBukiChild(
 
 export function selectBukiChild(childId: string) {
   return setActiveLocalChild(requireBukiDatabase(), childId);
+}
+
+export function reorderBukiChildren(orderedIds: string[]) {
+  return reorderLocalChildren(requireBukiDatabase(), orderedIds);
+}
+
+export function removeBukiChild(childId: string) {
+  return deleteLocalChild(requireBukiDatabase(), childId);
+}
+
+export function replayBukiOnboarding() {
+  return replayLocalOnboarding(requireBukiDatabase());
+}
+
+export function loadBooleanPreference(name: string, fallback: boolean) {
+  return getBooleanPreference(requireBukiDatabase(), name, fallback);
+}
+
+export function saveBooleanPreference(name: string, value: boolean) {
+  return setBooleanPreference(requireBukiDatabase(), name, value);
+}
+
+export function loadBukiUsage() {
+  return getLocalUsage(requireBukiDatabase());
 }
 
 export function loadLibrarySnapshot(): Promise<StoreData> {

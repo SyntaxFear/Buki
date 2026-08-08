@@ -7,9 +7,11 @@ import { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { BUKI_DATABASE_NAME, initializeBukiDatabase } from "@/database";
+import { ParentalGateHost } from "@/components/parental-gate";
 import { useDrawings } from "@/store/drawings";
 import { useAuth } from "@/store/auth";
 import { useProfiles } from "@/store/profiles";
+import { usePreferences } from "@/store/preferences";
 import { colors, PATRICK_HAND } from "@/theme";
 
 // Module scope, unawaited: called any later (e.g. inside the component) risks
@@ -39,20 +41,23 @@ function ReadyApp() {
   const initializeAuth = useAuth((s) => s.initialize);
   const profilesHydrated = useProfiles((s) => s.hydrated);
   const hydrateProfiles = useProfiles((s) => s.hydrate);
+  const preferencesHydrated = usePreferences((s) => s.hydrated);
+  const hydratePreferences = usePreferences((s) => s.hydrate);
   const [splashHidden, setSplashHidden] = useState(false);
 
   useEffect(() => {
     void (async () => {
       await initializeAuth();
       await hydrateProfiles();
+      await hydratePreferences();
       await hydrate();
     })();
-  }, [hydrate, hydrateProfiles, initializeAuth]);
+  }, [hydrate, hydratePreferences, hydrateProfiles, initializeAuth]);
 
   // The native splash stays up until every readiness signal — fonts for the
   // title/UI, and the sketchpad store — has actually landed, so it never
   // hands off to a still-loading frame.
-  const ready = fontsLoaded && hydrated && authHydrated && profilesHydrated;
+  const ready = fontsLoaded && hydrated && authHydrated && profilesHydrated && preferencesHydrated;
 
   useEffect(() => {
     if (ready && !splashHidden) {
@@ -77,7 +82,12 @@ function ReadyApp() {
           name="scan"
           options={{ presentation: "fullScreenModal", animation: "fade" }}
         />
+        <Stack.Screen
+          name="account"
+          options={{ presentation: "fullScreenModal", animation: "slide_from_bottom" }}
+        />
       </Stack>
+      <ParentalGateHost />
     </GestureHandlerRootView>
   );
 }

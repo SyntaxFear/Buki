@@ -9,7 +9,6 @@ import {
 } from "@shopify/react-native-skia";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Device from "expo-device";
-import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
@@ -36,6 +35,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Glass } from "@/components/glass";
 import { useDrawings } from "@/store/drawings";
 import { colors } from "@/theme";
+import { Haptics, impactHaptic } from "@/utils/haptics";
 import { processPhotoToCutout, resolveAssetUri, type ProcessedCutout } from "@/utils/imageio";
 import { SAMPLE_PHOTOS } from "@/utils/samples";
 
@@ -94,7 +94,7 @@ export function Scan() {
         setPhase("aim");
         return;
       }
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      impactHaptic(Haptics.ImpactFeedbackStyle.Light);
       setPhotoUri(uri);
       setResult(cutout);
       setPhase("glow");

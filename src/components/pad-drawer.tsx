@@ -25,6 +25,7 @@ import { Host, Picker } from "@expo/ui";
 import { useFonts } from "expo-font";
 
 import { useDrawings, type PadStyle, type Sketchpad } from "@/store/drawings";
+import { useProfiles } from "@/store/profiles";
 import { getPadDesign, PAD_DESIGNS, type PadDesignId } from "@/pad-designs";
 import { colors, PAGE_COLORS, PATRICK_HAND } from "@/theme";
 
@@ -48,7 +49,9 @@ export function PadDrawer({ open, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const panelWidth = Math.min(PANEL_MAX_W, Math.max(0, windowWidth - PANEL_SCREEN_GUTTER));
-  const pads = useDrawings((s) => s.pads);
+  const allPads = useDrawings((s) => s.pads);
+  const activeChildId = useProfiles((s) => s.activeChildId);
+  const pads = allPads.filter((pad) => pad.childId === activeChildId);
   const activePadId = useDrawings((s) => s.activePadId);
   const drawingsByPad = useDrawings((s) => s.drawingsByPad);
   const setActivePad = useDrawings((s) => s.setActivePad);
@@ -85,7 +88,13 @@ export function PadDrawer({ open, onClose }: Props) {
   }));
 
   const submitCreate = () => {
-    const createdPadId = createPad(newName, newStyle, newDesign, newPageColor);
+    const createdPadId = createPad(
+      newName,
+      newStyle,
+      newDesign,
+      newPageColor,
+      activeChildId ?? undefined,
+    );
     if (!createdPadId) return;
     setNewName("");
     setCreating(false);

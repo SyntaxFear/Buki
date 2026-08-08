@@ -65,7 +65,9 @@ export async function loadProfileState(db: SQLiteDatabase): Promise<ProfileState
       sortOrder: row.sort_order,
       createdAt: row.created_at,
     })),
-    activeChildId: activeChild?.value ?? rows[0]?.id ?? null,
+    activeChildId: rows.some((row) => row.id === activeChild?.value)
+      ? (activeChild?.value ?? null)
+      : (rows[0]?.id ?? null),
     onboardingComplete: onboarding?.value === "true",
   };
 }
@@ -170,30 +172,47 @@ export async function completeLocalOnboarding(
 export async function createLocalChild(
   db: SQLiteDatabase,
   child: Omit<LocalChildProfile, "ownerId" | "sortOrder" | "createdAt">,
+  defaultPadId: string,
 ): Promise<void> {
   const ownerId = await activeLocalOwnerId(db);
   if (!ownerId) throw new Error("Sign in before creating a child profile.");
   const now = Date.now();
-  const count = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) AS count FROM child_profiles WHERE owner_id = ? AND deleted_at IS NULL",
-    ownerId,
-  );
-  await db.runAsync(
-    `INSERT INTO child_profiles (
-      id, owner_id, name, avatar_color, avatar_uri, birth_month, birth_year,
-      sort_order, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    child.id,
-    ownerId,
-    child.name,
-    child.avatarColor,
-    child.avatarUri,
-    child.birthMonth,
-    child.birthYear,
-    count?.count ?? 0,
-    now,
-    now,
-  );
+  const design = getPadDesign("sunshine");
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    const count = await tx.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM child_profiles WHERE owner_id = ? AND deleted_at IS NULL",
+      ownerId,
+    );
+    await tx.runAsync(
+      `INSERT INTO child_profiles (
+        id, owner_id, name, avatar_color, avatar_uri, birth_month, birth_year,
+        sort_order, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      child.id,
+      ownerId,
+      child.name,
+      child.avatarColor,
+      child.avatarUri,
+      child.birthMonth,
+      child.birthYear,
+      count?.count ?? 0,
+      now,
+      now,
+    );
+    await tx.runAsync(
+      `INSERT INTO sketchpads (
+        id, owner_id, child_id, name, style, design, cover_color, page_color,
+        sort_order, created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, 'My Book', 'spread', 'sunshine', ?, ?, 0, ?, ?, NULL)`,
+      defaultPadId,
+      ownerId,
+      child.id,
+      design.cover,
+      design.paper,
+      now,
+      now,
+    );
+  });
 }
 
 export async function updateLocalChild(
@@ -240,4 +259,55 @@ export async function setActiveLocalChild(db: SQLiteDatabase, childId: string): 
     childId,
     Date.now(),
   );
+}
+
+export async function reorderLocalChildren(db: SQLiteDatabase, orderedIds: string[]): Promise<void> {
+  const ownerId = await activeLocalOwnerId(db);
+  if (!ownerId) throw new Error("No active Buki account.");
+  const now = Date.now();
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    for (const [index, childId] of orderedIds.entries()) {
+      await tx.runAsync(
+        "UPDATE child_profiles SET sort_order = ?, updated_at = ? WHERE id = ? AND owner_id = ?",
+        index,
+        now,
+        childId,
+        ownerId,
+      );
+    }
+  });
+}
+
+export async function deleteLocalChild(db: SQLiteDatabase, childId: string): Promise<void> {
+  const ownerId = await activeLocalOwnerId(db);
+  if (!ownerId) throw new Error("No active Buki account.");
+  const count = await db.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) AS count FROM child_profiles WHERE owner_id = ? AND deleted_at IS NULL",
+    ownerId,
+  );
+  if ((count?.count ?? 0) <= 1) throw new Error("Buki must keep at least one child profile.");
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.runAsync("DELETE FROM child_profiles WHERE id = ? AND owner_id = ?", childId, ownerId);
+    const next = await tx.getFirstAsync<{ id: string }>(
+      `SELECT id FROM child_profiles
+       WHERE owner_id = ? AND deleted_at IS NULL
+       ORDER BY sort_order, created_at LIMIT 1`,
+      ownerId,
+    );
+    if (next) {
+      await tx.runAsync(
+        `INSERT INTO preferences (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+        scopedKey("active_child_id", ownerId),
+        next.id,
+        Date.now(),
+      );
+    }
+  });
+}
+
+export async function replayLocalOnboarding(db: SQLiteDatabase): Promise<void> {
+  const ownerId = await activeLocalOwnerId(db);
+  if (!ownerId) throw new Error("No active Buki account.");
+  await db.runAsync("DELETE FROM preferences WHERE key = ?", scopedKey("onboarding_complete", ownerId));
 }

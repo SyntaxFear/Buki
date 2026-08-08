@@ -1,5 +1,4 @@
 import { useRouter } from "expo-router";
-import * as Haptics from "expo-haptics";
 import { SymbolView } from "expo-symbols";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
@@ -14,8 +13,11 @@ import { PagePagination } from "@/components/page-pagination";
 import { PadDrawer } from "@/components/pad-drawer";
 import { FlipPad } from "@/components/flip-pad";
 import { Scrapbook, type FlipState } from "@/components/scrapbook";
+import { useAuth } from "@/store/auth";
 import { activeDrawingsOf, activePadOf, useDrawings, type Drawing } from "@/store/drawings";
+import { confirmAdult } from "@/store/parental-gate";
 import { colors } from "@/theme";
+import { Haptics, impactHaptic, notificationHaptic, selectionHaptic } from "@/utils/haptics";
 import {
   drawingHitTest,
   getBookLayout,
@@ -45,6 +47,7 @@ export function Home() {
   const hydrated = useDrawings((s) => s.hydrated);
   const commitPending = useDrawings((s) => s.commitPending);
   const clearActivePad = useDrawings((s) => s.clearActivePad);
+  const adultProfile = useAuth((s) => s.profile);
 
   const style = pad?.style ?? "spread";
   // Garden Path title canvas (82) + the 44pt sketchpad selector below it.
@@ -152,7 +155,7 @@ export function Home() {
       autoFlipTarget.current = to;
       logPageFlip("auto-request", { from, to });
       setFlip({ from, to });
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      impactHaptic(Haptics.ImpactFeedbackStyle.Light);
       cancelAnimation(flipAnim);
       flipAnim.value = 0;
     },
@@ -288,7 +291,7 @@ export function Home() {
   useEffect(() => () => cancelAnimation(flipAnim), [flipAnim]);
 
   const handleLanded = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    impactHaptic(Haptics.ImpactFeedbackStyle.Medium);
     commitPending();
     const s = useDrawings.getState();
     const list = activeDrawingsOf(s);
@@ -308,7 +311,7 @@ export function Home() {
     (to: number, completed: boolean) => {
       if (completed) {
         logPageFlip("settle-finished", { to, completed, progress: flipAnim.value });
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(() => {});
+        impactHaptic(Haptics.ImpactFeedbackStyle.Soft);
         finishFlip(to);
       } else {
         logPageFlip("settle-finished", { to, completed, progress: flipAnim.value });
@@ -324,11 +327,11 @@ export function Home() {
     autoFlipTarget.current = null;
     logPageFlip("gesture-start", { from: unitRef.current, to });
     setFlip({ from: unitRef.current, to });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
   }, []);
 
   const playCrestHaptic = useCallback(() => {
-    Haptics.selectionAsync().catch(() => {});
+    selectionHaptic();
   }, []);
   const pageFlipBlocked = Boolean(pending) || drawerOpen;
 
@@ -448,7 +451,7 @@ export function Home() {
         padLayout,
       );
       if (hit && drawings[hit.index]) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        impactHaptic(Haptics.ImpactFeedbackStyle.Light);
         setViewing({ drawing: drawings[hit.index], rect: hit.rect });
       }
     });
@@ -464,6 +467,24 @@ export function Home() {
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <HandwrittenTitle width={W} />
+
+      <Pressable
+        onPress={() => router.push("/account")}
+        accessibilityRole="button"
+        accessibilityLabel="Open profile and account"
+        hitSlop={8}
+        style={({ pressed }) => [
+          styles.accountButton,
+          { top: insets.top + 12 },
+          pressed && styles.accountButtonPressed,
+        ]}
+      >
+        <Text style={styles.accountAvatar}>
+          {adultProfile?.avatarUri?.startsWith("emoji:")
+            ? adultProfile.avatarUri.slice("emoji:".length)
+            : (adultProfile?.displayName.trim().charAt(0).toUpperCase() || "P")}
+        </Text>
+      </Pressable>
 
       <View style={styles.padPillWrap}>
         <Pressable
@@ -545,22 +566,28 @@ export function Home() {
           <Pressable
             onPress={() => router.push("/scan")}
             onLongPress={() => {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-              Alert.alert(
-                `Clear “${pad?.name ?? "this sketchpad"}”?`,
-                "This removes every saved drawing from this sketchpad.",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  {
-                    text: "Clear",
-                    style: "destructive",
-                    onPress: () => {
-                      clearActivePad();
-                      jumpToUnit(0);
+              notificationHaptic(Haptics.NotificationFeedbackType.Warning);
+              void (async () => {
+                const confirmed = await confirmAdult(
+                  "Clearing a sketchpad permanently removes its saved drawings from this device.",
+                );
+                if (!confirmed) return;
+                Alert.alert(
+                  `Clear “${pad?.name ?? "this sketchpad"}”?`,
+                  "This removes every saved drawing from this sketchpad.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Clear",
+                      style: "destructive",
+                      onPress: () => {
+                        clearActivePad();
+                        jumpToUnit(0);
+                      },
                     },
-                  },
-                ],
-              );
+                  ],
+                );
+              })();
             }}
             accessibilityRole="button"
             accessibilityLabel="Scan a drawing"
@@ -590,6 +617,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  accountButton: {
+    position: "absolute",
+    right: 18,
+    zIndex: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderCurve: "continuous",
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: "rgba(22,125,130,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#75624B",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.14,
+    shadowRadius: 7,
+  },
+  accountButtonPressed: { opacity: 0.72, transform: [{ scale: 0.96 }] },
+  accountAvatar: { fontSize: 21, fontWeight: "900", color: colors.titleTeal },
   padPillWrap: {
     alignSelf: "flex-start",
     marginLeft: 20,

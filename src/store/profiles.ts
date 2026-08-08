@@ -7,9 +7,13 @@ import {
   editBukiChild,
   finishBukiOnboarding,
   loadBukiProfiles,
+  removeBukiChild,
+  reorderBukiChildren,
+  replayBukiOnboarding,
   selectBukiChild,
 } from "@/database";
 import { canCreateContent } from "@/subscription/access";
+import { useDrawings } from "@/store/drawings";
 import { currentCapabilities, useMembership } from "@/store/membership";
 import type { LocalChildProfile } from "@/database/profile-repository";
 
@@ -44,6 +48,9 @@ interface ProfilesState {
     updates: Partial<Pick<ChildProfile, "name" | "avatarColor" | "avatarUri" | "birthMonth" | "birthYear">>,
   ) => Promise<boolean>;
   setActiveChild: (childId: string) => Promise<boolean>;
+  moveChild: (childId: string, direction: -1 | 1) => Promise<boolean>;
+  deleteChild: (childId: string) => Promise<boolean>;
+  replayOnboarding: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -109,7 +116,8 @@ export const useProfiles = create<ProfilesState>((set, get) => ({
       const { error } = await getSupabaseClient().auth.updateUser({
         data: { full_name: adultName, avatar_url: input.adultAvatarUri },
       });
-      if (error) throw error;
+      if (error) console.warn("Could not update remote Buki profile metadata", error);
+      await useDrawings.getState().reloadForAccount();
       await get().reloadForAccount();
       return true;
     } catch (error) {
@@ -136,14 +144,18 @@ export const useProfiles = create<ProfilesState>((set, get) => ({
     set({ busy: true, error: null });
     try {
       const id = Crypto.randomUUID();
-      await addBukiChild({
-        id,
-        name,
-        avatarColor: input.avatarColor,
-        avatarUri: input.avatarUri ?? null,
-        birthMonth: input.birthMonth ?? null,
-        birthYear: input.birthYear ?? null,
-      });
+      await addBukiChild(
+        {
+          id,
+          name,
+          avatarColor: input.avatarColor,
+          avatarUri: input.avatarUri ?? null,
+          birthMonth: input.birthMonth ?? null,
+          birthYear: input.birthYear ?? null,
+        },
+        Crypto.randomUUID(),
+      );
+      await useDrawings.getState().reloadForAccount();
       await get().reloadForAccount();
       return id;
     } catch (error) {
@@ -173,11 +185,47 @@ export const useProfiles = create<ProfilesState>((set, get) => ({
     try {
       await selectBukiChild(childId);
       set({ activeChildId: childId });
+      useDrawings.getState().setActiveChild(childId);
       return true;
     } catch (error) {
       set({ error: message(error) });
       return false;
     }
+  },
+
+  moveChild: async (childId, direction) => {
+    const children = [...get().children];
+    const index = children.findIndex((child) => child.id === childId);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= children.length) return false;
+    [children[index], children[target]] = [children[target], children[index]];
+    try {
+      await reorderBukiChildren(children.map((child) => child.id));
+      await get().reloadForAccount();
+      return true;
+    } catch (error) {
+      set({ error: message(error) });
+      return false;
+    }
+  },
+
+  deleteChild: async (childId) => {
+    try {
+      await removeBukiChild(childId);
+      useDrawings.getState().removeChildContent(childId);
+      await get().reloadForAccount();
+      const nextActive = get().activeChildId;
+      if (nextActive) useDrawings.getState().setActiveChild(nextActive);
+      return true;
+    } catch (error) {
+      set({ error: message(error) });
+      return false;
+    }
+  },
+
+  replayOnboarding: async () => {
+    await replayBukiOnboarding();
+    set({ onboardingComplete: false });
   },
 
   clearError: () => set({ error: null }),
