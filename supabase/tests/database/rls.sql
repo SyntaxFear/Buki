@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(27);
+select plan(39);
 
 select has_table('public', 'adult_profiles', 'adult_profiles exists');
 select has_table('public', 'child_profiles', 'child_profiles exists');
@@ -12,12 +12,21 @@ select has_table('public', 'entitlement_snapshots', 'entitlement_snapshots exist
 select has_table('public', 'storage_usage', 'storage_usage exists');
 select has_table('public', 'media_upload_reservations', 'media upload reservations exist');
 select has_table('public', 'cloud_retention', 'cloud_retention exists');
+select has_table('public', 'storage_deletion_sweeps', 'delayed storage deletion sweeps exist');
+select has_column('public', 'cloud_retention', 'uploads_enabled', 'privacy hold is persisted server-side');
+select has_column('public', 'cloud_retention', 'last_entitlement_refresh_attempt_at', 'stale active entitlements are refreshable without webhooks');
+select has_column('public', 'entitlement_snapshots', 'had_pro', 'historical Pro access is persisted server-side');
 
 select ok((select relrowsecurity from pg_class where oid = 'public.adult_profiles'::regclass), 'adult_profiles has RLS enabled');
 select ok((select relrowsecurity from pg_class where oid = 'public.child_profiles'::regclass), 'child_profiles has RLS enabled');
 select ok((select relrowsecurity from pg_class where oid = 'public.sketchpads'::regclass), 'sketchpads has RLS enabled');
 select ok((select relrowsecurity from pg_class where oid = 'public.artworks'::regclass), 'artworks has RLS enabled');
 select ok((select relrowsecurity from pg_class where oid = 'public.media_files'::regclass), 'media_files has RLS enabled');
+select ok((select relrowsecurity from pg_class where oid = 'public.storage_deletion_sweeps'::regclass), 'storage deletion sweeps are service-only');
+select ok(
+  not has_table_privilege('authenticated', 'public.storage_deletion_sweeps', 'SELECT'),
+  'authenticated clients cannot inspect delayed storage sweeps'
+);
 select ok(
   not has_table_privilege('authenticated', 'public.media_files', 'INSERT'),
   'authenticated clients cannot bypass media upload reservations'
@@ -35,8 +44,38 @@ select has_function('public', 'has_cloud_access', array['uuid'], 'cloud access r
 select has_function(
   'public',
   'record_entitlement_verification',
-  array['uuid', 'boolean', 'timestamp with time zone', 'timestamp with time zone'],
+  array['uuid', 'boolean', 'boolean', 'timestamp with time zone', 'timestamp with time zone'],
   'server entitlement verifier exists'
+);
+select has_function(
+  'public',
+  'claim_due_cloud_retention',
+  array['integer'],
+  'due retention records can be claimed safely'
+);
+select has_function(
+  'public',
+  'claim_entitlements_due_for_refresh',
+  array['integer'],
+  'stale active entitlements can be claimed safely'
+);
+select has_function(
+  'public',
+  'claim_storage_deletion_sweeps',
+  array['integer'],
+  'delayed storage sweeps can be claimed safely'
+);
+select has_function(
+  'public',
+  'verify_retention_cron_secret',
+  array['text'],
+  'retention cron authorization is verified inside Vault'
+);
+select has_function(
+  'public',
+  'purge_buki_cloud_content',
+  array['uuid'],
+  'cloud content can be purged without deleting the adult account'
 );
 select has_function(
   'public',
@@ -83,6 +122,10 @@ select has_trigger(
   'tombstones',
   'tombstones_keep_latest_delete',
   'tombstone timestamps never move backwards'
+);
+select ok(
+  exists(select 1 from cron.job where jobname = 'buki-retention-cleanup'),
+  'retention cleanup is scheduled'
 );
 
 select * from finish();

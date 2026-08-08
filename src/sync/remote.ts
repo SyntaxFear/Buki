@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/auth/supabase";
+import { verifyServerEntitlement, type ServerEntitlementState } from "@/subscription/server-entitlement";
 import { deleteQueuedMedia, uploadQueuedMedia } from "./media-upload";
 import type { SyncEntityType, SyncQueueItem } from "./types";
 
@@ -52,12 +53,12 @@ function throwIfError(error: { message: string; code?: string } | null): void {
   throw new RemoteSyncError(error.message, error.code);
 }
 
-export async function verifyRemoteCloudAccess(): Promise<boolean> {
-  const { data, error } = await getSupabaseClient().functions.invoke<{
-    active?: boolean;
-  }>("verify-entitlement", { body: {} });
-  if (error) throw new RemoteSyncError("Buki could not verify cloud access.", "verification_failed");
-  return data?.active === true;
+export async function verifyRemoteCloudAccess(): Promise<ServerEntitlementState> {
+  try {
+    return await verifyServerEntitlement();
+  } catch {
+    throw new RemoteSyncError("Buki could not verify cloud access.", "verification_failed");
+  }
 }
 
 async function pushUpsert(item: SyncQueueItem): Promise<void> {

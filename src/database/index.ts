@@ -59,6 +59,7 @@ import {
 } from "./media-repository";
 import { applyRemoteCloudSnapshot } from "./cloud-restore-repository";
 import type { RemoteCloudSnapshot } from "@/sync/cloud-types";
+import { deleteLocalAccountData, resetLocalCloudState } from "./privacy-repository";
 
 export { BUKI_DATABASE_NAME };
 
@@ -261,6 +262,16 @@ export function saveBukiCloudUsage(ownerId: string, bytesUsed: number, bytesLimi
 
 export function restoreBukiCloudSnapshot(ownerId: string, snapshot: RemoteCloudSnapshot) {
   return applyRemoteCloudSnapshot(requireBukiDatabase(), ownerId, snapshot);
+}
+
+export function deleteBukiLocalAccount(ownerId: string) {
+  return deleteLocalAccountData(requireBukiDatabase(), ownerId);
+}
+
+export function resetBukiCloudState(ownerId: string) {
+  return resetLocalCloudState(requireBukiDatabase(), ownerId).then(() => {
+    notifySyncQueueChanged();
+  });
 }
 
 export type { ImportedArchiveLibrary };

@@ -8,7 +8,9 @@ import type { Session, User } from "@supabase/supabase-js";
 import {
   activateBukiAccount,
   clearBukiAccount,
+  deleteBukiLocalAccount,
   editAdultProfile,
+  flushLibraryWrites,
   loadAdultProfile,
 } from "@/database";
 import { getSupabaseClient } from "@/auth/supabase";
@@ -18,6 +20,7 @@ import { useMembership } from "@/store/membership";
 import { useProfiles } from "@/store/profiles";
 import { usePreferences } from "@/store/preferences";
 import { useCloudSync } from "@/store/sync";
+import { requestBukiAccountDeletion } from "@/privacy/account-data";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -46,6 +49,8 @@ interface AuthState {
   signInWithGoogle: () => Promise<boolean>;
   refreshProfile: () => Promise<void>;
   updateProfile: (updates: { displayName: string; avatarUri: string | null }) => Promise<boolean>;
+  clearLocalData: () => Promise<boolean>;
+  deleteAccount: () => Promise<boolean>;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
@@ -295,6 +300,68 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ profile });
       return true;
     } catch (error) {
+      set({ error: errorMessage(error) });
+      return false;
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  clearLocalData: async () => {
+    const user = get().user;
+    if (!user) return false;
+    set({ busy: true, error: null });
+    try {
+      await useCloudSync.getState().pauseForPrivacyAction();
+      await flushLibraryWrites();
+      const cleanup = await deleteBukiLocalAccount(user.id);
+      await getSupabaseClient().auth.signOut({ scope: "local" }).catch(() => {});
+      lastAppliedUserId = undefined;
+      await applySession(null);
+      if (cleanup.failedFileCount > 0) {
+        set({
+          error: `Buki was cleared, but ${cleanup.failedFileCount} local file${cleanup.failedFileCount === 1 ? "" : "s"} could not be removed. Delete the app before giving this device to someone else.`,
+        });
+      }
+      return true;
+    } catch (error) {
+      set({ error: errorMessage(error) });
+      return false;
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  deleteAccount: async () => {
+    const user = get().user;
+    if (!user) return false;
+    let remoteDeleted = false;
+    set({ busy: true, error: null });
+    try {
+      await useCloudSync.getState().pauseForPrivacyAction();
+      await requestBukiAccountDeletion();
+      remoteDeleted = true;
+      await flushLibraryWrites();
+      const cleanup = await deleteBukiLocalAccount(user.id);
+      await getSupabaseClient().auth.signOut({ scope: "local" }).catch(() => {});
+      lastAppliedUserId = undefined;
+      await applySession(null);
+      if (cleanup.failedFileCount > 0) {
+        set({
+          error: `Your Buki account was deleted, but ${cleanup.failedFileCount} local file${cleanup.failedFileCount === 1 ? "" : "s"} could not be removed. Delete Buki from this device before giving it to someone else.`,
+        });
+      }
+      return true;
+    } catch (error) {
+      if (remoteDeleted) {
+        await getSupabaseClient().auth.signOut({ scope: "local" }).catch(() => {});
+        lastAppliedUserId = undefined;
+        await applySession(null).catch(() => {});
+        set({
+          error: "Your Buki account was deleted, but some local files could not be removed. Delete Buki from this device before giving it to someone else.",
+        });
+        return true;
+      }
       set({ error: errorMessage(error) });
       return false;
     } finally {

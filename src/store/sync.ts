@@ -21,6 +21,7 @@ import { subscribeToSyncQueue } from "@/sync/signals";
 import { restoreCloudAccount } from "@/sync/cloud-restore";
 import type { CloudRestoreResult } from "@/sync/cloud-types";
 import { isCloudQuotaError } from "@/sync/media-upload";
+import { verifyServerEntitlement } from "@/subscription/server-entitlement";
 import { useDrawings } from "./drawings";
 import { useMembership } from "./membership";
 import { useProfiles } from "./profiles";
@@ -42,6 +43,7 @@ interface CloudSyncState {
   disconnectUser: () => void;
   refreshSyncState: () => Promise<void>;
   setAutomaticBackup: (enabled: boolean) => Promise<void>;
+  pauseForPrivacyAction: () => Promise<void>;
   syncNow: (force?: boolean) => Promise<void>;
   restoreNow: () => Promise<boolean>;
 }
@@ -248,6 +250,20 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
     const ownerId = get().ownerId;
     if (!ownerId) return;
     try {
+      if (enabled) {
+        const network = await NetInfo.fetch();
+        online = isOnline(network);
+        if (!online) throw new Error("Connect to the internet to turn cloud backup on.");
+        const verification = await verifyServerEntitlement({ resumeCloudBackup: true });
+        if (!verification.cloudAccess) throw new Error("Buki Pro is required to turn cloud backup on.");
+        useMembership.setState({
+          hadPro: useMembership.getState().hadPro || verification.hadPro,
+          retentionStatus: verification.retention.status,
+          cloudReadOnlySince: verification.retention.readOnlySince,
+          cloudDeleteAfter: verification.retention.deleteAfter,
+          cloudUploadsEnabled: verification.retention.uploadsEnabled,
+        });
+      }
       await saveBukiAutomaticBackup(ownerId, enabled);
       if (get().ownerId !== ownerId) return;
       set({
@@ -259,6 +275,18 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
     } catch (error) {
       if (get().ownerId === ownerId) set({ status: "error", error: message(error) });
     }
+  },
+
+  pauseForPrivacyAction: async () => {
+    const ownerId = get().ownerId;
+    if (!ownerId) return;
+    clearRetryTimer();
+    deferredSyncDelay = null;
+    await saveBukiAutomaticBackup(ownerId, false);
+    if (get().ownerId === ownerId) {
+      set({ automaticBackup: false, status: "idle", error: null });
+    }
+    if (syncRun) await syncRun;
   },
 
   syncNow: async (force = true) => {
@@ -285,9 +313,25 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
 
       set({ status: "syncing", error: null });
       try {
-        const active = await verifyRemoteCloudAccess();
+        const verification = await verifyRemoteCloudAccess();
         if (get().ownerId !== ownerId) return;
-        if (!active) {
+        useMembership.setState({
+          hadPro: useMembership.getState().hadPro || verification.hadPro,
+          retentionStatus: verification.retention.status,
+          cloudReadOnlySince: verification.retention.readOnlySince,
+          cloudDeleteAfter: verification.retention.deleteAfter,
+          cloudUploadsEnabled: verification.retention.uploadsEnabled,
+        });
+        if (!verification.cloudAccess) {
+          if (!verification.retention.uploadsEnabled) {
+            await saveBukiAutomaticBackup(ownerId, false);
+            set({
+              automaticBackup: false,
+              status: "paused",
+              error: "Cloud copies were removed. Turn backup on when you want to create them again.",
+            });
+            return;
+          }
           set({ status: "paused", error: "Buki Pro cloud access could not be verified." });
           return;
         }
@@ -375,6 +419,21 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
       }
       set({ status: "syncing", error: null });
       try {
+        const verification = await verifyServerEntitlement();
+        if (get().ownerId !== ownerId) return false;
+        useMembership.setState({
+          hadPro: useMembership.getState().hadPro || verification.hadPro,
+          retentionStatus: verification.retention.status,
+          cloudReadOnlySince: verification.retention.readOnlySince,
+          cloudDeleteAfter: verification.retention.deleteAfter,
+          cloudUploadsEnabled: verification.retention.uploadsEnabled,
+        });
+        const restoreAllowed = verification.cloudAccess
+          || verification.retention.status === "read_only"
+          || verification.retention.status === "pending_deletion";
+        if (!restoreAllowed) {
+          throw new Error("No Buki Pro cloud backup is available for this account.");
+        }
         const restored = await restoreCloudAccount(ownerId, get().deviceId);
         if (get().ownerId !== ownerId) return false;
         await reloadRestoredAccount();

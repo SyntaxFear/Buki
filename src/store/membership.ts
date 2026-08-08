@@ -22,6 +22,10 @@ import {
   refreshRevenueCatCustomerInfo,
   restoreRevenueCatPurchases,
 } from "@/subscription/revenuecat-client";
+import {
+  verifyServerEntitlement,
+  type CloudRetentionStatus,
+} from "@/subscription/server-entitlement";
 
 export interface UpgradeRequest {
   feature: ProFeature;
@@ -38,6 +42,11 @@ interface MembershipState {
   capabilities: Capabilities;
   managementUrl: string | null;
   periodType: string | null;
+  hadPro: boolean;
+  retentionStatus: CloudRetentionStatus | null;
+  cloudReadOnlySince: string | null;
+  cloudDeleteAfter: string | null;
+  cloudUploadsEnabled: boolean;
   error: string | null;
   upgradeRequest: UpgradeRequest | null;
   initializeForUser: (ownerId: string) => Promise<void>;
@@ -89,6 +98,7 @@ function scheduleExpiryCheck(ownerId: string, entitlement: EntitlementSnapshot):
     if (current.status === "expired") {
       useMembership.setState({ ...resolvedState(current), periodType: null });
       void saveBukiEntitlement(ownerId, current).catch(() => {});
+      void useMembership.getState().refreshMembership();
     } else {
       scheduleExpiryCheck(ownerId, current);
     }
@@ -105,6 +115,7 @@ async function applyCustomerInfo(ownerId: string, customerInfo: CustomerInfo): P
     loading: false,
     managementUrl: customerInfo.managementURL,
     periodType,
+    hadPro: useMembership.getState().hadPro || entitlement.product !== null,
     error: null,
   });
   scheduleExpiryCheck(ownerId, entitlement);
@@ -112,6 +123,19 @@ async function applyCustomerInfo(ownerId: string, customerInfo: CustomerInfo): P
     await saveBukiEntitlement(ownerId, entitlement);
   } catch (error) {
     console.warn("Could not cache the Buki entitlement", error);
+  }
+  try {
+    const server = await verifyServerEntitlement();
+    if (useMembership.getState().ownerId !== ownerId) return;
+    useMembership.setState({
+      hadPro: useMembership.getState().hadPro || server.hadPro,
+      retentionStatus: server.retention.status,
+      cloudReadOnlySince: server.retention.readOnlySince,
+      cloudDeleteAfter: server.retention.deleteAfter,
+      cloudUploadsEnabled: server.retention.uploadsEnabled,
+    });
+  } catch (error) {
+    console.warn("Could not refresh Buki cloud retention", error);
   }
 }
 
@@ -128,6 +152,11 @@ export const useMembership = create<MembershipState>((set, get) => ({
   capabilities: FREE_CAPABILITIES,
   managementUrl: null,
   periodType: null,
+  hadPro: false,
+  retentionStatus: null,
+  cloudReadOnlySince: null,
+  cloudDeleteAfter: null,
+  cloudUploadsEnabled: true,
   error: null,
   upgradeRequest: null,
 
@@ -140,6 +169,11 @@ export const useMembership = create<MembershipState>((set, get) => ({
       loading: true,
       managementUrl: null,
       periodType: null,
+      hadPro: false,
+      retentionStatus: null,
+      cloudReadOnlySince: null,
+      cloudDeleteAfter: null,
+      cloudUploadsEnabled: true,
       error: null,
       upgradeRequest: null,
     });
@@ -149,7 +183,12 @@ export const useMembership = create<MembershipState>((set, get) => ({
       cached = await loadBukiEntitlement(ownerId);
       if (get().ownerId !== ownerId) return;
       const cachedEntitlement = entitlementAtTime(cached ?? EMPTY_ENTITLEMENT);
-      set({ ...resolvedState(cachedEntitlement), hydrated: true, periodType: null });
+      set({
+        ...resolvedState(cachedEntitlement),
+        hydrated: true,
+        periodType: null,
+        hadPro: cachedEntitlement.product !== null,
+      });
       scheduleExpiryCheck(ownerId, cachedEntitlement);
     } catch (error) {
       console.warn("Could not load the cached Buki entitlement", error);
@@ -222,6 +261,11 @@ export const useMembership = create<MembershipState>((set, get) => ({
       capabilities: FREE_CAPABILITIES,
       managementUrl: null,
       periodType: null,
+      hadPro: false,
+      retentionStatus: null,
+      cloudReadOnlySince: null,
+      cloudDeleteAfter: null,
+      cloudUploadsEnabled: true,
       error: null,
       upgradeRequest: null,
     });
@@ -236,7 +280,11 @@ export const useMembership = create<MembershipState>((set, get) => ({
 
   setEntitlement: (entitlement) => {
     const current = entitlementAtTime(entitlement);
-    set({ ...resolvedState(current), hydrated: true });
+    set((state) => ({
+      ...resolvedState(current),
+      hydrated: true,
+      hadPro: state.hadPro || current.product !== null,
+    }));
     const ownerId = get().ownerId;
     if (ownerId) scheduleExpiryCheck(ownerId, current);
   },
@@ -258,6 +306,11 @@ export const useMembership = create<MembershipState>((set, get) => ({
       capabilities: FREE_CAPABILITIES,
       managementUrl: null,
       periodType: null,
+      hadPro: false,
+      retentionStatus: null,
+      cloudReadOnlySince: null,
+      cloudDeleteAfter: null,
+      cloudUploadsEnabled: true,
       error: null,
       upgradeRequest: null,
     });

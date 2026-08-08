@@ -411,3 +411,21 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/delete-media/deno.json"
 entrypoint = "./functions/delete-media/index.ts"
+
+[functions.delete-cloud-data]
+enabled = true
+verify_jwt = true
+import_map = "./functions/delete-cloud-data/deno.json"
+entrypoint = "./functions/delete-cloud-data/index.ts"
+
+[functions.request-account-deletion]
+enabled = true
+verify_jwt = true
+import_map = "./functions/request-account-deletion/deno.json"
+entrypoint = "./functions/request-account-deletion/index.ts"
+
+[functions.retention-cleanup]
+enabled = true
+verify_jwt = false
+import_map = "./functions/retention-cleanup/deno.json"
+entrypoint = "./functions/retention-cleanup/index.ts"

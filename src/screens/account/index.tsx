@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getPublicAppConfig } from "@/config/env";
 import { loadBukiUsage } from "@/database";
+import { removeBukiCloudCopies } from "@/privacy/account-data";
 import { useAuth } from "@/store/auth";
 import { useDrawings } from "@/store/drawings";
 import { useMembership } from "@/store/membership";
@@ -83,6 +84,8 @@ export function AccountCenter() {
   const authBusy = useAuth((state) => state.busy);
   const authError = useAuth((state) => state.error);
   const updateProfile = useAuth((state) => state.updateProfile);
+  const clearLocalData = useAuth((state) => state.clearLocalData);
+  const deleteAccount = useAuth((state) => state.deleteAccount);
   const signOut = useAuth((state) => state.signOut);
   const children = useProfiles((state) => state.children);
   const activeChildId = useProfiles((state) => state.activeChildId);
@@ -105,6 +108,10 @@ export function AccountCenter() {
   const membershipError = useMembership((state) => state.error);
   const managementUrl = useMembership((state) => state.managementUrl);
   const periodType = useMembership((state) => state.periodType);
+  const hadPro = useMembership((state) => state.hadPro);
+  const retentionStatus = useMembership((state) => state.retentionStatus);
+  const cloudDeleteAfter = useMembership((state) => state.cloudDeleteAfter);
+  const cloudUploadsEnabled = useMembership((state) => state.cloudUploadsEnabled);
   const refreshMembership = useMembership((state) => state.refreshMembership);
   const restorePurchases = useMembership((state) => state.restorePurchases);
   const requestUpgrade = useMembership((state) => state.requestUpgrade);
@@ -119,6 +126,8 @@ export function AccountCenter() {
   const setAutomaticBackup = useCloudSync((state) => state.setAutomaticBackup);
   const syncNow = useCloudSync((state) => state.syncNow);
   const restoreNow = useCloudSync((state) => state.restoreNow);
+  const pauseForPrivacyAction = useCloudSync((state) => state.pauseForPrivacyAction);
+  const refreshSyncState = useCloudSync((state) => state.refreshSyncState);
   const [usage, setUsage] = useState({
     localBytes: 0,
     cloudBytes: 0,
@@ -126,6 +135,7 @@ export function AccountCenter() {
   });
   const [adultEditorOpen, setAdultEditorOpen] = useState(false);
   const [childDraft, setChildDraft] = useState<ChildDraft | null>(null);
+  const [privacyBusy, setPrivacyBusy] = useState(false);
 
   const artworkCount = useMemo(
     () => Object.values(drawingsByPad).reduce((sum, drawings) => sum + drawings.length, 0),
@@ -142,27 +152,37 @@ export function AccountCenter() {
     );
   }, [user?.identities]);
   const renewalDate = formatDate(entitlement.expiresAt);
+  const retentionDeleteDate = formatDate(cloudDeleteAfter);
   const avatar = adultAvatar(profile?.avatarUri, profile?.displayName ?? "Parent");
   const cloudProgress = Math.min(1, usage.cloudBytes / Math.max(1, usage.cloudLimit));
   const cloudQuotaReached = usage.cloudBytes >= usage.cloudLimit;
-  const cloudRestoreAvailable = capabilities.cloudBackup || entitlement.status === "expired";
-  const syncDetail = !capabilities.cloudBackup
-    ? "Buki Pro required"
-    : !automaticBackup
-      ? "Paused on this device"
-      : syncStatus === "syncing"
-        ? `Backing up ${pendingSyncCount || "recent"} change${pendingSyncCount === 1 ? "" : "s"}…`
-        : syncStatus === "offline"
-          ? `Waiting for internet${pendingSyncCount ? ` · ${pendingSyncCount} pending` : ""}`
-          : syncStatus === "error"
-            ? syncError ?? "Backup will retry automatically"
-            : syncStatus === "paused"
-              ? syncError ?? "Cloud uploads are paused"
-            : pendingSyncCount
-              ? `${pendingSyncCount} change${pendingSyncCount === 1 ? "" : "s"} waiting to upload`
-              : lastSyncedAt
-                ? `Last backup ${formatSyncTime(lastSyncedAt) ?? "recently"}`
-                : "Ready to back up this library";
+  const cloudRetentionReadOnly = retentionStatus === "read_only" || retentionStatus === "pending_deletion";
+  const cloudRestoreAvailable = (capabilities.cloudBackup && cloudUploadsEnabled)
+    || cloudRetentionReadOnly
+    || (retentionStatus === null && (hadPro || entitlement.product !== null));
+  const syncDetail = cloudRetentionReadOnly
+    ? retentionStatus === "pending_deletion"
+      ? "Cloud deletion verification is pending"
+      : `Read-only${retentionDeleteDate ? ` until ${retentionDeleteDate}` : " during the 90-day retention period"}`
+    : !cloudUploadsEnabled
+      ? "Cloud copies removed · turn on to create a new backup"
+      : !capabilities.cloudBackup
+        ? "Buki Pro required"
+        : !automaticBackup
+          ? "Paused on this device"
+          : syncStatus === "syncing"
+            ? `Backing up ${pendingSyncCount || "recent"} change${pendingSyncCount === 1 ? "" : "s"}…`
+            : syncStatus === "offline"
+              ? `Waiting for internet${pendingSyncCount ? ` · ${pendingSyncCount} pending` : ""}`
+              : syncStatus === "error"
+                ? syncError ?? "Backup will retry automatically"
+                : syncStatus === "paused"
+                  ? syncError ?? "Cloud uploads are paused"
+                  : pendingSyncCount
+                    ? `${pendingSyncCount} change${pendingSyncCount === 1 ? "" : "s"} waiting to upload`
+                    : lastSyncedAt
+                      ? `Last backup ${formatSyncTime(lastSyncedAt) ?? "recently"}`
+                      : "Ready to back up this library";
 
   useEffect(() => {
     void loadBukiUsage().then(setUsage).catch(() => {});
@@ -179,11 +199,6 @@ export function AccountCenter() {
 
   const introducePro = async (feature: ProFeature, source: string) => {
     requestUpgrade(feature, source);
-  };
-
-  const guardedFutureAction = async (title: string, body: string) => {
-    if (!(await confirmAdult(`${title} changes account data or opens a protected tool.`))) return;
-    Alert.alert(title, body);
   };
 
   const beginCreateChild = () => {
@@ -295,6 +310,87 @@ export function AccountCenter() {
     );
   };
 
+  const confirmClearLocalData = async () => {
+    if (!(await confirmAdult("Clearing this device permanently removes its local Buki files."))) return;
+    Alert.alert(
+      "Clear Buki from this device?",
+      "Local artwork and unsynced changes will be permanently removed, then Buki will sign out. Existing cloud copies stay available for a later restore.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear This Device",
+          style: "destructive",
+          onPress: () => void (async () => {
+            setPrivacyBusy(true);
+            const cleared = await clearLocalData();
+            setPrivacyBusy(false);
+            if (cleared) {
+              const warning = useAuth.getState().error;
+              router.dismissTo("/");
+              if (warning) Alert.alert("Device cleared", warning);
+            } else Alert.alert("Could not clear this device", useAuth.getState().error ?? "Please try again.");
+          })(),
+        },
+      ],
+    );
+  };
+
+  const confirmRemoveCloudCopies = async () => {
+    if (!user || !(await confirmAdult("Removing cloud copies permanently deletes this account’s remote backup."))) return;
+    Alert.alert(
+      "Remove all cloud copies?",
+      "Every Buki cloud image and synced record for this account will be permanently deleted. Local artwork stays on this device. Automatic backup pauses on all devices until an adult turns it on again.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove Cloud Copies",
+          style: "destructive",
+          onPress: () => void (async () => {
+            setPrivacyBusy(true);
+            try {
+              await pauseForPrivacyAction();
+              await removeBukiCloudCopies(user.id);
+              await Promise.all([refreshSyncState(), refreshMembership()]);
+              setUsage(await loadBukiUsage());
+              Alert.alert("Cloud copies removed", "Local artwork is still on this device. Turn Automatic backup on whenever you want to create a new private backup.");
+            } catch (error) {
+              Alert.alert("Could not remove cloud copies", error instanceof Error ? error.message : "Please try again.");
+            } finally {
+              setPrivacyBusy(false);
+            }
+          })(),
+        },
+      ],
+    );
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (!(await confirmAdult("Account deletion permanently removes Buki account data."))) return;
+    Alert.alert(
+      "Delete Buki account?",
+      "This permanently deletes the adult profile, child profiles, sketchpads, artwork, local files, and cloud copies. Deleting Buki does not cancel an App Store subscription; manage or cancel it separately in Apple subscription settings.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: () => void (async () => {
+            setPrivacyBusy(true);
+            const deleted = await deleteAccount();
+            setPrivacyBusy(false);
+            if (deleted) {
+              const warning = useAuth.getState().error;
+              router.dismissTo("/");
+              if (warning) Alert.alert("Account deleted", warning);
+            } else {
+              Alert.alert("Could not delete account", useAuth.getState().error ?? "Please try again.");
+            }
+          })(),
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.root}>
       <View style={[styles.navigation, { paddingTop: insets.top + 8 }]}>
@@ -397,7 +493,16 @@ export function AccountCenter() {
                     : "Active on this Buki account"}
               </Text>
             ) : (
-              <ActionButton title="Discover Buki Pro" prominent onPress={() => void introducePro("cloudBackup", "account_membership")} />
+              <>
+                <ActionButton title="Discover Buki Pro" prominent onPress={() => void introducePro("cloudBackup", "account_membership")} />
+                {cloudRetentionReadOnly ? (
+                  <Text style={styles.membershipFootnote}>
+                    {retentionStatus === "pending_deletion"
+                      ? "Cloud deletion is being rechecked against RevenueCat. Renewing before deletion resumes synchronization."
+                      : `Cloud restore remains available${retentionDeleteDate ? ` until ${retentionDeleteDate}` : " for 90 days"}. Renew to resume backup or export.`}
+                  </Text>
+                ) : null}
+              </>
             )}
           </View>
           <SettingRow
@@ -441,7 +546,7 @@ export function AccountCenter() {
             detail={syncDetail}
             right={
               <Switch
-                value={automaticBackup && capabilities.cloudBackup}
+                value={automaticBackup && capabilities.cloudBackup && cloudUploadsEnabled}
                 disabled={!capabilities.cloudBackup}
                 onValueChange={(value) => void setAutomaticBackup(value)}
               />
@@ -561,16 +666,9 @@ export function AccountCenter() {
         </Section>
 
         <Section title="Danger Zone" danger>
-          <DangerButton title="Clear local data" onPress={() => void guardedFutureAction("Clear local data", "Cloud-safe local clearing is enabled with backup and account-deletion support.")} />
-          <DangerButton title="Remove cloud copies" onPress={() => void guardedFutureAction("Remove cloud copies", "Cloud deletion becomes available after the private Buki storage backend is connected.")} />
-          <DangerButton title="Delete Buki account" onPress={() => void (async () => {
-            if (!(await confirmAdult("Account deletion permanently removes Buki account data."))) return;
-            Alert.alert(
-              "Delete Buki account",
-              "Deleting Buki does not cancel an App Store subscription. The complete deletion workflow is enabled with the cloud backend so local and server copies can be removed together.",
-              [{ text: "OK" }],
-            );
-          })()} />
+          <DangerButton title="Clear local data" busy={privacyBusy} onPress={() => void confirmClearLocalData()} />
+          <DangerButton title="Remove cloud copies" busy={privacyBusy} onPress={() => void confirmRemoveCloudCopies()} />
+          <DangerButton title="Delete Buki account" busy={privacyBusy} onPress={() => void confirmDeleteAccount()} />
         </Section>
 
         <ActionButton title="Sign out" destructive busy={authBusy} onPress={confirmSignOut} />
@@ -652,8 +750,8 @@ function MiniAction({ label, onPress, disabled, destructive }: { label: string; 
   return <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.miniAction, disabled && styles.disabled, pressed && styles.pressed]}><Text style={[styles.miniActionLabel, destructive && styles.dangerText]}>{label}</Text></Pressable>;
 }
 
-function DangerButton({ title, onPress }: { title: string; onPress: () => void }) {
-  return <Pressable onPress={onPress} style={({ pressed }) => [styles.dangerButton, pressed && styles.rowPressed]}><Text style={styles.dangerText}>{title}</Text><Text style={styles.dangerChevron}>›</Text></Pressable>;
+function DangerButton({ title, onPress, busy }: { title: string; onPress: () => void; busy?: boolean }) {
+  return <Pressable disabled={busy} onPress={onPress} style={({ pressed }) => [styles.dangerButton, busy && styles.disabled, pressed && styles.rowPressed]}><Text style={styles.dangerText}>{title}</Text>{busy ? <ActivityIndicator color="#B43C3C" /> : <Text style={styles.dangerChevron}>›</Text>}</Pressable>;
 }
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
