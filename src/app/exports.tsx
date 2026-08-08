@@ -1,3 +1,1 @@
-import { ExportsScreen } from "@/screens/exports";
-
-export default ExportsScreen;
+export { default } from "@/screens/routes/exports-route";

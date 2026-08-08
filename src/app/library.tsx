@@ -1,3 +1,1 @@
-import { ArtLibrary } from "@/screens/library";
-
-export default ArtLibrary;
+export { default } from "@/screens/routes/library-route";

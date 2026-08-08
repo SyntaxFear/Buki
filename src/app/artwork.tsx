@@ -1,3 +1,1 @@
-import { ArtworkDetails } from "@/screens/artwork";
-
-export default ArtworkDetails;
+export { default } from "@/screens/routes/artwork-route";

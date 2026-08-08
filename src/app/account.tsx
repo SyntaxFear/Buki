@@ -1,5 +1,1 @@
-import { AccountCenter } from "@/screens/account";
-
-export default function AccountRoute() {
-  return <AccountCenter />;
-}
+export { default } from "@/screens/routes/account-route";
