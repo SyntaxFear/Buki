@@ -1,48 +1,84 @@
-// Palette sampled from the original "Make it Bloom" demo video
+// Garden Path header + Sunshine Studio sketchpad palette.
+// The semantic names keep the rest of the app coherent while the underlying
+// colors stay intentionally small and recognizable to children.
 export const colors = {
-  background: "#EBE6DA",
-  page: "#FDF8ED",
-  pageEdge: "#F3EDDF",
-  bookBorder: "#E8695A",
-  bookBorderDark: "#D95B4C",
-  spineDot: "#E8967F",
-  titleGreen: "#4E9B5E",
-  titleTeal: "#4FB8A6",
-  titleCoral: "#E8695A",
-  vine: "#5B9E63",
-  flower: "#E85C4A",
-  tapeTeal: "#5EC6B4",
-  tapeYellow: "#F2C94C",
-  fab: "#E8836F",
-  fabPressed: "#D9705C",
-  confetti: ["#5EC6B4", "#F2C94C", "#E8695A", "#7FB069", "#F2994A"],
+  background: "#FFF5E5",
+  backgroundDeep: "#F8ECD4",
+  surface: "#FFFDF7",
+  surfaceAlt: "#F7ECD8",
+  page: "#FFFDF4",
+  pageEdge: "#F2E5CD",
+  pageShadow: "rgba(71,74,61,0.18)",
+  bookBorder: "#4A79D8",
+  bookBorderDark: "#315CA8",
+  ringCoral: "#FF765E",
+  ringCoralDark: "#D95746",
+  ringHole: "#244D72",
+  spineDot: "#FF8B73",
+  titleGreen: "#167D82",
+  titleTeal: "#167D82",
+  titleCoral: "#FF765E",
+  titleYellow: "#F4B83F",
+  titleBlue: "#6FA9E8",
+  vine: "#167D82",
+  vineSoft: "#D8D5B5",
+  flower: "#FF765E",
+  bloomTeal: "#167D82",
+  bloomYellow: "#FFD65A",
+  bloomBlue: "#6FA9E8",
+  bloomGreen: "#66A86B",
+  tabTeal: "#48C6B7",
+  tabYellow: "#FFD65A",
+  tabCoral: "#FF765E",
+  tapeTeal: "#48C6B7",
+  tapeYellow: "#FFD65A",
+  ink: "#28435A",
+  mutedText: "#75685A",
+  border: "rgba(40,67,90,0.13)",
+  gridDot: "rgba(255,118,94,0.16)",
+  slotBorder: "rgba(74,121,216,0.18)",
+  fab: "#FF765E",
+  fabPressed: "#E65F4B",
+  confetti: ["#48C6B7", "#FFD65A", "#FF765E", "#66A86B", "#6FA9E8"],
   shutterRing: "#FFFFFF",
-  scrimDark: "rgba(30,25,20,0.35)",
+  scrimDark: "rgba(32,47,54,0.34)",
 } as const;
 
 export const PATRICK_HAND = require("@expo-google-fonts/patrick-hand/400Regular/PatrickHand_400Regular.ttf");
 
 /** Cover colors a sketchpad can be born with (main + darker stitch tone). */
 export const PAD_COLORS = [
-  { main: "#E8695A", dark: "#D95B4C" }, // coral
-  { main: "#5EC6B4", dark: "#4BAE9D" }, // teal
-  { main: "#F2C94C", dark: "#DDB43A" }, // yellow
-  { main: "#7FB069", dark: "#6C9C58" }, // green
-  { main: "#6C9BD1", dark: "#5A87BC" }, // blue
+  { main: "#4A79D8", dark: "#315CA8" }, // studio blue
+  { main: "#167D82", dark: "#0E6266" }, // lagoon teal
+  { main: "#FF765E", dark: "#D95746" }, // coral
+  { main: "#FFD65A", dark: "#D7AD31" }, // butter yellow
+  { main: "#66A86B", dark: "#4E8753" }, // leaf green
 ] as const;
 
 /** Soft page tints that keep crayon drawings readable. */
 export const PAGE_COLORS = [
-  "#FDF8ED", // classic cream
-  "#E9F6EC", // mint
-  "#EAF3FB", // sky
-  "#FBEDEE", // blush
-  "#FDF6DC", // butter
-  "#F1EDFA", // lavender
+  "#FFFDF4", // studio cream
+  "#ECF8F1", // mint
+  "#EDF5FC", // sky
+  "#FFF0EC", // blush
+  "#FFF8DD", // butter
+  "#F4EFFC", // lavender
 ] as const;
 
 export function padDarkColor(main: string): string {
-  return PAD_COLORS.find((c) => c.main === main)?.dark ?? colors.bookBorderDark;
+  const current = PAD_COLORS.find((c) => c.main === main)?.dark;
+  if (current) return current;
+
+  // Existing installations keep their saved pad colors after the rebrand.
+  // Preserve a matching edge tone instead of applying the new blue fallback.
+  const legacy: Record<string, string> = {
+    "#E8695A": "#D95B4C",
+    "#5EC6B4": "#4BAE9D",
+    "#F2C94C": "#DDB43A",
+    "#7FB069": "#6C9C58",
+    "#6C9BD1": "#5A87BC",
+  };
+  return legacy[main] ?? colors.bookBorderDark;
 }
 
 // Book geometry (fractions of screen width)

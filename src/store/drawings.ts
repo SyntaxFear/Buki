@@ -2,8 +2,8 @@ import { File, Paths } from "expo-file-system";
 import { create } from "zustand";
 
 import type { ProcessedCutout } from "@/utils/imageio";
+import { getPadDesign, type PadDesignId } from "@/pad-designs";
 import {
-  DEFAULT_COVER,
   makePad,
   migrateStoreData,
   type Drawing,
@@ -32,7 +32,8 @@ interface DrawingsState {
   clearPending: () => void;
   /** Wipe the active pad's drawings (long-press on the camera button). */
   clearActivePad: () => void;
-  createPad: (name: string, style: PadStyle, coverColor: string, pageColor?: string) => string;
+  createPad: (name: string, style: PadStyle, design: PadDesignId, pageColor?: string) => string;
+  setPadDesign: (id: string, design: PadDesignId) => void;
   renamePad: (id: string, name: string) => void;
   /** Deletes the pad and its drawings from disk. No-op on the last pad. */
   deletePad: (id: string) => void;
@@ -63,7 +64,7 @@ function legacyIndexFile(): File {
 
 function persist(s: { activePadId: string; pads: Sketchpad[]; drawingsByPad: Record<string, Drawing[]> }): void {
   const data: StoreData = {
-    version: 2,
+    version: 3,
     activePadId: s.activePadId,
     pads: s.pads,
     drawingsByPad: s.drawingsByPad,
@@ -173,14 +174,31 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     persist({ activePadId, pads, drawingsByPad: nextByPad });
   },
 
-  createPad: (name, style, coverColor, pageColor) => {
+  createPad: (name, style, design, pageColor) => {
     const { pads, drawingsByPad } = get();
-    const pad = makePad(name, style, coverColor || DEFAULT_COVER, Date.now(), undefined, pageColor);
+    const pad = makePad(name, style, design, Date.now(), undefined, pageColor);
     const nextPads = [...pads, pad];
     const nextByPad = { ...drawingsByPad, [pad.id]: [] };
     set({ pads: nextPads, drawingsByPad: nextByPad, activePadId: pad.id });
     persist({ activePadId: pad.id, pads: nextPads, drawingsByPad: nextByPad });
     return pad.id;
+  },
+
+  setPadDesign: (id, design) => {
+    const { pads, drawingsByPad, activePadId } = get();
+    const palette = getPadDesign(design);
+    const nextPads = pads.map((pad) =>
+      pad.id === id
+        ? {
+            ...pad,
+            design,
+            coverColor: palette.cover,
+            pageColor: palette.paper,
+          }
+        : pad,
+    );
+    set({ pads: nextPads });
+    persist({ activePadId, pads: nextPads, drawingsByPad });
   },
 
   renamePad: (id, name) => {

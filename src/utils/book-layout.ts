@@ -1,5 +1,6 @@
 import { BOOK } from "@/theme";
 import type { PadStyle } from "@/store/migrate";
+import { PAD_GEOMETRY } from "@/pad-designs";
 
 export interface Rect {
   x: number;
@@ -34,7 +35,7 @@ export interface PadPageLayout {
   spine: number;
 }
 
-const PAGE_INSET = 10;
+const PAGE_INSET = PAD_GEOMETRY.pageInset;
 
 /**
  * Apple's standard layout margins for full-width content: 16pt on compact
@@ -42,7 +43,9 @@ const PAGE_INSET = 10;
  * the screen edge.
  */
 export function edgeMargin(screenWidth: number): number {
-  return screenWidth >= 414 ? 20 : 16;
+  if (screenWidth < 350) return 22;
+  if (screenWidth < 400) return 28;
+  return screenWidth >= 430 ? 32 : 30;
 }
 
 function slotWithin(page: Rect, wFrac: number, hFrac: number): Rect {

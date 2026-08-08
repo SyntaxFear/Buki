@@ -1,6 +1,14 @@
 // Pure store-shape types + migration, kept free of native imports so the
 // logic is unit-testable with plain objects.
 
+import {
+  DEFAULT_PAD_DESIGN_ID,
+  getPadDesign,
+  inferPadDesignId,
+  isPadDesignId,
+  type PadDesignId,
+} from "@/pad-designs";
+
 export type PadStyle = "spread" | "vertical" | "album" | "grid" | "strip";
 
 export const PAD_STYLES: readonly PadStyle[] = ["spread", "vertical", "album", "grid", "strip"];
@@ -21,6 +29,7 @@ export interface Sketchpad {
   id: string;
   name: string;
   style: PadStyle;
+  design: PadDesignId;
   coverColor: string;
   /** Page tint; older pads omit it and render the classic cream */
   pageColor?: string;
@@ -28,37 +37,39 @@ export interface Sketchpad {
 }
 
 export interface StoreData {
-  version: 2;
+  version: 3;
   activePadId: string;
   pads: Sketchpad[];
   drawingsByPad: Record<string, Drawing[]>;
 }
 
 export const DEFAULT_PAD_NAME = "My Book";
-export const DEFAULT_COVER = "#E8695A";
-export const DEFAULT_PAGE = "#FDF8ED";
+export const DEFAULT_COVER = getPadDesign(DEFAULT_PAD_DESIGN_ID).cover;
+export const DEFAULT_PAGE = getPadDesign(DEFAULT_PAD_DESIGN_ID).paper;
 
 export function makePad(
   name: string,
   style: PadStyle,
-  coverColor: string,
+  design: PadDesignId,
   now: number,
   id?: string,
-  pageColor: string = DEFAULT_PAGE,
+  pageColor?: string,
 ): Sketchpad {
+  const palette = getPadDesign(design);
   return {
     id: id ?? `pad-${now}-${Math.random().toString(36).slice(2, 8)}`,
     name: name.trim() || DEFAULT_PAD_NAME,
     style,
-    coverColor,
-    pageColor,
+    design,
+    coverColor: palette.cover,
+    pageColor: pageColor ?? palette.paper,
     createdAt: now,
   };
 }
 
 function emptyStore(now: number): StoreData {
-  const pad = makePad(DEFAULT_PAD_NAME, "spread", DEFAULT_COVER, now, "pad-default");
-  return { version: 2, activePadId: pad.id, pads: [pad], drawingsByPad: { [pad.id]: [] } };
+  const pad = makePad(DEFAULT_PAD_NAME, "spread", DEFAULT_PAD_DESIGN_ID, now, "pad-default");
+  return { version: 3, activePadId: pad.id, pads: [pad], drawingsByPad: { [pad.id]: [] } };
 }
 
 function isDrawing(d: unknown): d is Drawing {
@@ -68,23 +79,23 @@ function isDrawing(d: unknown): d is Drawing {
 }
 
 /**
- * Accepts whatever JSON was on disk — v1 ({version:1, drawings}), v2, or
- * garbage — and returns a valid v2 store. v1 collections become a single
+ * Accepts whatever JSON was on disk — v1 ({version:1, drawings}), v2/v3, or
+ * garbage — and returns a valid v3 store. v1 collections become a single
  * default spread pad so nothing is lost.
  */
 export function migrateStoreData(raw: unknown, now: number): StoreData {
   if (typeof raw !== "object" || raw === null) return emptyStore(now);
   const o = raw as Record<string, unknown>;
 
-  if (o.version === 2 && Array.isArray(o.pads) && typeof o.drawingsByPad === "object" && o.drawingsByPad !== null) {
-    const pads = (o.pads as unknown[]).filter(
-      (p): p is Sketchpad =>
-        typeof p === "object" &&
-        p !== null &&
-        typeof (p as Sketchpad).id === "string" &&
-        typeof (p as Sketchpad).name === "string" &&
-        PAD_STYLES.includes((p as Sketchpad).style),
-    );
+  if (
+    (o.version === 2 || o.version === 3) &&
+    Array.isArray(o.pads) &&
+    typeof o.drawingsByPad === "object" &&
+    o.drawingsByPad !== null
+  ) {
+    const pads = (o.pads as unknown[])
+      .map(normalizePad)
+      .filter((pad): pad is Sketchpad => pad !== null);
     if (pads.length === 0) return emptyStore(now);
     const byPad: Record<string, Drawing[]> = {};
     for (const pad of pads) {
@@ -95,7 +106,7 @@ export function migrateStoreData(raw: unknown, now: number): StoreData {
       typeof o.activePadId === "string" && pads.some((p) => p.id === o.activePadId)
         ? o.activePadId
         : pads[0].id;
-    return { version: 2, activePadId, pads, drawingsByPad: byPad };
+    return { version: 3, activePadId, pads, drawingsByPad: byPad };
   }
 
   // v1: a single flat drawing list
@@ -106,4 +117,31 @@ export function migrateStoreData(raw: unknown, now: number): StoreData {
   }
 
   return emptyStore(now);
+}
+
+function normalizePad(value: unknown): Sketchpad | null {
+  if (typeof value !== "object" || value === null) return null;
+  const pad = value as Record<string, unknown>;
+  if (
+    typeof pad.id !== "string" ||
+    typeof pad.name !== "string" ||
+    !PAD_STYLES.includes(pad.style as PadStyle)
+  ) {
+    return null;
+  }
+
+  const design = isPadDesignId(pad.design)
+    ? pad.design
+    : inferPadDesignId(typeof pad.coverColor === "string" ? pad.coverColor : undefined);
+  const palette = getPadDesign(design);
+
+  return {
+    id: pad.id,
+    name: pad.name,
+    style: pad.style as PadStyle,
+    design,
+    coverColor: typeof pad.coverColor === "string" ? pad.coverColor : palette.cover,
+    pageColor: typeof pad.pageColor === "string" ? pad.pageColor : palette.paper,
+    createdAt: typeof pad.createdAt === "number" ? pad.createdAt : 0,
+  };
 }
