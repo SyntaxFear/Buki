@@ -1,13 +1,15 @@
 import {
   Canvas,
-  Circle,
   Group,
+  Image,
   Path,
   Skia,
   Text as SkiaText,
   useFont,
+  useImage,
 } from "@shopify/react-native-skia";
 import { useEffect, useMemo } from "react";
+import { AccessibilityInfo } from "react-native";
 import {
   Easing,
   useDerivedValue,
@@ -19,112 +21,164 @@ import {
 
 import { colors, PATRICK_HAND } from "@/theme";
 
-const HEIGHT = 64;
-const FONT_SIZE = 34;
-const BASELINE = 42;
-const LEFT = 22;
+const HEIGHT = 82;
+const FONT_SIZE = 44;
+const BASELINE = 53;
+const LEFT = 20;
+const BEAR_SIZE = 54;
+const BEAR_RIGHT = 8;
+const TRAIL_BEAR_GAP = 8;
 
 interface Props {
   width: number;
 }
 
 /**
- * "Buki" handwrites itself in two colored halves, then a vine grows to
- * the right edge and a little flower blooms at its tip.
+ * Buki wordmark: four friendly letter colors, a paired garden trail, and the
+ * smiling bear from the app icon. The trail reserves a real gap before the
+ * mascot, so neither stroke can show through its transparent image bounds.
  */
 export function HandwrittenTitle({ width }: Props) {
   const font = useFont(PATRICK_HAND, FONT_SIZE);
+  const bear = useImage(require("../../assets/images/header-bear.png"));
 
-  const w1 = useSharedValue(0); // "Bu" reveal
-  const w2 = useSharedValue(0); // "ki" reveal
-  const vine = useSharedValue(0);
-  const flower = useSharedValue(0);
+  const b = useSharedValue(0);
+  const u = useSharedValue(0);
+  const k = useSharedValue(0);
+  const i = useSharedValue(0);
+  const trail = useSharedValue(0);
+  const bearPop = useSharedValue(0);
 
   useEffect(() => {
-    const ease = Easing.out(Easing.cubic);
-    w1.value = withDelay(350, withTiming(1, { duration: 460, easing: ease }));
-    w2.value = withDelay(830, withTiming(1, { duration: 400, easing: ease }));
-    vine.value = withDelay(1250, withTiming(1, { duration: 700, easing: Easing.inOut(Easing.quad) }));
-    flower.value = withDelay(1950, withSpring(1, { damping: 9, stiffness: 180 }));
-  }, [w1, w2, vine, flower]);
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .catch(() => false)
+      .then((reduceMotion) => {
+        if (!mounted) return;
+        if (reduceMotion) {
+          b.value = 1;
+          u.value = 1;
+          k.value = 1;
+          i.value = 1;
+          trail.value = 1;
+          bearPop.value = 1;
+          return;
+        }
 
-  const word1 = "Bu";
-  const word2 = "ki";
-  const word1W = font ? font.getTextWidth(word1) : 0;
-  const word2W = font ? font.getTextWidth(word2) : 0;
-  const word2X = LEFT + word1W + 2;
-  const textEnd = word2X + word2W;
+        const ease = Easing.out(Easing.cubic);
+        b.value = withDelay(180, withTiming(1, { duration: 280, easing: ease }));
+        u.value = withDelay(380, withTiming(1, { duration: 260, easing: ease }));
+        k.value = withDelay(570, withTiming(1, { duration: 260, easing: ease }));
+        i.value = withDelay(760, withTiming(1, { duration: 220, easing: ease }));
+        trail.value = withDelay(920, withTiming(1, { duration: 620, easing: Easing.inOut(Easing.quad) }));
+        bearPop.value = withDelay(1450, withSpring(1, { damping: 10, stiffness: 190 }));
+      });
 
-  const vinePath = useMemo(() => {
+    return () => {
+      mounted = false;
+    };
+  }, [b, bearPop, i, k, trail, u]);
+
+  const letters = ["B", "u", "k", "i"] as const;
+  const widths = letters.map((letter) => (font ? font.getTextWidth(letter) : 0));
+  const positions = [
+    LEFT,
+    LEFT + widths[0] - 1,
+    LEFT + widths[0] + widths[1] - 3,
+    LEFT + widths[0] + widths[1] + widths[2] - 5,
+  ];
+  const textEnd = positions[3] + widths[3];
+  const bearX = width - BEAR_SIZE - BEAR_RIGHT;
+  const bearY = 12;
+  const trailEndX = bearX - TRAIL_BEAR_GAP;
+
+  const mainTrail = useMemo(() => {
     const p = Skia.Path.Make();
-    const y = BASELINE + 6;
-    const startX = textEnd + 10;
-    const endX = width - 46;
+    const startX = textEnd + 13;
+    const endX = trailEndX;
+    const y = 50;
     if (endX <= startX) return p;
-    p.moveTo(startX, y);
     const span = endX - startX;
-    p.cubicTo(
-      startX + span * 0.3, y - 7,
-      startX + span * 0.55, y + 7,
-      startX + span * 0.8, y - 2,
-    );
-    p.quadTo(startX + span * 0.92, y - 6, endX, y - 4);
+    p.moveTo(startX, y);
+    p.cubicTo(startX + span * 0.23, y + 3, startX + span * 0.52, y - 15, startX + span * 0.72, y - 13);
+    p.cubicTo(startX + span * 0.84, y - 12, startX + span * 0.92, y - 9, endX, y - 10);
     return p;
-  }, [textEnd, width]);
+  }, [textEnd, trailEndX]);
 
-  const clip1 = useDerivedValue(() =>
-    Skia.XYWHRect(LEFT - 4, 0, (word1W + 10) * w1.value, HEIGHT),
-  );
-  const clip2 = useDerivedValue(() =>
-    Skia.XYWHRect(word2X - 2, 0, (word2W + 10) * w2.value, HEIGHT),
-  );
-  const flowerTransform = useDerivedValue(() => [{ scale: flower.value }]);
+  const softTrail = useMemo(() => {
+    const p = Skia.Path.Make();
+    const startX = textEnd + 13;
+    const endX = trailEndX;
+    const y = 59;
+    if (endX <= startX) return p;
+    const span = endX - startX;
+    p.moveTo(startX, y);
+    p.cubicTo(startX + span * 0.24, y + 4, startX + span * 0.53, y - 14, startX + span * 0.73, y - 12);
+    p.cubicTo(startX + span * 0.84, y - 11, startX + span * 0.93, y - 6, endX, y - 7);
+    return p;
+  }, [textEnd, trailEndX]);
 
-  // A little pen tip riding the reveal edge sells the "being written" feel
-  const pen1X = useDerivedValue(() => LEFT + word1W * Math.min(1, w1.value));
-  const pen1Opacity = useDerivedValue(() => (w1.value > 0.02 && w1.value < 0.98 ? 1 : 0));
-  const pen2X = useDerivedValue(() => word2X + word2W * Math.min(1, w2.value));
-  const pen2Opacity = useDerivedValue(() => (w2.value > 0.02 && w2.value < 0.98 ? 1 : 0));
-
-  const flowerX = width - 40;
-  const flowerY = BASELINE + 1;
+  const clipB = useDerivedValue(() => Skia.XYWHRect(positions[0] - 4, 0, (widths[0] + 8) * b.value, HEIGHT));
+  const clipU = useDerivedValue(() => Skia.XYWHRect(positions[1] - 3, 0, (widths[1] + 8) * u.value, HEIGHT));
+  const clipK = useDerivedValue(() => Skia.XYWHRect(positions[2] - 3, 0, (widths[2] + 8) * k.value, HEIGHT));
+  const clipI = useDerivedValue(() => Skia.XYWHRect(positions[3] - 3, 0, (widths[3] + 10) * i.value, HEIGHT));
+  const bearTransform = useDerivedValue(() => [{ scale: bearPop.value }]);
 
   if (!font) return null;
 
   return (
     <Canvas style={{ width, height: HEIGHT }}>
-      <Group clip={clip1}>
-        <SkiaText x={LEFT} y={BASELINE} text={word1} font={font} color={colors.titleGreen} />
+      <Group clip={clipB}>
+        <SkiaText x={positions[0] + 1.5} y={BASELINE + 2.5} text="B" font={font} color="rgba(56,57,48,0.18)" />
+        <SkiaText x={positions[0]} y={BASELINE} text="B" font={font} color={colors.titleCoral} />
       </Group>
-      <Group clip={clip2}>
-        <SkiaText x={word2X} y={BASELINE} text={word2} font={font} color={colors.titleCoral} />
+      <Group clip={clipU}>
+        <SkiaText x={positions[1] + 1.5} y={BASELINE + 2.5} text="u" font={font} color="rgba(56,57,48,0.18)" />
+        <SkiaText x={positions[1]} y={BASELINE} text="u" font={font} color={colors.titleTeal} />
       </Group>
-      <Circle cx={pen1X} cy={BASELINE - 10} r={2.6} color={colors.titleGreen} opacity={pen1Opacity} />
-      <Circle cx={pen2X} cy={BASELINE - 10} r={2.6} color={colors.titleCoral} opacity={pen2Opacity} />
+      <Group clip={clipK}>
+        <SkiaText x={positions[2] + 1.5} y={BASELINE + 2.5} text="k" font={font} color="rgba(56,57,48,0.18)" />
+        <SkiaText x={positions[2]} y={BASELINE} text="k" font={font} color={colors.titleYellow} />
+      </Group>
+      <Group clip={clipI}>
+        <SkiaText x={positions[3] + 1.5} y={BASELINE + 2.5} text="i" font={font} color="rgba(56,57,48,0.18)" />
+        <SkiaText x={positions[3]} y={BASELINE} text="i" font={font} color={colors.titleBlue} />
+      </Group>
+
       <Path
-        path={vinePath}
-        color={colors.vine}
+        path={softTrail}
+        color={colors.vineSoft}
         style="stroke"
-        strokeWidth={2.4}
+        strokeWidth={3.1}
         strokeCap="round"
         start={0}
-        end={vine}
+        end={trail}
       />
-      <Group transform={flowerTransform} origin={{ x: flowerX, y: flowerY }}>
-        {[0, 72, 144, 216, 288].map((angle) => {
-          const rad = (angle * Math.PI) / 180;
-          return (
-            <Circle
-              key={angle}
-              cx={flowerX + Math.cos(rad) * 5.5}
-              cy={flowerY + Math.sin(rad) * 5.5}
-              r={4}
-              color={colors.flower}
-            />
-          );
-        })}
-        <Circle cx={flowerX} cy={flowerY} r={3.2} color={colors.tapeYellow} />
-      </Group>
+      <Path
+        path={mainTrail}
+        color={colors.vine}
+        style="stroke"
+        strokeWidth={3.3}
+        strokeCap="round"
+        start={0}
+        end={trail}
+      />
+
+      {bear ? (
+        <Group
+          transform={bearTransform}
+          origin={{ x: bearX + BEAR_SIZE / 2, y: bearY + BEAR_SIZE / 2 }}
+        >
+          <Image
+            image={bear}
+            x={bearX}
+            y={bearY}
+            width={BEAR_SIZE}
+            height={BEAR_SIZE}
+            fit="contain"
+          />
+        </Group>
+      ) : null}
     </Canvas>
   );
 }

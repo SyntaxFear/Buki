@@ -152,7 +152,12 @@ export function Scan() {
               Point it at a drawing and it flies into your book. You can also import a photo with
               the gallery button below.
             </Text>
-            <Pressable onPress={askForCamera} style={styles.deniedBtn}>
+            <Pressable
+              onPress={askForCamera}
+              accessibilityRole="button"
+              accessibilityLabel={permission?.canAskAgain ? "Allow camera" : "Open Settings"}
+              style={({ pressed }) => [styles.deniedBtn, pressed && { opacity: 0.8 }]}
+            >
               <Text style={styles.deniedBtnText}>
                 {permission?.canAskAgain ? "Allow camera" : "Open Settings"}
               </Text>
@@ -187,20 +192,29 @@ export function Scan() {
 
       {phase === "aim" ? (
         <View style={[styles.controls, { bottom: insets.bottom + 22 }]}>
-          <Glass tint={colors.tapeTeal} fallbackColor="rgba(94,198,180,0.82)" style={styles.galleryBtn}>
+          <Glass tint={colors.tabTeal} fallbackColor="rgba(72,198,183,0.84)" style={styles.galleryBtn}>
             <Pressable
               onPress={pickOrCycle}
+              accessibilityRole="button"
+              accessibilityLabel={isDevice ? "Choose a drawing from photos" : "Show another demo drawing"}
               style={({ pressed }) => [StyleSheet.absoluteFill, styles.glassBtnTouchable, pressed && { opacity: 0.8 }]}
             >
               <SymbolView name="photo.on.rectangle" size={20} tintColor="#F2FBF9" />
             </Pressable>
           </Glass>
-          <Pressable onPress={shoot} style={styles.shutterOuter}>
+          <Pressable
+            onPress={shoot}
+            accessibilityRole="button"
+            accessibilityLabel="Capture drawing"
+            style={({ pressed }) => [styles.shutterOuter, pressed && { transform: [{ scale: 0.96 }] }]}
+          >
             <View style={styles.shutterInner} />
           </Pressable>
           <Glass tint="#28221C" fallbackColor="rgba(40,34,28,0.65)" style={styles.closeBtn}>
             <Pressable
               onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Close camera"
               style={({ pressed }) => [StyleSheet.absoluteFill, styles.glassBtnTouchable, pressed && { opacity: 0.8 }]}
             >
               <SymbolView name="xmark" size={18} tintColor="#F5F2ED" />
@@ -283,7 +297,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#141210",
+    backgroundColor: "#14272B",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 44,
@@ -303,7 +317,7 @@ const styles = StyleSheet.create({
   },
   deniedBtn: {
     marginTop: 10,
-    backgroundColor: "#E8695A",
+    backgroundColor: colors.fab,
     paddingHorizontal: 22,
     paddingVertical: 12,
     borderRadius: 22,
@@ -315,12 +329,12 @@ const styles = StyleSheet.create({
   },
   root: {
     flex: 1,
-    backgroundColor: "#1C1712",
+    backgroundColor: "#122428",
   },
   demoChip: {
     position: "absolute",
     alignSelf: "center",
-    backgroundColor: "rgba(28,23,18,0.72)",
+    backgroundColor: "rgba(20,39,43,0.76)",
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 16,
@@ -328,7 +342,7 @@ const styles = StyleSheet.create({
   noticeChip: {
     position: "absolute",
     alignSelf: "center",
-    backgroundColor: "rgba(190,60,45,0.88)",
+    backgroundColor: "rgba(217,87,70,0.92)",
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 16,

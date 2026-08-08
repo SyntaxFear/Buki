@@ -2,7 +2,7 @@
   "expo": {
     "name": "Buki",
     "slug": "Bloombook",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "buki",
@@ -16,7 +16,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#EBE6DA",
+        "backgroundColor": "#FFF5E5",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -37,7 +37,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#025655",
+          "backgroundColor": "#167D82",
           "image": "./assets/images/icon.png",
           "imageWidth": 230
         }
