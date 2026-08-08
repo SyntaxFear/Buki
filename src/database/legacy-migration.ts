@@ -4,6 +4,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import { migrateStoreData } from "@/store/migrate";
 import { buildLegacyMigrationRecords } from "./legacy-records";
 import { DEFAULT_CHILD_ID, LEGACY_MIGRATION_KEY } from "./constants";
+import { activePadPreferenceKey } from "./account-repository";
 
 interface LegacySource {
   name: "buki.json" | "bloombook.json" | "none";
@@ -121,8 +122,9 @@ export async function migrateLegacyJson(db: SQLiteDatabase): Promise<void> {
     }
 
     await tx.runAsync(
-      `INSERT INTO preferences (key, value, updated_at) VALUES ('active_pad_id', ?, ?)
+      `INSERT INTO preferences (key, value, updated_at) VALUES (?, ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      activePadPreferenceKey(null),
       data.activePadId,
       now,
     );

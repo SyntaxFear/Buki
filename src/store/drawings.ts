@@ -29,6 +29,8 @@ interface DrawingsState {
   drawingsByPad: Record<string, Drawing[]>;
   pending: PendingDrawing | null;
   hydrate: () => Promise<void>;
+  reloadForAccount: () => Promise<void>;
+  resetForAccountSwitch: () => void;
   setPending: (cutout: ProcessedCutout) => void;
   /** Land the pending cutout in the active pad and persist it. */
   commitPending: () => boolean;
@@ -117,6 +119,20 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       });
     }
   },
+
+  reloadForAccount: async () => {
+    const data = await loadLibrarySnapshot();
+    set({
+      hydrated: true,
+      pads: data.pads,
+      activePadId: data.activePadId,
+      drawingsByPad: data.drawingsByPad,
+      pending: null,
+    });
+  },
+
+  resetForAccountSwitch: () =>
+    set({ hydrated: false, pads: [], activePadId: "", drawingsByPad: {}, pending: null }),
 
   setPending: (cutout) => {
     set({

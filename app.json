@@ -10,6 +10,7 @@
     "ios": {
       "bundleIdentifier": "com.parastashvili.bloombook",
       "supportsTablet": false,
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -57,7 +58,8 @@
       ],
       "expo-sqlite",
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true,
