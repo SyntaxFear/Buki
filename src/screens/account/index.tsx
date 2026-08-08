@@ -89,6 +89,10 @@ export function AccountCenter() {
   const tier = useMembership((state) => state.tier);
   const entitlement = useMembership((state) => state.entitlement);
   const capabilities = useMembership((state) => state.capabilities);
+  const membershipLoading = useMembership((state) => state.loading);
+  const membershipError = useMembership((state) => state.error);
+  const managementUrl = useMembership((state) => state.managementUrl);
+  const refreshMembership = useMembership((state) => state.refreshMembership);
   const requestUpgrade = useMembership((state) => state.requestUpgrade);
   const hapticsEnabled = usePreferences((state) => state.hapticsEnabled);
   const setHapticsEnabled = usePreferences((state) => state.setHapticsEnabled);
@@ -272,7 +276,9 @@ export function AccountCenter() {
               <View>
                 <Text style={styles.membershipName}>{tier === "pro" ? "Buki Pro" : "Buki Free"}</Text>
                 <Text style={styles.membershipDetail}>
-                  {tier === "pro"
+                  {membershipLoading
+                    ? "Checking App Store access…"
+                    : tier === "pro"
                     ? `${entitlement.product ? entitlement.product.charAt(0).toUpperCase() + entitlement.product.slice(1) : "Pro"} access`
                     : "1 child · 1 sketchpad · 20 artworks"}
                 </Text>
@@ -294,7 +300,13 @@ export function AccountCenter() {
           <SettingRow
             title="Manage subscription"
             detail="Open Apple subscription settings"
-            onPress={() => void openExternal("https://apps.apple.com/account/subscriptions", "Subscription management opens Apple’s settings.")}
+            onPress={() => void openExternal(managementUrl ?? "https://apps.apple.com/account/subscriptions", "Subscription management opens Apple’s settings.")}
+          />
+          <SettingRow
+            title="Refresh membership status"
+            detail={membershipError ?? (entitlement.checkedAt ? `Last checked ${formatDate(entitlement.checkedAt) ?? "recently"}` : "Check this Buki account now")}
+            right={membershipLoading ? <ActivityIndicator color={colors.titleTeal} /> : undefined}
+            onPress={() => void refreshMembership()}
           />
           <SettingRow
             title="Restore purchases"

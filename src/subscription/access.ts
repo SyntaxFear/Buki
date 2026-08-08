@@ -73,6 +73,20 @@ export function tierForEntitlement(status: EntitlementStatus): AccessTier {
   return status === "active" || status === "grace" ? "pro" : "free";
 }
 
+export function entitlementAtTime(
+  snapshot: EntitlementSnapshot,
+  now: number = Date.now(),
+): EntitlementSnapshot {
+  if (
+    (snapshot.status === "active" || snapshot.status === "grace") &&
+    snapshot.expiresAt &&
+    Date.parse(snapshot.expiresAt) <= now
+  ) {
+    return { ...snapshot, status: "expired", willRenew: false };
+  }
+  return snapshot;
+}
+
 export function resolveCapabilities(tier: AccessTier): Capabilities {
   return tier === "pro" ? PRO_CAPABILITIES : FREE_CAPABILITIES;
 }

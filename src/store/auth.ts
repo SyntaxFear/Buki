@@ -14,6 +14,7 @@ import {
 import { getSupabaseClient } from "@/auth/supabase";
 import { parseOAuthCallback } from "@/auth/oauth";
 import { useDrawings } from "@/store/drawings";
+import { useMembership } from "@/store/membership";
 import { useProfiles } from "@/store/profiles";
 import { usePreferences } from "@/store/preferences";
 
@@ -58,6 +59,7 @@ function errorMessage(error: unknown): string {
 
 async function applySession(session: Session | null): Promise<void> {
   if (!session?.user) {
+    await useMembership.getState().disconnectUser();
     await clearBukiAccount();
     useAuth.setState({
       hydrated: true,
@@ -82,6 +84,7 @@ async function applySession(session: Session | null): Promise<void> {
     profile,
     error: null,
   });
+  await useMembership.getState().initializeForUser(session.user.id);
   await useDrawings.getState().reloadForAccount();
   await useProfiles.getState().reloadForAccount();
   usePreferences.getState().resetForAccountSwitch();
@@ -136,6 +139,7 @@ export const useAuth = create<AuthState>((set, get) => ({
             });
           }
         } catch (error) {
+          useMembership.getState().resetMembership();
           set({
             hydrated: true,
             status: "signedOut",

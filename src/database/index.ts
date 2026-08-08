@@ -28,6 +28,11 @@ import {
   getLocalUsage,
   setBooleanPreference,
 } from "./settings-repository";
+import {
+  loadLocalEntitlementSnapshot,
+  saveLocalEntitlementSnapshot,
+} from "./entitlement-repository";
+import type { EntitlementSnapshot } from "@/subscription/access";
 
 export { BUKI_DATABASE_NAME };
 
@@ -112,6 +117,14 @@ export function saveBooleanPreference(name: string, value: boolean) {
 
 export function loadBukiUsage() {
   return getLocalUsage(requireBukiDatabase());
+}
+
+export function loadBukiEntitlement(ownerId: string) {
+  return loadLocalEntitlementSnapshot(requireBukiDatabase(), ownerId);
+}
+
+export function saveBukiEntitlement(ownerId: string, snapshot: EntitlementSnapshot) {
+  return saveLocalEntitlementSnapshot(requireBukiDatabase(), ownerId, snapshot);
 }
 
 export function loadLibrarySnapshot(): Promise<StoreData> {

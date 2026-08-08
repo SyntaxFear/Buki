@@ -1,6 +1,7 @@
 import {
   canCreateContent,
   EMPTY_ENTITLEMENT,
+  entitlementAtTime,
   FREE_LIMITS,
   remainingContentAllowance,
   resolveCapabilities,
@@ -51,5 +52,35 @@ describe("Buki access capabilities", () => {
 
   it("keeps the documented Free limits in one canonical place", () => {
     expect(FREE_LIMITS).toEqual({ children: 1, sketchpads: 1, artworks: 20 });
+  });
+
+  it("expires a cached subscription after its store expiration time", () => {
+    expect(
+      entitlementAtTime(
+        {
+          product: "monthly",
+          status: "active",
+          expiresAt: "2026-08-01T00:00:00Z",
+          willRenew: true,
+          checkedAt: "2026-07-30T00:00:00Z",
+        },
+        Date.parse("2026-08-08T00:00:00Z"),
+      ),
+    ).toMatchObject({ status: "expired", willRenew: false });
+  });
+
+  it("keeps lifetime access active without an expiration date", () => {
+    expect(
+      entitlementAtTime(
+        {
+          product: "lifetime",
+          status: "active",
+          expiresAt: null,
+          willRenew: false,
+          checkedAt: "2026-08-08T00:00:00Z",
+        },
+        Date.parse("2036-08-08T00:00:00Z"),
+      ).status,
+    ).toBe("active");
   });
 });

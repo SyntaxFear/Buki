@@ -12,6 +12,7 @@ import { useDrawings } from "@/store/drawings";
 import { useAuth } from "@/store/auth";
 import { useProfiles } from "@/store/profiles";
 import { usePreferences } from "@/store/preferences";
+import { useMembership } from "@/store/membership";
 import { colors, PATRICK_HAND } from "@/theme";
 
 // Module scope, unawaited: called any later (e.g. inside the component) risks
@@ -43,6 +44,7 @@ function ReadyApp() {
   const hydrateProfiles = useProfiles((s) => s.hydrate);
   const preferencesHydrated = usePreferences((s) => s.hydrated);
   const hydratePreferences = usePreferences((s) => s.hydrate);
+  const membershipHydrated = useMembership((s) => s.hydrated);
   const [splashHidden, setSplashHidden] = useState(false);
 
   useEffect(() => {
@@ -57,7 +59,13 @@ function ReadyApp() {
   // The native splash stays up until every readiness signal — fonts for the
   // title/UI, and the sketchpad store — has actually landed, so it never
   // hands off to a still-loading frame.
-  const ready = fontsLoaded && hydrated && authHydrated && profilesHydrated && preferencesHydrated;
+  const ready =
+    fontsLoaded &&
+    hydrated &&
+    authHydrated &&
+    profilesHydrated &&
+    preferencesHydrated &&
+    membershipHydrated;
 
   useEffect(() => {
     if (ready && !splashHidden) {
