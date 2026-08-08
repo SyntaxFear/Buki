@@ -3,6 +3,8 @@ import { create } from "zustand";
 
 import type { ProcessedCutout } from "@/utils/imageio";
 import { getPadDesign, type PadDesignId } from "@/pad-designs";
+import { canCreateContent, type ContentCounts } from "@/subscription/access";
+import { currentCapabilities, useMembership } from "@/store/membership";
 import {
   makePad,
   migrateStoreData,
@@ -28,11 +30,11 @@ interface DrawingsState {
   hydrate: () => void;
   setPending: (cutout: ProcessedCutout) => void;
   /** Land the pending cutout in the active pad and persist it. */
-  commitPending: () => void;
+  commitPending: () => boolean;
   clearPending: () => void;
   /** Wipe the active pad's drawings (long-press on the camera button). */
   clearActivePad: () => void;
-  createPad: (name: string, style: PadStyle, design: PadDesignId, pageColor?: string) => string;
+  createPad: (name: string, style: PadStyle, design: PadDesignId, pageColor?: string) => string | null;
   setPadDesign: (id: string, design: PadDesignId) => void;
   renamePad: (id: string, name: string) => void;
   /** Deletes the pad and its drawings from disk. No-op on the last pad. */
@@ -41,6 +43,17 @@ interface DrawingsState {
 }
 
 const EMPTY_DRAWINGS: Drawing[] = [];
+
+export function contentCountsOf(s: {
+  pads: Sketchpad[];
+  drawingsByPad: Record<string, Drawing[]>;
+}): ContentCounts {
+  return {
+    children: 1,
+    sketchpads: s.pads.length,
+    artworks: Object.values(s.drawingsByPad).reduce((total, drawings) => total + drawings.length, 0),
+  };
+}
 
 export function activeDrawingsOf(s: {
   drawingsByPad: Record<string, Drawing[]>;
@@ -144,11 +157,15 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
 
   commitPending: () => {
     const { pending, drawingsByPad, activePadId, pads } = get();
-    if (!pending) return;
+    if (!pending) return false;
     const current = drawingsByPad[activePadId] ?? [];
     if (current.some((d) => d.uri === pending.uri)) {
       set({ pending: null });
-      return;
+      return true;
+    }
+    if (!canCreateContent("artworks", contentCountsOf({ pads, drawingsByPad }), currentCapabilities())) {
+      useMembership.getState().requestUpgrade("artworks", "artwork_limit");
+      return false;
     }
     const drawing: Drawing = {
       id: `d-${pending.uri.split("/").pop() ?? Date.now()}`,
@@ -162,6 +179,7 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     const nextByPad = { ...drawingsByPad, [activePadId]: [...current, drawing] };
     set({ drawingsByPad: nextByPad, pending: null });
     persist({ activePadId, pads, drawingsByPad: nextByPad });
+    return true;
   },
 
   clearPending: () => set({ pending: null }),
@@ -176,6 +194,10 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
 
   createPad: (name, style, design, pageColor) => {
     const { pads, drawingsByPad } = get();
+    if (!canCreateContent("sketchpads", contentCountsOf({ pads, drawingsByPad }), currentCapabilities())) {
+      useMembership.getState().requestUpgrade("sketchpads", "sketchpad_limit");
+      return null;
+    }
     const pad = makePad(name, style, design, Date.now(), undefined, pageColor);
     const nextPads = [...pads, pad];
     const nextByPad = { ...drawingsByPad, [pad.id]: [] };

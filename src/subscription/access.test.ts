@@ -1,0 +1,55 @@
+import {
+  canCreateContent,
+  EMPTY_ENTITLEMENT,
+  FREE_LIMITS,
+  remainingContentAllowance,
+  resolveCapabilities,
+  tierForEntitlement,
+  type ContentCounts,
+} from "./access";
+
+const counts = (artworks: number, sketchpads = 1, children = 1): ContentCounts => ({
+  artworks,
+  sketchpads,
+  children,
+});
+
+describe("Buki access capabilities", () => {
+  it("defaults an unknown entitlement to Free", () => {
+    expect(tierForEntitlement(EMPTY_ENTITLEMENT.status)).toBe("free");
+  });
+
+  it.each(["active", "grace"] as const)("treats %s Pro access as active", (status) => {
+    expect(tierForEntitlement(status)).toBe("pro");
+  });
+
+  it("enforces the Free artwork boundary at 0, 19, and 20", () => {
+    const free = resolveCapabilities("free");
+    expect(canCreateContent("artworks", counts(0), free)).toBe(true);
+    expect(canCreateContent("artworks", counts(19), free)).toBe(true);
+    expect(canCreateContent("artworks", counts(20), free)).toBe(false);
+    expect(remainingContentAllowance("artworks", counts(19), free)).toBe(1);
+    expect(remainingContentAllowance("artworks", counts(20), free)).toBe(0);
+  });
+
+  it("preserves but does not extend an over-limit Free library", () => {
+    const free = resolveCapabilities("free");
+    expect(canCreateContent("artworks", counts(27), free)).toBe(false);
+    expect(canCreateContent("sketchpads", counts(0, 3), free)).toBe(false);
+    expect(canCreateContent("children", counts(0, 1, 2), free)).toBe(false);
+  });
+
+  it("gives Pro unlimited local content and every Pro capability", () => {
+    const pro = resolveCapabilities("pro");
+    expect(canCreateContent("artworks", counts(1_000_000, 200, 50), pro)).toBe(true);
+    expect(pro.cloudBackup).toBe(true);
+    expect(pro.exportData).toBe(true);
+    expect(pro.advancedOrganization).toBe(true);
+    expect(pro.premiumVisuals).toBe(true);
+    expect(pro.maxArtworks).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("keeps the documented Free limits in one canonical place", () => {
+    expect(FREE_LIMITS).toEqual({ children: 1, sketchpads: 1, artworks: 20 });
+  });
+});

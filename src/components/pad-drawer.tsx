@@ -85,7 +85,8 @@ export function PadDrawer({ open, onClose }: Props) {
   }));
 
   const submitCreate = () => {
-    createPad(newName, newStyle, newDesign, newPageColor);
+    const createdPadId = createPad(newName, newStyle, newDesign, newPageColor);
+    if (!createdPadId) return;
     setNewName("");
     setCreating(false);
     onClose();
