@@ -3,7 +3,14 @@ import { create } from "zustand";
 
 import type { ProcessedCutout } from "@/utils/imageio";
 import { enqueueLibrarySnapshot, loadLibrarySnapshot } from "@/database";
-import { getPadDesign, type PadDesignId } from "@/pad-designs";
+import { getPadDesign, isPremiumPadDesign, type PadDesignId } from "@/pad-designs";
+import {
+  hasPremiumPadVisual,
+  isPremiumPadBorder,
+  isPremiumPadDecoration,
+  type PadBorderId,
+  type PadDecorationId,
+} from "@/pad-visuals";
 import { canCreateContent, type ContentCounts } from "@/subscription/access";
 import { currentCapabilities, useMembership } from "@/store/membership";
 import { usePreferences } from "@/store/preferences";
@@ -44,8 +51,18 @@ interface DrawingsState {
     design: PadDesignId,
     pageColor?: string,
     childId?: string,
+    border?: PadBorderId,
+    decoration?: PadDecorationId,
   ) => string | null;
-  setPadDesign: (id: string, design: PadDesignId) => void;
+  setPadVisuals: (
+    id: string,
+    visuals: {
+      design: PadDesignId;
+      border: PadBorderId;
+      decoration: PadDecorationId;
+      pageColor?: string;
+    },
+  ) => boolean;
   renamePad: (id: string, name: string) => void;
   /** Deletes the pad and its drawings from disk. No-op on the last pad. */
   deletePad: (id: string) => void;
@@ -80,7 +97,7 @@ export function activePadOf(s: { pads: Sketchpad[]; activePadId: string }): Sket
 
 function persist(s: { activePadId: string; pads: Sketchpad[]; drawingsByPad: Record<string, Drawing[]> }): void {
   const data: StoreData = {
-    version: 3,
+    version: 4,
     activePadId: s.activePadId,
     pads: s.pads,
     drawingsByPad: s.drawingsByPad,
@@ -200,14 +217,31 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     persist({ activePadId, pads, drawingsByPad: nextByPad });
   },
 
-  createPad: (name, style, design, pageColor, childId) => {
+  createPad: (name, style, design, pageColor, childId, border = "none", decoration = "none") => {
     const { pads, drawingsByPad } = get();
     if (!canCreateContent("sketchpads", contentCountsOf({ pads, drawingsByPad }), currentCapabilities())) {
       useMembership.getState().requestUpgrade("sketchpads", "sketchpad_limit");
       return null;
     }
     if (!childId) return null;
-    const pad = makePad(name, style, design, Date.now(), undefined, pageColor, childId);
+    if (
+      hasPremiumPadVisual({ design, border, decoration }) &&
+      !currentCapabilities().premiumVisuals
+    ) {
+      useMembership.getState().requestUpgrade("premiumVisuals", "premium_visual_create");
+      return null;
+    }
+    const pad = makePad(
+      name,
+      style,
+      design,
+      Date.now(),
+      undefined,
+      pageColor,
+      childId,
+      border,
+      decoration,
+    );
     const nextPads = [...pads, pad];
     const nextByPad = { ...drawingsByPad, [pad.id]: [] };
     set({ pads: nextPads, drawingsByPad: nextByPad, activePadId: pad.id });
@@ -215,21 +249,34 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     return pad.id;
   },
 
-  setPadDesign: (id, design) => {
+  setPadVisuals: (id, visuals) => {
     const { pads, drawingsByPad, activePadId } = get();
-    const palette = getPadDesign(design);
+    const current = pads.find((pad) => pad.id === id);
+    if (!current) return false;
+    const introducesPremium =
+      (current.design !== visuals.design && isPremiumPadDesign(visuals.design)) ||
+      (current.border !== visuals.border && isPremiumPadBorder(visuals.border)) ||
+      (current.decoration !== visuals.decoration && isPremiumPadDecoration(visuals.decoration));
+    if (introducesPremium && !currentCapabilities().premiumVisuals) {
+      useMembership.getState().requestUpgrade("premiumVisuals", "premium_visual_save");
+      return false;
+    }
+    const palette = getPadDesign(visuals.design);
     const nextPads = pads.map((pad) =>
       pad.id === id
         ? {
             ...pad,
-            design,
+            design: visuals.design,
+            border: visuals.border,
+            decoration: visuals.decoration,
             coverColor: palette.cover,
-            pageColor: palette.paper,
+            pageColor: visuals.pageColor ?? palette.paper,
           }
         : pad,
     );
     set({ pads: nextPads });
     persist({ activePadId, pads: nextPads, drawingsByPad });
+    return true;
   },
 
   renamePad: (id, name) => {

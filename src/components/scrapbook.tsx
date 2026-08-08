@@ -26,8 +26,15 @@ import {
   PAGE_DOT_STEP,
   PAGE_FACE_RADIUS,
 } from "@/components/curl-shader";
-import { BindingRing, PadStampMark, PadTab } from "@/components/pad-ornaments";
+import {
+  BindingRing,
+  PadDecorationMarks,
+  PadStampMark,
+  PadTab,
+  PageBorder,
+} from "@/components/pad-ornaments";
 import { getPadDesign, PAD_GEOMETRY, type PadDesignId } from "@/pad-designs";
+import type { PadBorderId, PadDecorationId } from "@/pad-visuals";
 import type { Drawing } from "@/store/drawings";
 import { colors, padDarkColor } from "@/theme";
 import { useImageCache } from "@/utils/image-cache";
@@ -50,6 +57,8 @@ interface Props {
   coverColor?: string;
   pageColor?: string;
   design?: PadDesignId;
+  border?: PadBorderId;
+  decoration?: PadDecorationId;
 }
 
 function DrawingOnPage({
@@ -86,6 +95,8 @@ export function Scrapbook({
   coverColor,
   pageColor,
   design,
+  border = "none",
+  decoration = "none",
 }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { book, leftPage, rightPage, leftSlot, rightSlot, spineX } = layout;
@@ -355,6 +366,23 @@ export function Scrapbook({
       {/* right page drawing being revealed (or the settled one) */}
       {staticRight ? <DrawingOnPage drawing={staticRight} image={imageFor(staticRight)} slot={rightSlot} /> : null}
 
+      <PageBorder
+        id={border}
+        x={leftPage.x}
+        y={leftPage.y}
+        width={leftPage.width}
+        height={leftPage.height}
+        accent={palette.stampColor}
+      />
+      <PageBorder
+        id={border}
+        x={rightPage.x}
+        y={rightPage.y}
+        width={rightPage.width}
+        height={rightPage.height}
+        accent={palette.stampColor}
+      />
+
       {/*
        * The center binding belongs above the open spread but behind a loose
        * turning sheet. This prevents the rings from floating over the fold.
@@ -425,12 +453,24 @@ export function Scrapbook({
         </Group>
       ) : null}
 
-      <PadStampMark
-        cx={leftPage.x + 27}
-        cy={leftPage.y + leftPage.height - 27}
-        stamp={palette.stamp}
-        color={palette.stampColor}
-      />
+      {decoration === "none" ? (
+        <PadStampMark
+          cx={leftPage.x + 27}
+          cy={leftPage.y + leftPage.height - 27}
+          stamp={palette.stamp}
+          color={palette.stampColor}
+        />
+      ) : (
+        <PadDecorationMarks
+          id={decoration}
+          x={leftPage.x}
+          y={leftPage.y}
+          width={rightPage.x + rightPage.width - leftPage.x}
+          height={leftPage.height}
+          accent={palette.stampColor}
+          secondary={palette.tabs[1].color}
+        />
+      )}
     </Canvas>
   );
 }

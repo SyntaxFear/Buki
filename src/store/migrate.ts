@@ -9,6 +9,12 @@ import {
   type PadDesignId,
 } from "@/pad-designs";
 import { DEFAULT_CHILD_ID } from "@/database/constants";
+import {
+  isPadBorderId,
+  isPadDecorationId,
+  type PadBorderId,
+  type PadDecorationId,
+} from "@/pad-visuals";
 
 export type PadStyle = "spread" | "vertical" | "album" | "grid" | "strip";
 
@@ -32,6 +38,8 @@ export interface Sketchpad {
   name: string;
   style: PadStyle;
   design: PadDesignId;
+  border: PadBorderId;
+  decoration: PadDecorationId;
   coverColor: string;
   /** Page tint; older pads omit it and render the classic cream */
   pageColor?: string;
@@ -39,7 +47,7 @@ export interface Sketchpad {
 }
 
 export interface StoreData {
-  version: 3;
+  version: 4;
   activePadId: string;
   pads: Sketchpad[];
   drawingsByPad: Record<string, Drawing[]>;
@@ -57,6 +65,8 @@ export function makePad(
   id?: string,
   pageColor?: string,
   childId: string = DEFAULT_CHILD_ID,
+  border: PadBorderId = "none",
+  decoration: PadDecorationId = "none",
 ): Sketchpad {
   const palette = getPadDesign(design);
   return {
@@ -65,6 +75,8 @@ export function makePad(
     name: name.trim() || DEFAULT_PAD_NAME,
     style,
     design,
+    border,
+    decoration,
     coverColor: palette.cover,
     pageColor: pageColor ?? palette.paper,
     createdAt: now,
@@ -73,7 +85,7 @@ export function makePad(
 
 function emptyStore(now: number): StoreData {
   const pad = makePad(DEFAULT_PAD_NAME, "spread", DEFAULT_PAD_DESIGN_ID, now, "pad-default");
-  return { version: 3, activePadId: pad.id, pads: [pad], drawingsByPad: { [pad.id]: [] } };
+  return { version: 4, activePadId: pad.id, pads: [pad], drawingsByPad: { [pad.id]: [] } };
 }
 
 function isDrawing(d: unknown): d is Drawing {
@@ -84,7 +96,7 @@ function isDrawing(d: unknown): d is Drawing {
 
 /**
  * Accepts whatever JSON was on disk — v1 ({version:1, drawings}), v2/v3, or
- * garbage — and returns a valid v3 store. v1 collections become a single
+ * garbage — and returns a valid v4 store. v1 collections become a single
  * default spread pad so nothing is lost.
  */
 export function migrateStoreData(raw: unknown, now: number): StoreData {
@@ -92,7 +104,7 @@ export function migrateStoreData(raw: unknown, now: number): StoreData {
   const o = raw as Record<string, unknown>;
 
   if (
-    (o.version === 2 || o.version === 3) &&
+    (o.version === 2 || o.version === 3 || o.version === 4) &&
     Array.isArray(o.pads) &&
     typeof o.drawingsByPad === "object" &&
     o.drawingsByPad !== null
@@ -110,7 +122,7 @@ export function migrateStoreData(raw: unknown, now: number): StoreData {
       typeof o.activePadId === "string" && pads.some((p) => p.id === o.activePadId)
         ? o.activePadId
         : pads[0].id;
-    return { version: 3, activePadId, pads, drawingsByPad: byPad };
+    return { version: 4, activePadId, pads, drawingsByPad: byPad };
   }
 
   // v1: a single flat drawing list
@@ -145,6 +157,8 @@ function normalizePad(value: unknown): Sketchpad | null {
     name: pad.name,
     style: pad.style as PadStyle,
     design,
+    border: isPadBorderId(pad.border) ? pad.border : "none",
+    decoration: isPadDecorationId(pad.decoration) ? pad.decoration : "none",
     coverColor: typeof pad.coverColor === "string" ? pad.coverColor : palette.cover,
     pageColor: typeof pad.pageColor === "string" ? pad.pageColor : palette.paper,
     createdAt: typeof pad.createdAt === "number" ? pad.createdAt : 0,

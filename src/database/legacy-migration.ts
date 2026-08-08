@@ -62,9 +62,9 @@ export async function migrateLegacyJson(db: SQLiteDatabase): Promise<void> {
     for (const pad of records.sketchpads) {
       await tx.runAsync(
         `INSERT INTO sketchpads (
-          id, owner_id, child_id, name, style, design, cover_color, page_color,
+          id, owner_id, child_id, name, style, design, cover_color, page_color, border, decoration,
           sort_order, created_at, updated_at, deleted_at
-        ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         ON CONFLICT(id) DO UPDATE SET
           child_id = excluded.child_id,
           name = excluded.name,
@@ -72,6 +72,8 @@ export async function migrateLegacyJson(db: SQLiteDatabase): Promise<void> {
           design = excluded.design,
           cover_color = excluded.cover_color,
           page_color = excluded.page_color,
+          border = excluded.border,
+          decoration = excluded.decoration,
           sort_order = excluded.sort_order,
           created_at = excluded.created_at,
           updated_at = excluded.updated_at,
@@ -83,6 +85,8 @@ export async function migrateLegacyJson(db: SQLiteDatabase): Promise<void> {
         pad.design,
         pad.coverColor,
         pad.pageColor ?? null,
+        pad.border,
+        pad.decoration,
         pad.sortOrder,
         pad.createdAt,
         now,

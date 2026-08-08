@@ -25,12 +25,14 @@ describe("migrateStoreData", () => {
   it("wraps a v1 store into a single default spread pad", () => {
     const v1 = { version: 1, drawings: [drawing(1), drawing(2)] };
     const out = migrateStoreData(v1, NOW);
-    expect(out.version).toBe(3);
+    expect(out.version).toBe(4);
     expect(out.pads).toHaveLength(1);
     expect(out.pads[0].style).toBe("spread");
     expect(out.pads[0].name).toBe("My Book");
     expect(out.pads[0].childId).toBe("child-default");
     expect(out.pads[0].design).toBe("sunshine");
+    expect(out.pads[0].border).toBe("none");
+    expect(out.pads[0].decoration).toBe("none");
     expect(out.activePadId).toBe(out.pads[0].id);
     expect(out.drawingsByPad[out.pads[0].id]).toHaveLength(2);
   });
@@ -46,7 +48,7 @@ describe("migrateStoreData", () => {
       drawingsByPad: { p1: [drawing(1)], p2: [drawing(2), drawing(3)] },
     };
     const out = migrateStoreData(v2, NOW);
-    expect(out.version).toBe(3);
+    expect(out.version).toBe(4);
     expect(out.pads).toHaveLength(2);
     expect(out.activePadId).toBe("p2");
     expect(out.pads[0].design).toBe("berry");
@@ -100,10 +102,40 @@ describe("migrateStoreData", () => {
       drawingsByPad: { p1: [] },
     };
     const out = migrateStoreData(v3, NOW);
-    expect(out.version).toBe(3);
+    expect(out.version).toBe(4);
     expect(out.pads[0].design).toBe("sky");
     expect(out.pads[0].childId).toBe("child-default");
     expect(out.pads[0].pageColor).toBe("#F8FCFF");
+    expect(out.pads[0].border).toBe("none");
+    expect(out.pads[0].decoration).toBe("none");
+  });
+
+  it("preserves premium visuals in a v4 library", () => {
+    const v4 = {
+      version: 4,
+      activePadId: "p1",
+      pads: [
+        {
+          id: "p1",
+          childId: "child-1",
+          name: "Magic pad",
+          style: "spread",
+          design: "moonlight",
+          border: "museum-frame",
+          decoration: "starry-sky",
+          coverColor: "#48527E",
+          pageColor: "#F7F5FF",
+          createdAt: NOW,
+        },
+      ],
+      drawingsByPad: { p1: [] },
+    };
+    const out = migrateStoreData(v4, NOW);
+    expect(out.pads[0]).toMatchObject({
+      design: "moonlight",
+      border: "museum-frame",
+      decoration: "starry-sky",
+    });
   });
 
   it("returns a fresh default store for garbage", () => {

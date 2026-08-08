@@ -2,7 +2,7 @@ import { buildLegacyMigrationRecords } from "./legacy-records";
 import type { StoreData } from "@/store/migrate";
 
 const legacy: StoreData = {
-  version: 3,
+  version: 4,
   activePadId: "pad-a",
   pads: [
     {
@@ -11,6 +11,8 @@ const legacy: StoreData = {
       name: "First",
       style: "spread",
       design: "berry",
+      border: "none",
+      decoration: "none",
       coverColor: "#D86485",
       pageColor: "#FFF8F5",
       createdAt: 100,
@@ -39,6 +41,8 @@ describe("legacy SQLite migration records", () => {
       childId: "child-default",
       style: "spread",
       design: "berry",
+      border: "none",
+      decoration: "none",
       createdAt: 100,
     });
     expect(records.artworks[0]).toMatchObject({

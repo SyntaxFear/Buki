@@ -26,8 +26,15 @@ import {
   type FaceItem,
 } from "@/components/curl-shader";
 import type { FlipState } from "@/components/scrapbook";
-import { BindingRing, PadStampMark, PadTab } from "@/components/pad-ornaments";
+import {
+  BindingRing,
+  PadDecorationMarks,
+  PadStampMark,
+  PadTab,
+  PageBorder,
+} from "@/components/pad-ornaments";
 import { getPadDesign, PAD_GEOMETRY, type PadDesignId } from "@/pad-designs";
+import type { PadBorderId, PadDecorationId } from "@/pad-visuals";
 import type { Drawing, PadStyle } from "@/store/drawings";
 import { colors, padDarkColor } from "@/theme";
 import { fitRect, unitCapacity, type PadPageLayout } from "@/utils/book-layout";
@@ -46,6 +53,8 @@ interface Props {
   coverColor?: string;
   pageColor?: string;
   design?: PadDesignId;
+  border?: PadBorderId;
+  decoration?: PadDecorationId;
 }
 
 /**
@@ -64,6 +73,8 @@ export function FlipPad({
   coverColor,
   pageColor,
   design,
+  border = "none",
+  decoration = "none",
 }: Props) {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const { book, page: pageRect, slots, binding, spine } = layout;
@@ -402,6 +413,15 @@ export function FlipPad({
         return <SlotDrawing key={d.id} drawing={d} image={imageFor(d)} slot={slots[slotIdx]} />;
       })}
 
+      <PageBorder
+        id={border}
+        x={pageRect.x}
+        y={pageRect.y}
+        width={pageRect.width}
+        height={pageRect.height}
+        accent={palette.stampColor}
+      />
+
       {/*
        * The binding sits above the stationary page but below the loose sheet.
        * Drawing it before the flip shader lets the turning paper naturally
@@ -468,12 +488,24 @@ export function FlipPad({
         </Group>
       ) : null}
 
-      <PadStampMark
-        cx={pageRect.x + 29}
-        cy={pageRect.y + pageRect.height - 29}
-        stamp={palette.stamp}
-        color={palette.stampColor}
-      />
+      {decoration === "none" ? (
+        <PadStampMark
+          cx={pageRect.x + 29}
+          cy={pageRect.y + pageRect.height - 29}
+          stamp={palette.stamp}
+          color={palette.stampColor}
+        />
+      ) : (
+        <PadDecorationMarks
+          id={decoration}
+          x={pageRect.x}
+          y={pageRect.y}
+          width={pageRect.width}
+          height={pageRect.height}
+          accent={palette.stampColor}
+          secondary={palette.tabs[1].color}
+        />
+      )}
     </Canvas>
   );
 }

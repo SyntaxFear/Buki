@@ -516,6 +516,8 @@ export function Home() {
           coverColor={pad?.coverColor}
           pageColor={pad?.pageColor}
           design={pad?.design}
+          border={pad?.border}
+          decoration={pad?.decoration}
         />
       ) : (
         <FlipPad
@@ -529,6 +531,8 @@ export function Home() {
           coverColor={pad?.coverColor}
           pageColor={pad?.pageColor}
           design={pad?.design}
+          border={pad?.border}
+          decoration={pad?.decoration}
         />
       )}
 

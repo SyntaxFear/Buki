@@ -160,6 +160,11 @@ CREATE TABLE IF NOT EXISTS preferences (
 );
 `;
 
+const SCHEMA_V2 = `
+ALTER TABLE sketchpads ADD COLUMN border TEXT NOT NULL DEFAULT 'none';
+ALTER TABLE sketchpads ADD COLUMN decoration TEXT NOT NULL DEFAULT 'none';
+`;
+
 export async function migrateDatabaseSchema(db: SQLiteDatabase): Promise<void> {
   await db.execAsync("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   const current = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
@@ -169,6 +174,13 @@ export async function migrateDatabaseSchema(db: SQLiteDatabase): Promise<void> {
     await db.withExclusiveTransactionAsync(async (tx) => {
       await tx.execAsync(SCHEMA_V1);
       await tx.execAsync("PRAGMA user_version = 1");
+    });
+  }
+
+  if (currentVersion < 2) {
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      await tx.execAsync(SCHEMA_V2);
+      await tx.execAsync("PRAGMA user_version = 2");
     });
   }
 

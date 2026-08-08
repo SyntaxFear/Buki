@@ -13,6 +13,8 @@ interface SketchpadRow {
   design: string;
   cover_color: string;
   page_color: string | null;
+  border: string;
+  decoration: string;
   created_at: number;
 }
 
@@ -46,7 +48,7 @@ function fileSize(uri: string): number | null {
 export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
   const ownerId = await activeLocalOwnerId(db);
   const pads = await db.getAllAsync<SketchpadRow>(
-    `SELECT id, child_id, name, style, design, cover_color, page_color, created_at
+    `SELECT id, child_id, name, style, design, cover_color, page_color, border, decoration, created_at
      FROM sketchpads
      WHERE deleted_at IS NULL AND ((? IS NULL AND owner_id IS NULL) OR owner_id = ?)
      ORDER BY sort_order, created_at`,
@@ -83,7 +85,7 @@ export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
 
   return migrateStoreData(
     {
-      version: 3,
+      version: 4,
       activePadId: active?.value ?? pads[0]?.id,
       pads: pads.map((pad) => ({
         id: pad.id,
@@ -91,6 +93,8 @@ export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
         name: pad.name,
         style: pad.style,
         design: pad.design,
+        border: pad.border,
+        decoration: pad.decoration,
         coverColor: pad.cover_color,
         pageColor: pad.page_color ?? undefined,
         createdAt: pad.created_at,
@@ -109,9 +113,9 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
     for (const [sortOrder, pad] of data.pads.entries()) {
       await tx.runAsync(
         `INSERT INTO sketchpads (
-          id, owner_id, child_id, name, style, design, cover_color, page_color,
+          id, owner_id, child_id, name, style, design, cover_color, page_color, border, decoration,
           sort_order, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         ON CONFLICT(id) DO UPDATE SET
           child_id = excluded.child_id,
           name = excluded.name,
@@ -119,6 +123,8 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
           design = excluded.design,
           cover_color = excluded.cover_color,
           page_color = excluded.page_color,
+          border = excluded.border,
+          decoration = excluded.decoration,
           sort_order = excluded.sort_order,
           updated_at = excluded.updated_at,
           deleted_at = NULL`,
@@ -130,6 +136,8 @@ export async function saveLibrary(db: SQLiteDatabase, data: StoreData): Promise<
         pad.design,
         pad.coverColor,
         pad.pageColor ?? null,
+        pad.border,
+        pad.decoration,
         sortOrder,
         pad.createdAt,
         now,
