@@ -52,13 +52,13 @@ describe("sync queue policy", () => {
     ).toEqual(["relation", "art", "pad", "child"]);
   });
 
-  it("finishes upserts before processing queued deletes", () => {
+  it("frees deleted cloud storage before processing new uploads", () => {
     expect(
       sortSyncItems([
         item("old-art", "artwork", "delete", 1),
         item("new-pad", "sketchpad", "upsert", 2),
       ]).map((entry) => entry.id),
-    ).toEqual(["new-pad", "old-art"]);
+    ).toEqual(["old-art", "new-pad"]);
   });
 
   it("uses bounded exponential retry delays", () => {

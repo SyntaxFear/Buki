@@ -39,8 +39,13 @@ type CreateUploadResponse =
       bytesLimit: number;
     };
 
-class CloudMediaError extends Error {
-  constructor(message: string, readonly code?: string) {
+export class CloudMediaError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+    readonly bytesUsed?: number,
+    readonly bytesLimit?: number,
+  ) {
     super(message);
     this.name = "CloudMediaError";
   }
@@ -64,12 +69,11 @@ function requiredNumber(value: unknown, code: string): number {
   return value;
 }
 
-async function edgeErrorCode(error: unknown): Promise<string | null> {
+async function edgeErrorBody(error: unknown): Promise<Record<string, unknown> | null> {
   const context = record(error)?.context;
   if (!context || typeof (context as Response).clone !== "function") return null;
   try {
-    const body = record(await (context as Response).clone().json());
-    return typeof body?.error === "string" ? body.error : null;
+    return record(await (context as Response).clone().json());
   } catch {
     return null;
   }
@@ -81,9 +85,15 @@ async function invokeEdge(
 ): Promise<Record<string, unknown>> {
   const { data, error } = await getSupabaseClient().functions.invoke(functionName, { body });
   if (error) {
-    const code = await edgeErrorCode(error);
+    const details = await edgeErrorBody(error);
+    const code = typeof details?.error === "string" ? details.error : null;
     if (code === "cloud_quota_exceeded") {
-      throw new CloudMediaError("Buki cloud storage is full. Local artwork is still safe.", code);
+      throw new CloudMediaError(
+        "Buki cloud storage is full. Local artwork is still safe.",
+        code,
+        typeof details?.bytesUsed === "number" ? details.bytesUsed : undefined,
+        typeof details?.bytesLimit === "number" ? details.bytesLimit : undefined,
+      );
     }
     if (code === "cloud_access_required") {
       throw new CloudMediaError("Buki Pro cloud access is required to upload artwork.", code);
@@ -203,11 +213,22 @@ export async function uploadQueuedMedia(item: SyncQueueItem): Promise<void> {
     }));
     await persistUpload(item.ownerId, item.entityId, completed);
   } catch (error) {
+    if (
+      error instanceof CloudMediaError
+      && typeof error.bytesUsed === "number"
+      && typeof error.bytesLimit === "number"
+    ) {
+      await saveBukiCloudUsage(item.ownerId, error.bytesUsed, error.bytesLimit);
+    }
     await markBukiMediaFailed(item.ownerId, item.entityId, false);
     throw error;
   } finally {
     prepared.cleanup();
   }
+}
+
+export function isCloudQuotaError(error: unknown): boolean {
+  return error instanceof CloudMediaError && error.code === "cloud_quota_exceeded";
 }
 
 export async function deleteQueuedMedia(item: SyncQueueItem): Promise<void> {

@@ -156,20 +156,20 @@ export async function loadReadyLocalSyncOperations(
      WHERE owner_id = ? AND available_at <= ?
      ORDER BY
        CASE
-         WHEN operation = 'upsert' AND entity_type = 'adult_profile' THEN 10
-         WHEN operation = 'upsert' AND entity_type = 'child_profile' THEN 20
-         WHEN operation = 'upsert' AND entity_type = 'sketchpad' THEN 30
-         WHEN operation = 'upsert' AND entity_type = 'artwork' THEN 40
-         WHEN operation = 'upsert' AND entity_type = 'tag' THEN 50
-         WHEN operation = 'upsert' AND entity_type = 'artwork_tag' THEN 60
-         WHEN operation = 'upsert' AND entity_type = 'media_file' THEN 70
-         WHEN operation = 'upsert' AND entity_type = 'sync_device' THEN 80
-         WHEN operation = 'delete' AND entity_type = 'artwork_tag' THEN 110
-         WHEN operation = 'delete' AND entity_type = 'media_file' THEN 120
-         WHEN operation = 'delete' AND entity_type = 'artwork' THEN 130
-         WHEN operation = 'delete' AND entity_type = 'sketchpad' THEN 140
-         WHEN operation = 'delete' AND entity_type = 'child_profile' THEN 150
-         WHEN operation = 'delete' AND entity_type = 'tag' THEN 160
+         WHEN operation = 'delete' AND entity_type = 'artwork_tag' THEN 10
+         WHEN operation = 'delete' AND entity_type = 'media_file' THEN 20
+         WHEN operation = 'delete' AND entity_type = 'artwork' THEN 30
+         WHEN operation = 'delete' AND entity_type = 'sketchpad' THEN 40
+         WHEN operation = 'delete' AND entity_type = 'child_profile' THEN 50
+         WHEN operation = 'delete' AND entity_type = 'tag' THEN 60
+         WHEN operation = 'upsert' AND entity_type = 'adult_profile' THEN 110
+         WHEN operation = 'upsert' AND entity_type = 'child_profile' THEN 120
+         WHEN operation = 'upsert' AND entity_type = 'sketchpad' THEN 130
+         WHEN operation = 'upsert' AND entity_type = 'artwork' THEN 140
+         WHEN operation = 'upsert' AND entity_type = 'tag' THEN 150
+         WHEN operation = 'upsert' AND entity_type = 'artwork_tag' THEN 160
+         WHEN operation = 'upsert' AND entity_type = 'media_file' THEN 170
+         WHEN operation = 'upsert' AND entity_type = 'sync_device' THEN 180
          ELSE 999
        END,
        created_at,

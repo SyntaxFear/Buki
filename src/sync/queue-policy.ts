@@ -25,7 +25,7 @@ const DELETE_PRIORITY: Record<SyncEntityType, number> = {
 };
 
 export function syncPriority(operation: SyncOperation, entityType: SyncEntityType): number {
-  return operation === "delete" ? 100 + DELETE_PRIORITY[entityType] : UPSERT_PRIORITY[entityType];
+  return operation === "delete" ? DELETE_PRIORITY[entityType] : 100 + UPSERT_PRIORITY[entityType];
 }
 
 export function sortSyncItems(items: SyncQueueItem[]): SyncQueueItem[] {

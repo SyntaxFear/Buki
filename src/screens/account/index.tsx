@@ -33,7 +33,6 @@ import { colors } from "@/theme";
 
 const ADULT_AVATARS = ["🌻", "🦊", "🐻", "🌈", "⭐️"] as const;
 const CHILD_COLORS = ["#FFD65A", "#70D0BD", "#86B8EA", "#FFA7B9", "#A98BE6"] as const;
-const CLOUD_LIMIT = 2 * 1024 * 1024 * 1024;
 
 type ChildDraft = {
   id: string | null;
@@ -115,10 +114,16 @@ export function AccountCenter() {
   const syncStatus = useCloudSync((state) => state.status);
   const pendingSyncCount = useCloudSync((state) => state.pendingCount);
   const lastSyncedAt = useCloudSync((state) => state.lastSyncedAt);
+  const lastRestore = useCloudSync((state) => state.lastRestore);
   const syncError = useCloudSync((state) => state.error);
   const setAutomaticBackup = useCloudSync((state) => state.setAutomaticBackup);
   const syncNow = useCloudSync((state) => state.syncNow);
-  const [usage, setUsage] = useState({ localBytes: 0, cloudBytes: 0 });
+  const restoreNow = useCloudSync((state) => state.restoreNow);
+  const [usage, setUsage] = useState({
+    localBytes: 0,
+    cloudBytes: 0,
+    cloudLimit: 2 * 1024 * 1024 * 1024,
+  });
   const [adultEditorOpen, setAdultEditorOpen] = useState(false);
   const [childDraft, setChildDraft] = useState<ChildDraft | null>(null);
 
@@ -138,7 +143,9 @@ export function AccountCenter() {
   }, [user?.identities]);
   const renewalDate = formatDate(entitlement.expiresAt);
   const avatar = adultAvatar(profile?.avatarUri, profile?.displayName ?? "Parent");
-  const cloudProgress = Math.min(1, usage.cloudBytes / CLOUD_LIMIT);
+  const cloudProgress = Math.min(1, usage.cloudBytes / Math.max(1, usage.cloudLimit));
+  const cloudQuotaReached = usage.cloudBytes >= usage.cloudLimit;
+  const cloudRestoreAvailable = capabilities.cloudBackup || entitlement.status === "expired";
   const syncDetail = !capabilities.cloudBackup
     ? "Buki Pro required"
     : !automaticBackup
@@ -149,6 +156,8 @@ export function AccountCenter() {
           ? `Waiting for internet${pendingSyncCount ? ` · ${pendingSyncCount} pending` : ""}`
           : syncStatus === "error"
             ? syncError ?? "Backup will retry automatically"
+            : syncStatus === "paused"
+              ? syncError ?? "Cloud uploads are paused"
             : pendingSyncCount
               ? `${pendingSyncCount} change${pendingSyncCount === 1 ? "" : "s"} waiting to upload`
               : lastSyncedAt
@@ -157,7 +166,7 @@ export function AccountCenter() {
 
   useEffect(() => {
     void loadBukiUsage().then(setUsage).catch(() => {});
-  }, [artworkCount, lastSyncedAt, pads.length, pendingSyncCount]);
+  }, [artworkCount, lastRestore, lastSyncedAt, pads.length, pendingSyncCount, syncError, syncStatus]);
 
   const openExternal = async (url: string, reason: string) => {
     if (!(await confirmAdult(reason))) return;
@@ -246,6 +255,39 @@ export function AccountCenter() {
               } else {
                 Alert.alert("Restore unavailable", "Buki could not restore purchases. Check your connection and try again.");
               }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
+  const confirmCloudRestore = async () => {
+    if (!cloudRestoreAvailable) {
+      void introducePro("cloudBackup", "account_restore");
+      return;
+    }
+    if (!(await confirmAdult("Cloud restore can replace matching local records with their latest backed-up versions."))) return;
+    Alert.alert(
+      "Restore this device?",
+      "Buki will merge this account’s private cloud library onto this device. Cloud deletions take priority, while local-only artwork is preserved.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Restore",
+          onPress: () => {
+            void (async () => {
+              const restored = await restoreNow();
+              const result = useCloudSync.getState().lastRestore;
+              if (!restored || !result) {
+                Alert.alert("Restore unavailable", useCloudSync.getState().error ?? "Buki could not restore this device.");
+                return;
+              }
+              await useAuth.getState().refreshProfile();
+              Alert.alert(
+                "Cloud library restored",
+                `${result.artworks} artwork${result.artworks === 1 ? "" : "s"} restored${result.failedMediaCount ? ` · ${result.failedMediaCount} image${result.failedMediaCount === 1 ? "" : "s"} need another attempt` : ""}.`,
+              );
             })();
           },
         },
@@ -386,9 +428,10 @@ export function AccountCenter() {
           <View style={styles.cloudMeter}>
             <View style={styles.meterHeader}>
               <Text style={styles.rowTitle}>Cloud storage</Text>
-              <Text style={styles.rowDetail}>{formatBytes(usage.cloudBytes)} of 2 GB</Text>
+              <Text style={styles.rowDetail}>{formatBytes(usage.cloudBytes)} of {formatBytes(usage.cloudLimit)}</Text>
             </View>
             <View style={styles.meterTrack}><View style={[styles.meterFill, { width: `${cloudProgress * 100}%` }]} /></View>
+            {cloudQuotaReached ? <Text style={styles.errorText}>Cloud uploads pause at the 2 GB limit; local artwork remains available.</Text> : null}
           </View>
         </Section>
 
@@ -416,7 +459,15 @@ export function AccountCenter() {
               else void introducePro("cloudBackup", "account_sync_now");
             }}
           />
-          <SettingRow title="Restore this device" detail="No cloud restore has run" onPress={() => void introducePro("cloudBackup", "account_restore")} />
+          <SettingRow
+            title="Restore this device"
+            detail={lastRestore
+              ? `Last restored ${formatSyncTime(lastRestore.restoredAt) ?? "recently"} · ${lastRestore.artworks} artwork${lastRestore.artworks === 1 ? "" : "s"}`
+              : cloudRestoreAvailable
+                ? "Merge this account’s private cloud library onto this device"
+                : "Buki Pro cloud restore"}
+            onPress={() => void confirmCloudRestore()}
+          />
         </Section>
 
         <Section title="Data & Export" caption="Exports remain on this adult-controlled screen.">

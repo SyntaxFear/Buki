@@ -57,6 +57,8 @@ import {
   markLocalMediaUploading,
   saveLocalCloudUsage,
 } from "./media-repository";
+import { applyRemoteCloudSnapshot } from "./cloud-restore-repository";
+import type { RemoteCloudSnapshot } from "@/sync/cloud-types";
 
 export { BUKI_DATABASE_NAME };
 
@@ -255,6 +257,10 @@ export function markBukiMediaFailed(ownerId: string, mediaId: string, mediaMissi
 
 export function saveBukiCloudUsage(ownerId: string, bytesUsed: number, bytesLimit: number) {
   return saveLocalCloudUsage(requireBukiDatabase(), ownerId, bytesUsed, bytesLimit);
+}
+
+export function restoreBukiCloudSnapshot(ownerId: string, snapshot: RemoteCloudSnapshot) {
+  return applyRemoteCloudSnapshot(requireBukiDatabase(), ownerId, snapshot);
 }
 
 export type { ImportedArchiveLibrary };

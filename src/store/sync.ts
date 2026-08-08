@@ -18,7 +18,12 @@ import {
 import { processSyncItems } from "@/sync/queue-policy";
 import { pushRemoteSyncItem, verifyRemoteCloudAccess } from "@/sync/remote";
 import { subscribeToSyncQueue } from "@/sync/signals";
+import { restoreCloudAccount } from "@/sync/cloud-restore";
+import type { CloudRestoreResult } from "@/sync/cloud-types";
+import { isCloudQuotaError } from "@/sync/media-upload";
+import { useDrawings } from "./drawings";
 import { useMembership } from "./membership";
+import { useProfiles } from "./profiles";
 
 export type CloudSyncStatus = "idle" | "syncing" | "offline" | "paused" | "error";
 
@@ -31,12 +36,14 @@ interface CloudSyncState {
   pendingCount: number;
   nextAttemptAt: number | null;
   lastSyncedAt: string | null;
+  lastRestore: CloudRestoreResult | null;
   error: string | null;
   initializeForUser: (ownerId: string) => Promise<void>;
   disconnectUser: () => void;
   refreshSyncState: () => Promise<void>;
   setAutomaticBackup: (enabled: boolean) => Promise<void>;
   syncNow: (force?: boolean) => Promise<void>;
+  restoreNow: () => Promise<boolean>;
 }
 
 let networkUnsubscribe: (() => void) | null = null;
@@ -45,6 +52,7 @@ let membershipUnsubscribe: (() => void) | null = null;
 let appStateSubscription: { remove: () => void } | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let syncRun: Promise<void> | null = null;
+let restoreRun: Promise<boolean> | null = null;
 let deferredSyncDelay: number | null = null;
 let online = true;
 
@@ -105,6 +113,13 @@ async function refreshOwner(ownerId: string): Promise<void> {
   });
 }
 
+async function reloadRestoredAccount(): Promise<void> {
+  await Promise.all([
+    useDrawings.getState().reloadForAccount(),
+    useProfiles.getState().reloadForAccount(),
+  ]);
+}
+
 function installListeners(ownerId: string): void {
   networkUnsubscribe = NetInfo.addEventListener((state) => {
     online = isOnline(state);
@@ -157,6 +172,7 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
   pendingCount: 0,
   nextAttemptAt: null,
   lastSyncedAt: null,
+  lastRestore: null,
   error: null,
 
   initializeForUser: async (ownerId) => {
@@ -171,6 +187,7 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
       pendingCount: 0,
       nextAttemptAt: null,
       lastSyncedAt: null,
+      lastRestore: null,
       error: null,
     });
     try {
@@ -188,6 +205,7 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
         pendingCount: summary.pendingCount,
         nextAttemptAt: summary.nextAttemptAt,
         lastSyncedAt: summary.lastSyncedAt,
+        lastRestore: null,
         error: summary.lastError,
         status: online ? "idle" : "offline",
       });
@@ -211,6 +229,7 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
       pendingCount: 0,
       nextAttemptAt: null,
       lastSyncedAt: null,
+      lastRestore: null,
       error: null,
     });
   },
@@ -292,8 +311,9 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
           if (result.failedItem) {
             const retryAt = await failBukiSyncOperation(ownerId, result.failedItem.id, result.error);
             await refreshOwner(ownerId);
-            set({ status: "error", error: message(result.error) });
-            if (get().automaticBackup && retryAt) {
+            const quotaExceeded = isCloudQuotaError(result.error);
+            set({ status: quotaExceeded ? "paused" : "error", error: message(result.error) });
+            if (!quotaExceeded && get().automaticBackup && retryAt) {
               scheduleSync(Math.max(0, retryAt - Date.now()));
             }
             return;
@@ -304,9 +324,20 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
         await refreshOwner(ownerId);
         if (get().ownerId !== ownerId) return;
         if (get().pendingCount === 0) {
-          const completedAt = new Date().toISOString();
+          const restored = await restoreCloudAccount(ownerId, deviceId);
+          if (get().ownerId !== ownerId) return;
+          await reloadRestoredAccount();
+          const completedAt = restored.restoredAt;
           await markBukiSyncCompleted(ownerId, completedAt);
-          set({ status: "idle", lastSyncedAt: completedAt, nextAttemptAt: null, error: null });
+          set({
+            status: "idle",
+            lastSyncedAt: completedAt,
+            lastRestore: restored,
+            nextAttemptAt: null,
+            error: restored.failedMediaCount
+              ? `${restored.failedMediaCount} cloud image${restored.failedMediaCount === 1 ? "" : "s"} could not be restored.`
+              : null,
+          });
         } else {
           set({ status: "idle" });
           const nextAttemptAt = get().nextAttemptAt;
@@ -327,5 +358,42 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
       }
     });
     return syncRun;
+  },
+
+  restoreNow: async () => {
+    if (restoreRun) return restoreRun;
+    restoreRun = (async () => {
+      if (syncRun) await syncRun;
+      const ownerId = get().ownerId;
+      if (!ownerId) return false;
+      await flushLibraryWrites();
+      const network = await NetInfo.fetch();
+      online = isOnline(network);
+      if (!online) {
+        set({ status: "offline", error: "Connect to the internet to restore this device." });
+        return false;
+      }
+      set({ status: "syncing", error: null });
+      try {
+        const restored = await restoreCloudAccount(ownerId, get().deviceId);
+        if (get().ownerId !== ownerId) return false;
+        await reloadRestoredAccount();
+        await refreshOwner(ownerId);
+        set({
+          status: "idle",
+          lastRestore: restored,
+          error: restored.failedMediaCount
+            ? `${restored.failedMediaCount} cloud image${restored.failedMediaCount === 1 ? "" : "s"} could not be restored.`
+            : null,
+        });
+        return true;
+      } catch (error) {
+        if (get().ownerId === ownerId) set({ status: "error", error: message(error) });
+        return false;
+      }
+    })().finally(() => {
+      restoreRun = null;
+    });
+    return restoreRun;
   },
 }));
