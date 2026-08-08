@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. Input image is a style anchor only: the selected premium tactile Buki sketchpad concept. Do not simply recolor it. Reimagine the entire first screen for a modern children's drawing scrapbook while keeping its warm, dimensional paper-and-soft-rubber quality. Create a new composition with a compact playful wordmark at upper left, exact text \"Buki\", a curved garden-path brand line made from two subtle layered strokes, and a completely new abstract bloom mark made of five rounded pebble petals plus a tiny leaf. Center a large blank portrait drawing pad lower on the screen, with a refined top coil, generous dot-grid page, asymmetric corner protectors, and three functional-looking color tabs. Use a warm modern palette: apricot coral #FF765E, deep lagoon #167D82, butter #FFD65A, sky #6FA9E8, leaf #66A86B, oat #FFF5E5. Camera action is a small premium coral pebble button below the pad. Childlike and joyful but sophisticated, minimal, highly buildable in Expo/Skia. The page stays blank. Exact readable text only \"Buki\". No phone frame, no additional words, no giant mascot, no clutter, no photorealistic room.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/01-garden-path.png"
+  ],
+  "created": 1786135544,
+  "usage": {
+    "input_tokens": 1805,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 269
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3177
+  }
+}

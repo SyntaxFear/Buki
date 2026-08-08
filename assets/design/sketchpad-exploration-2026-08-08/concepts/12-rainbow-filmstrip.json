@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Input 1 is the current Buki filmstrip pad screen and input 2 is the Buki bear icon. Redesign the full app UI into a modern playful vertical filmstrip scrapbook. Keep the top Buki identity small, the central portrait pad dominant, and one floating camera button. Make the structure visible when empty: three equal stacked landscape artwork frames, generous consistent gutters, faint dot grids inside every frame, top binding, small perforation details, rounded frame corners, and a narrow rainbow index rail. Rainbow Binder palette: berry magenta #E14D72, orange #FF8E42, yellow #F7D154, aqua #43C7C4, blue #4B7BE5, warm paper #FFF8F1, soft cream background #F6EDDF, deep ink #3D3B58. Cheerful contemporary stationery with tactile felt and paper, clean enough for children to focus on their art, feasible in Expo and Skia. No device frame, no extra copy, no gibberish, no large mascot.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/04-current-filmstrip.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/12-rainbow-filmstrip.png"
+  ],
+  "created": 1786134911,
+  "usage": {
+    "input_tokens": 1727,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 223
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3099
+  }
+}

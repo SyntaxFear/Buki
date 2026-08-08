@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. Use the input only as a tactile premium quality reference. Fully redesign Buki's first screen, not a recolor. Make the exact word \"Buki\" from four rounded soft-clay letter blocks in a compact top card. Replace the old line and flower with a modular bead trail: alternating tiny rounded bars and dots ending in a modern eight-ray soft starburst bloom. Recompose the page as a floating portrait drawing board with an offset binding rail, layered white paper, bold rounded blue outer shell, small snap-on side modules, and a precise faint dot grid. Move the sketchpad chooser into a tiny icon chip attached to the pad rather than a separate wide pill. Use cobalt #3468D4, tangerine #FF8A47, aqua #43C6B7, lemon #FFE064, raspberry #EF5D88, warm ivory #FFF8E9. Camera action is a yellow circular charm suspended below the board. Premium Scandinavian toy design, playful and modern, clean enough to focus on children's art, feasible in Expo/Skia. Page blank. Exact text \"Buki\" only. No device bezel, no extra labels, no large character, no gibberish.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/02-toy-blocks.png"
+  ],
+  "created": 1786135548,
+  "usage": {
+    "input_tokens": 1795,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 259
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3167
+  }
+}

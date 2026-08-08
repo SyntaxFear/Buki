@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. Input is a reference only for finish quality; fully reimagine the screen. Design Buki as a modern soft-gel and paper children's creativity app. Exact text \"Buki\" appears in rounded translucent bubble letters with solid colored cores, readable and premium. Replace the old line and flower with a floating gel cord made from three connected bubbles, ending in an abstract bloom cluster of five glossy translucent circles, clearly not the original flower. Build a new portrait blank sketchpad with a pillowy rounded outer shell, cloud-cut page corners, a small set of capsule-shaped binding clips, subtle dot grid, inner safe frame, and colorful side bubbles used as tabs. Use aqua #42C7C6, berry #DF5C91, tangerine #FF8B48, lavender #9B83DC, sunshine #FFD45C, vanilla #FFF5E7. Camera control is a glassy aqua capsule anchored to a shallow bottom dock. Bright and childy but composed like a premium toy, minimal and implementable in Expo/Skia. Blank page, exact text \"Buki\" only. No device frame, no other copy, no giant character, no photorealistic environment.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/08-bubble-bloom.png"
+  ],
+  "created": 1786135800,
+  "usage": {
+    "input_tokens": 1794,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 258
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3166
+  }
+}

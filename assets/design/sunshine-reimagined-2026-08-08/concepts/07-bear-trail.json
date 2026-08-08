@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. Use the input only as a premium tactile style reference. Completely redesign the Buki first screen around a subtle bear-trail brand language without showing a large mascot. Write exact text \"Buki\" in chunky friendly letters; shape the two counters in the capital B like tiny rounded bear ears, tasteful and abstract. Replace the old line and flower with a short path of three tiny embossed paw dots that curves into a modern paw-rosette mark: one large rounded pad and four colorful pebble toes arranged like a bloom. Recompose the blank portrait sketchpad as a warm honey-colored soft cover with a cream layered page, top disc binding, precise dot grid, generous inner frame, a small paw bookmark and one side tab. Keep the header compact and give the pad more visual prominence. Palette: honey #F2A93B, coral #F06B55, deep teal #087B78, denim #4F79C7, leaf #6FA760, cream #FFF6E7. Camera button is an understated teal charm below the pad. Premium clay-and-paper, warm, modern, child-friendly, feasible in Expo/Skia. Page blank. Exact text only \"Buki\". No extra words, no giant bear, no phone frame, no room or product scene.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/07-bear-trail.png"
+  ],
+  "created": 1786135800,
+  "usage": {
+    "input_tokens": 1810,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 274
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3182
+  }
+}

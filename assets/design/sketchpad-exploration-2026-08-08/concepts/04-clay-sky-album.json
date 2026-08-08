@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Input 1 is the current Buki landscape album screen and input 2 is the Buki golden bear reading a coral book brand icon. Redesign the full mobile UI into a polished modern kids scrapbook concept. Keep a compact Buki header and selector, one centered landscape one-page pad, and a floating camera button. The album must have a visible left-side ring binding, one large 16:9 artwork-safe frame, clear margins, a subtle 12-column alignment grid inside the page, chunky rounded corners, and playful but restrained corner pieces. Clay and Sky palette: terracotta coral #E96B54, sky blue #68B7E8, sunflower #F6C64A, navy #23435C, warm paper #FFF9EE, sand background #F5ECDD. Tactile premium stationery with soft clay details, child-friendly but sophisticated, feasible in Expo and Skia. No device frame, no extra writing, no gibberish text, no realistic room.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/05-current-landscape.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/04-clay-sky-album.png"
+  ],
+  "created": 1786134737,
+  "usage": {
+    "input_tokens": 1714,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 210
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3086
+  }
+}

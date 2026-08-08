@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. Use the input only as a benchmark for polished tactile quality. Fully reimagine the Buki first screen around an intelligent tab system. Exact text \"Buki\" sits inside a compact rounded tab at the upper left, using a clean playful geometric wordmark. Replace the old line and flower with a segmented curved track that wraps from the brand tab toward the sketchpad and finishes in an abstract four-tab bloom: four rounded folded tabs rotating around a small center. Offset the large blank portrait pad slightly to the right, leaving room for a vertical stack of oversized functional tabs on the left. Use a side binding rather than top rings, layered paper, a subtle dot grid, clear inner artwork-safe border, and one small folded corner. Integrate the camera into a bright lower tab attached to the pad instead of a detached button. Palette: forest teal #146B69, vivid orange #F47A43, cornflower #587FD3, lime-sage #8DBB68, butter #F6D05A, warm cream #FFF6E7, dark ink #253F49. Bold modern information design softened like a premium children's toy, uncluttered, feasible in Expo/Skia. Blank page. Exact text only \"Buki\". No phone frame, no extra labels, no mascot, no room scene.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/10-wonder-tabs.png"
+  ],
+  "created": 1786135922,
+  "usage": {
+    "input_tokens": 1819,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 283
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3191
+  }
+}

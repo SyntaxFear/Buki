@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Input 1 is the current Buki mobile app screen. Input 2 is the Buki golden bear reading a coral book brand icon. Redesign the whole screen as a polished buildable mobile UI concept for a modern kids drawing scrapbook. Keep the basic structure: warm background, compact Buki wordmark and sketchpad selector at top, centered sketchpad, floating camera button at bottom. Create a portrait one-page sketchpad with a clearly visible modular dot grid, generous artwork-safe margins, rounded paper, top ring binding, playful corner tabs, and subtle tactile paper depth. Sunshine Studio palette: warm ivory #FFF7E8, lively coral #FF7A59, lemon #FFD84D, fresh turquoise #48C6B7, calm blue #4A79D8, dark ink #25364A. Make it modern, cheerful, premium, child-friendly, uncluttered, and realistic to implement in Expo and Skia. Use the bear icon only as brand mood; a tiny paw or bear stamp is optional. No device frame, no extra copy, no gibberish text, no photorealistic room.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/02-current-portrait.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "created": 1786134658,
+  "usage": {
+    "input_tokens": 1742,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 238
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3114
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Input 1 is the existing Buki open book mobile screen and input 2 is the brand icon. Redesign it into a gentle premium two-page scrapbook UI. Preserve the hierarchy but substantially modernize materials and spacing. Show an open two-page pad with two distinct framed artwork zones, visible center stitching, soft square grids, scalloped paper edges, felt corner patches, and a few small stitched badges. Soft Felt palette: sage #6FAF95, apricot #F2A47B, cornflower #759DE8, mustard #EBCB54, plum #7B5A8C, warm paper #FFF9EF, oat background #F3EBDD. Calm, tactile, child-friendly, not babyish, crisp and feasible in Expo and Skia. Keep the Buki brand clean; tiny bear or paw badge only. No device bezel, no extra writing, no gibberish, no photorealistic scene.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/01-current-spread.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/09-soft-felt-spread.png"
+  ],
+  "created": 1786134815,
+  "usage": {
+    "input_tokens": 1705,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 201
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3077
+  }
+}

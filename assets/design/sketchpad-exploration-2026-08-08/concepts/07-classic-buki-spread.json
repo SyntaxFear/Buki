@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Input 1 is the current Buki open spread screen and input 2 is the golden bear reading a coral book brand icon. Redesign the full mobile UI as the definitive refined Buki direction. Keep a compact Buki wordmark and selector, a centered open two-page scrapbook, and a circular camera button. The book must have two clearly separate artwork-safe frames, a believable center spine, visible but subtle dot grids, equal margins, soft page shadows, rounded cover, and restrained playful tape or paw accents. Classic Buki palette aligned to the icon: coral #F06449, deep teal #087F78, honey #F4A62A, leafy green #4E9B5E, warm cream #FFFDF6, sand background #F7EFD9, dark ink #29443F. Modern premium toy and stationery feel, warm, joyful, distinctive, highly buildable in Expo and Skia. Use the bear only as a tiny stamp if desired. No device frame, no extra copy, no gibberish, no photorealistic environment.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/01-current-spread.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/07-classic-buki-spread.png"
+  ],
+  "created": 1786134811,
+  "usage": {
+    "input_tokens": 1731,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 227
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3103
+  }
+}

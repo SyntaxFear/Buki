@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use input 1 as the Buki two-page app structure and input 2 as brand mood. Create a bold modern full-screen mobile scrapbook UI for children. Keep the top brand area simple, center a clearly open two-page book, retain one floating camera action. Make both pages visibly gridded with generous white gutters and separate artwork frames; emphasize a clean center crease, magnetic color tabs, asymmetric color-block corners, and rounded toy-like geometry. Candy Color Block palette: cobalt #3567D6, tangerine #FF8A3D, berry pink #F45B9A, mint #61CDBB, lemon #FFE15A, ivory #FFF8ED, warm cream background #FBF2E5. Energetic but controlled, premium and contemporary, accessible contrast, practical to reproduce in Expo and Skia. No phone frame, no unrelated words, no illegible text, no realistic room.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/01-current-spread.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/08-candy-block-spread.png"
+  ],
+  "created": 1786134817,
+  "usage": {
+    "input_tokens": 1701,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 197
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3073
+  }
+}

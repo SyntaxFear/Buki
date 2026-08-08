@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. Input is only a reference for premium tactile depth. Create a completely reimagined, flat orthographic full-screen mobile app UI for Buki, not a product photograph and not a physical room. The image canvas itself is the app screen, edge to edge, with no phone bezel, walls, floor, furniture, gallery, pedestal, perspective scene or environment. Design Buki as a calm modern children's art museum interface. Exact text \"Buki\" in a chunky refined wordmark at upper left. Replace the old line and flower with a dotted gallery path that turns one rounded corner and ends in an abstract four-petal pinwheel made from rounded diamonds. Compose a large portrait blank drawing board centered within the UI: slim teal left binding rail, layered warm-white paper, visible precise dot grid, double rounded artwork-safe frame, tiny colored registration dots outside the frame, and three small vertical selector tabs attached to the rail. Keep generous cream negative space. Place a restrained teal circular camera control at lower right within the app layout. Palette: deep teal #0D6F73, clay #E8735A, butter #F3CC5A, cornflower #6E93D6, moss #7DA36A, warm stone #F3EBDD, paper #FFFDF6. Sophisticated editorial spacing softened like a premium toy, child-friendly but not juvenile, feasible in Expo/Skia. Blank page. Exact readable text only \"Buki\". No extra words, no character illustration, no photorealistic scene.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/05-little-museum.png"
+  ],
+  "created": 1786136070,
+  "usage": {
+    "input_tokens": 1861,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 325
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3233
+  }
+}

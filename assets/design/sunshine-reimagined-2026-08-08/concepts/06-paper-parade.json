@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. Input is a style anchor for polished tactile depth only. Fully redesign the first Buki screen as a joyful paper-cut parade. Exact text \"Buki\" should be made from layered cut-paper letters with subtle offset shadows, positioned diagonally but still easy to read. Replace the old line and flower with a procession of five tiny geometric paper flags connected by a short stitched thread, ending in a folded origami bloom symbol. Recompose the central blank portrait sketchpad with a playful side-bound spine on the left, layered scalloped page edges, a clean dot grid, an inset rounded artwork frame, and a single oversized folded corner that functions like a tab. Camera action is a small paper medallion aligned with the lower right corner of the pad. Palette: watermelon #F45F63, marigold #F5BD3D, turquoise #31B8AE, bright blue #4C78D2, soft lilac #A88AD9, cream #FFF7E8. Modern cut-paper craft, premium, energetic yet well gridded, clearly buildable as vector-like shapes and shadows in Expo/Skia. Blank page. Exact readable text only \"Buki\". No phone mockup, no extra copy, no large mascot, no messy confetti field.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/06-paper-parade.png"
+  ],
+  "created": 1786135680,
+  "usage": {
+    "input_tokens": 1811,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 275
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3183
+  }
+}

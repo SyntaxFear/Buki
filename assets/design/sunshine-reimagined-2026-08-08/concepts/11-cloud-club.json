@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. The input is a tactile finish reference only; redesign the entire screen. Create a modern airy Buki creativity screen inspired by clouds and soft sky shapes without becoming babyish. Exact text \"Buki\" appears in a confident rounded wordmark floating on a small arched cream plaque. Replace the old straight line and flower with one broad soft arc, like a horizon ribbon, carrying two small colored beads and ending in a new cloud-sun emblem: three rounded cloud lobes with one offset golden circle. The blank portrait sketchpad has a softly cloud-notched top edge, five elegant capsule clips, a pale sky outer shell, warm white layered paper, precise dot grid, a thin inner safe frame, and two simple side tabs. Put a compact camera button inside a shallow curved bottom shelf. Palette: sky #6CB9E8, apricot #FF9B7A, butter #FFD86A, seafoam #6BC9B3, lavender #9D91DA, navy #284A65, cloud cream #FFF9ED. Premium soft-plastic and paper, contemporary, joyful, calm, easy to implement. Page blank. Exact readable text only \"Buki\"; no extra words, no phone frame, no giant character, no literal scenery.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/11-cloud-club.png"
+  ],
+  "created": 1786135924,
+  "usage": {
+    "input_tokens": 1807,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 271
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3179
+  }
+}

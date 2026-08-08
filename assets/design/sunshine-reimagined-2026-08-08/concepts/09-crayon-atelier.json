@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. Treat the input as a tactile quality reference, not a layout to preserve. Reimagine Buki's home as a premium modern crayon atelier for children. Exact text \"Buki\" is written in a carefully controlled chunky wax-crayon style with clean edges and rich pigment, positioned within a compact cream header strip. Replace the old line and flower with a double hand-drawn path: one navy crayon stroke and one mint stroke that cross once, ending in a refined six-stroke crayon rosette symbol. Make the main blank portrait pad more editorial: slightly rotated layered cover, top spiral, warm white page, strong inner artwork-safe frame, precise dot grid, two masking-tape corner tabs, and a small color-pencil side rail. Palette: ultramarine #315FAF, vermilion #E95F4F, mint #55BFAE, mustard #EABF45, dusty rose #D97B9A, paper #FFF8E9, ink #273D54. Camera action resembles one clean round crayon cap below the pad. Childlike hand-made energy with premium spacing and restraint, realistic to build in Expo/Skia. Page blank. Exact readable text only \"Buki\". No extra words, no device mockup, no giant mascot, no messy scribbles or room scene.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/09-crayon-atelier.png"
+  ],
+  "created": 1786135801,
+  "usage": {
+    "input_tokens": 1822,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 286
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3194
+  }
+}

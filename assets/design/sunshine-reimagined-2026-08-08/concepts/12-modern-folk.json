@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. Use the reference only for premium dimensional craftsmanship. Completely reimagine Buki's first screen with a modern folk-craft visual system that feels universal, geometric and child-friendly. Exact text \"Buki\" is built from simple rounded felt-cut letters with tiny stitch accents, placed in a compact top-left brand area. Replace the old line and flower with a restrained embroidered vine made from short dash stitches and two abstract leaves, ending in a new six-petal geometric rosette symbol. The main blank portrait sketchpad uses a stitched fabric cover, a cream page with a precise dot grid and generous artwork-safe frame, a left-side loop binding, colorful triangular corner caps, and two slim bookmark ribbons. Camera control is a circular stitched medallion centered low. Palette: deep berry #A8456F, forest #3F7F6B, mustard #E6B84A, sky #6D9FD3, peach #E88768, plum #625078, warm flax #F5EBD8, paper #FFF9EF. Sophisticated handcrafted warmth, modern, premium and childy without visual noise, practical for Expo/Skia. Blank page. Exact text only \"Buki\". No extra writing, no device bezel, no human or mascot, no realistic environment.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/12-modern-folk.png"
+  ],
+  "created": 1786135923,
+  "usage": {
+    "input_tokens": 1812,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 276
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3184
+  }
+}

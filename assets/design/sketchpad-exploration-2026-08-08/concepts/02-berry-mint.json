@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Input 1 is the current Buki mobile app screen. Input 2 is the Buki golden bear reading a coral book brand icon. Create a substantially redesigned but buildable full-screen mobile UI for Buki, a kids drawing scrapbook. Preserve only the useful hierarchy: small Buki header and selector, a central portrait one-page pad, and one camera action. The pad must have an obvious clean alignment grid, a large single artwork zone, visible inner margin guides, soft square corners, chunky top binding, and a few modern sticker-like shapes. Berry Mint palette: raspberry #D85C9A, mint #84D8C5, plum #5B3A72, peach #FFB38A, lavender paper #F7F0FF, warm cream background #FFF8EC. Style is Scandinavian toy design mixed with premium stationery, playful for children but not babyish, crisp spacing, tactile felt and paper details. No device frame, no extra words, no illegible text, no realistic scene.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/02-current-portrait.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/02-berry-mint.png"
+  ],
+  "created": 1786134659,
+  "usage": {
+    "input_tokens": 1718,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 214
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3090
+  }
+}

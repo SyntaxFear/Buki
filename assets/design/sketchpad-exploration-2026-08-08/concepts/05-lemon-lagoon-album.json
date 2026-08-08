@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use input 1 as the current Buki app layout and input 2 as brand mood. Create a fresh full-screen mobile UI with a horizontal one-page sketchpad. Preserve the simple hierarchy but modernize every surface. Make the landscape page visibly organized: left binding rail, one bold artwork frame, faint square grid, broad white gutters, rounded protector corners, and three small geometric side tabs. Lemon Lagoon palette: bright yellow #F2C84B, lagoon teal #0EA6A6, cobalt #2D5BD1, watermelon #FF6B6B, pale mint paper #F7FCF4, warm cream background #FFF8E8. Crisp Scandinavian toy design, tactile paper and rubber, energetic and premium, easy to build. Keep the Buki wordmark clean. No device frame, no extra copy, no illegible labels, no large mascot.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/05-current-landscape.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/05-lemon-lagoon-album.png"
+  ],
+  "created": 1786134735,
+  "usage": {
+    "input_tokens": 1691,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 187
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3063
+  }
+}

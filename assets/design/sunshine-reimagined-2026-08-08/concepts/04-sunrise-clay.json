@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. The input is only a quality and tactile-material reference. Completely reimagine Buki's first screen as a sunny premium clay-and-paper product for children. Use exact text \"Buki\" centered in a friendly custom rounded wordmark, with the dot of the i becoming a tiny sun bead. Replace the old horizontal line and flower with a wide sunrise arc behind the wordmark, made from two clean colored bands and ending in a compact three-ray sparkle mark rather than a literal flower. Integrate the brand header into the top edge of the sketchpad instead of leaving a large separate header zone. The portrait blank drawing page should have a softly arched top cover, seven chunky peg bindings, precise dot grid, inset artwork-safe border, two small side bookmarks, and premium layered paper edges. Palette: tomato #F2694F, golden honey #F4B53F, deep teal #177B76, powder blue #77AADB, charcoal navy #294153, vanilla #FFF4DE. Put a small rounded-square camera control in a short bottom dock. Childy, sunny, modern, premium and buildable; no babyish cartoons. Blank page. Exact text only \"Buki\". No phone frame, no extra labels, no giant mascot, no photorealistic setting.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/04-sunrise-clay.png"
+  ],
+  "created": 1786135685,
+  "usage": {
+    "input_tokens": 1812,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 276
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3184
+  }
+}

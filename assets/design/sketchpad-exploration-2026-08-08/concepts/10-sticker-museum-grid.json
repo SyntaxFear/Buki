@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Input 1 is the current Buki portrait grid pad screen and input 2 is the golden bear reading a coral book brand icon. Redesign the full app screen into a modern premium kids scrapbook UI. Keep the Buki header, selector, centered portrait pad, and circular camera button. Make the grid unmistakable even when empty: four equal 2-by-2 artwork frames, consistent wide gutters, aligned margins, faint internal dot grids, rounded frame corners, top ring binding, and small removable sticker tabs that never cover the art zones. Sticker Museum palette: coral #F25F5C, turquoise #3CC7BD, golden yellow #FFD166, royal blue #3964C3, warm cream #FFF7E6, pale sand background #F7EFDF, dark ink #28435A. Playful gallery-wall logic, crisp and child-friendly, tactile paper and rubber, feasible in Expo and Skia. No device frame, no extra labels, no gibberish text, no large mascot.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/03-current-grid.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/10-sticker-museum-grid.png"
+  ],
+  "created": 1786134910,
+  "usage": {
+    "input_tokens": 1719,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 215
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3091
+  }
+}

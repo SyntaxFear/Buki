@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Input 1 is the existing Buki horizontal album screen; input 2 is the bear and coral book brand reference. Redesign it as a modern child-friendly mobile scrapbook UI. Keep the top header light and compact, center a landscape one-page pad, retain one circular camera action. The pad should feel distinct: stitched left binding, clearly framed wide artwork area, visible modular dot grid, layered paper edge, rounded geometric stickers, and balanced spacing. Lilac Garden palette: lilac #8C6DD7, leaf green #78B159, apricot #F7A66A, aqua #6CD4C5, deep plum #4D3766, warm paper #FFF7F0, cream background #FAF3E6. Soft felt and cut-paper craft with modern minimal geometry, playful without clutter, realistic for Expo and Skia. No phone frame, no unrelated text, no gibberish, no photorealistic scene.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/05-current-landscape.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/06-lilac-garden-album.png"
+  ],
+  "created": 1786134738,
+  "usage": {
+    "input_tokens": 1707,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 203
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3079
+  }
+}

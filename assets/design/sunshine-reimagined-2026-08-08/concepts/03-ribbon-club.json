@@ -1,0 +1,35 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use case: ui-mockup. Treat the input as a reference for dimensional paper craft only. Radically reimagine the Buki home screen in a softer premium felt-and-ribbon direction. Put the exact word \"Buki\" on a small stitched fabric label near the top center. Replace the green line and flower with a looping woven ribbon that passes behind the label and ends in a layered rosette knot, clearly a new brand symbol. Build the main blank portrait sketchpad as a slightly asymmetric felt-backed page with six chunky mint loops at the top, a dashed inner artwork-safe frame, subtle square-dot grid, scalloped bottom paper edge, and two tasteful fabric patches outside the art zone. Palette: berry #D85691, mint #7FD4BE, plum #5B4075, peach #FFAE83, lilac #B79CE6, cream #FFF6EA. Camera control is a stitched berry fabric button near the bottom. Childy, cozy, premium, contemporary, uncluttered and implementable. Exact readable text only \"Buki\"; blank page; no phone frame, no other words, no giant bear, no realistic environment.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/01-sunshine-studio.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sunshine-reimagined-2026-08-08/concepts/03-ribbon-club.png"
+  ],
+  "created": 1786135546,
+  "usage": {
+    "input_tokens": 1781,
+    "input_tokens_details": {
+      "image_tokens": 1536,
+      "text_tokens": 245
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3153
+  }
+}

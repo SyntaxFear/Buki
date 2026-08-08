@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use input 1 as the current Buki app composition and input 2 as brand mood reference. Redesign it into a modern child-friendly mobile scrapbook screen with a portrait one-page sketchpad. Keep the top brand area compact, center the pad precisely, retain a single floating camera control. Make the page visibly structured with an 8-point dot grid, a clear inner artwork frame, balanced margins, scalloped top binding, rounded edge protectors, and small friendly geometric accents. Ocean Peach palette: deep teal #007C83, peach #FF9F80, sunny yellow #FFD166, navy #17324D, pale aqua #DDF4F0, cream #FFF8E8. Premium paper-craft and soft clay feel, high contrast without harshness, warm and contemporary, easy to reproduce in Expo and Skia. No device frame, no unrelated text, no gibberish, no large mascot illustration.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/02-current-portrait.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/03-ocean-peach.png"
+  ],
+  "created": 1786134656,
+  "usage": {
+    "input_tokens": 1700,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 196
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3072
+  }
+}

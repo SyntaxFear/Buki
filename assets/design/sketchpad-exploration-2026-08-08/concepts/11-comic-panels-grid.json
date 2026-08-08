@@ -1,0 +1,36 @@
+{
+  "mode": "edit",
+  "endpoint": "https://info-8678-resource.services.ai.azure.com/openai/v1/images/edits?api-version=preview",
+  "deployment": "gpt-image-2",
+  "api_version": "preview",
+  "request": {
+    "model": "gpt-image-2",
+    "prompt": "Use input 1 as the Buki horizontal album app screen and input 2 as brand mood. Create a distinct full-screen mobile UI centered on a horizontal one-page comic sketchpad. Preserve the compact Buki header and one camera action. The page must be properly gridded into three clean comic panels: one large panel on the left and two stacked panels on the right, with equal gutters, faint dot grids, clear safe margins, left binding, and rounded color tabs. Comic Panels palette: indigo #303F9F, mango #FFB627, mint #70D6B1, warm pink #FF7F7F, sky #6CB8E8, paper #FFF9E8, cream background #F6EEDD. Modern modular editorial design for kids, energetic but ordered, soft toy-like depth, highly buildable in Expo and Skia. No phone bezel, no unrelated words, no illegible text, no photorealistic setting.",
+    "size": "1024x1536",
+    "quality": "medium",
+    "output_format": "png",
+    "output_compression": 100,
+    "n": 1
+  },
+  "input_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/05-current-landscape.jpg",
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/current/06-current-icon.png"
+  ],
+  "saved_images": [
+    "/Volumes/Personal/Projects/Buki/assets/design/sketchpad-exploration-2026-08-08/concepts/11-comic-panels-grid.png"
+  ],
+  "created": 1786134910,
+  "usage": {
+    "input_tokens": 1711,
+    "input_tokens_details": {
+      "image_tokens": 1504,
+      "text_tokens": 207
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 3083
+  }
+}
