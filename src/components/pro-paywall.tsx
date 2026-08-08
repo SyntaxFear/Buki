@@ -25,6 +25,8 @@ import {
   purchaseRevenueCatPackage,
 } from "@/subscription/revenuecat-client";
 import { annualSavingsPercent } from "@/subscription/paywall-model";
+import { PRO_ENTITLEMENT_ID } from "@/subscription/customer-info";
+import { trackAnalyticsEvent } from "@/analytics/client";
 import { colors } from "@/theme";
 
 type PlanId = "monthly" | "yearly" | "lifetime";
@@ -213,19 +215,57 @@ export function ProPaywallHost() {
       `This continues to Apple’s purchase confirmation for ${selectedPlan.title} Buki Pro.`,
     );
     if (!confirmed) return;
+    const analyticsSource = request?.source ?? "paywall";
+    void trackAnalyticsEvent(user?.id, {
+      name: "purchase_started",
+      source: analyticsSource,
+      feature: request?.feature,
+      plan: selectedPlan.id,
+    });
     setPurchasing(true);
     setError(null);
     try {
       const result = await purchaseRevenueCatPackage(selectedPlan.aPackage);
       await acceptCustomerInfo(result.customerInfo);
       const source = request?.source;
+      void trackAnalyticsEvent(user?.id, {
+        name: "purchase_completed",
+        source: analyticsSource,
+        feature: request?.feature,
+        plan: selectedPlan.id,
+        result: "success",
+      });
+      if (result.customerInfo.entitlements.active[PRO_ENTITLEMENT_ID]?.periodType === "TRIAL") {
+        void trackAnalyticsEvent(user?.id, {
+          name: "trial_started",
+          source: analyticsSource,
+          feature: request?.feature,
+          plan: selectedPlan.id,
+          result: "success",
+        });
+      }
       clearRequest();
       if (source === "artwork_limit") {
         setTimeout(() => useDrawings.getState().commitPending(), 250);
       }
       Alert.alert("Buki Pro is ready", "Every Pro feature is now unlocked for this Buki account.");
     } catch (purchaseError) {
-      if (!isRevenueCatPurchaseCancelled(purchaseError)) {
+      if (isRevenueCatPurchaseCancelled(purchaseError)) {
+        void trackAnalyticsEvent(user?.id, {
+          name: "purchase_cancelled",
+          source: analyticsSource,
+          feature: request?.feature,
+          plan: selectedPlan.id,
+          result: "cancelled",
+        });
+      } else {
+        void trackAnalyticsEvent(user?.id, {
+          name: "purchase_failed",
+          source: analyticsSource,
+          feature: request?.feature,
+          plan: selectedPlan.id,
+          result: "failed",
+        });
         setError(
           purchaseError instanceof Error
             ? purchaseError.message
@@ -250,7 +290,7 @@ export function ProPaywallHost() {
           onPress: () => {
             setRestoring(true);
             setError(null);
-            void restorePurchases().then((result) => {
+            void restorePurchases(request?.source ?? "paywall").then((result) => {
               setRestoring(false);
               if (result === "restored") {
                 clearRequest();

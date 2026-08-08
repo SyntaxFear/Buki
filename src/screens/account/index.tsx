@@ -262,7 +262,7 @@ export function AccountCenter() {
           text: "Restore",
           onPress: () => {
             void (async () => {
-              const result = await restorePurchases();
+              const result = await restorePurchases("account_center");
               if (result === "restored") {
                 Alert.alert("Buki Pro restored", "Pro is now available on this Buki account.");
               } else if (result === "not_found") {

@@ -60,6 +60,12 @@ import {
 import { applyRemoteCloudSnapshot } from "./cloud-restore-repository";
 import type { RemoteCloudSnapshot } from "@/sync/cloud-types";
 import { deleteLocalAccountData, resetLocalCloudState } from "./privacy-repository";
+import {
+  completeAnalyticsEvents,
+  enqueueAnalyticsEvent,
+  failAnalyticsEvent,
+  loadReadyAnalyticsEvents,
+} from "./analytics-repository";
 
 export { BUKI_DATABASE_NAME };
 
@@ -274,5 +280,28 @@ export function resetBukiCloudState(ownerId: string) {
   });
 }
 
+export function enqueueBukiAnalyticsEvent(
+  event: Parameters<typeof enqueueAnalyticsEvent>[1],
+) {
+  return enqueueAnalyticsEvent(requireBukiDatabase(), event);
+}
+
+export function loadReadyBukiAnalyticsEvents(ownerId: string, now?: number, limit?: number) {
+  return loadReadyAnalyticsEvents(requireBukiDatabase(), ownerId, now, limit);
+}
+
+export function completeBukiAnalyticsEvents(ownerId: string, ids: readonly string[]) {
+  return completeAnalyticsEvents(requireBukiDatabase(), ownerId, ids);
+}
+
+export function failBukiAnalyticsEvent(
+  event: Parameters<typeof failAnalyticsEvent>[1],
+  error: unknown,
+  now?: number,
+) {
+  return failAnalyticsEvent(requireBukiDatabase(), event, error, now);
+}
+
 export type { ImportedArchiveLibrary };
 export type { LocalMediaFile, LocalMediaKind } from "./media-repository";
+export type { QueuedAnalyticsEvent } from "./analytics-repository";

@@ -81,6 +81,7 @@ export async function deleteLocalAccountData(
       "tags",
       "entitlement_snapshots",
       "storage_usage",
+      "analytics_queue",
     ]) {
       await tx.runAsync(`DELETE FROM ${table} WHERE owner_id = ?`, ownerId);
     }

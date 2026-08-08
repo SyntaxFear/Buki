@@ -22,6 +22,7 @@ import { restoreCloudAccount } from "@/sync/cloud-restore";
 import type { CloudRestoreResult } from "@/sync/cloud-types";
 import { isCloudQuotaError } from "@/sync/media-upload";
 import { verifyServerEntitlement } from "@/subscription/server-entitlement";
+import { trackAnalyticsEvent } from "@/analytics/client";
 import { useDrawings } from "./drawings";
 import { useMembership } from "./membership";
 import { useProfiles } from "./profiles";
@@ -271,7 +272,15 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
         status: enabled ? (online ? "idle" : "offline") : "idle",
         error: null,
       });
-      if (enabled) scheduleSync();
+      if (enabled) {
+        void trackAnalyticsEvent(ownerId, {
+          name: "backup_enabled",
+          source: "account_center",
+          feature: "cloudBackup",
+          result: "success",
+        });
+        scheduleSync();
+      }
     } catch (error) {
       if (get().ownerId === ownerId) set({ status: "error", error: message(error) });
     }
@@ -357,6 +366,14 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
             await refreshOwner(ownerId);
             const quotaExceeded = isCloudQuotaError(result.error);
             set({ status: quotaExceeded ? "paused" : "error", error: message(result.error) });
+            if (quotaExceeded) {
+              void trackAnalyticsEvent(ownerId, {
+                name: "quota_exceeded",
+                source: "automatic_backup",
+                feature: "cloudBackup",
+                result: "failed",
+              });
+            }
             if (!quotaExceeded && get().automaticBackup && retryAt) {
               scheduleSync(Math.max(0, retryAt - Date.now()));
             }

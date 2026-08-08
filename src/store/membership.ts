@@ -26,6 +26,7 @@ import {
   verifyServerEntitlement,
   type CloudRetentionStatus,
 } from "@/subscription/server-entitlement";
+import { trackAnalyticsEvent } from "@/analytics/client";
 
 export interface UpgradeRequest {
   feature: ProFeature;
@@ -51,7 +52,7 @@ interface MembershipState {
   upgradeRequest: UpgradeRequest | null;
   initializeForUser: (ownerId: string) => Promise<void>;
   refreshMembership: () => Promise<void>;
-  restorePurchases: () => Promise<"restored" | "not_found" | "failed">;
+  restorePurchases: (source?: string) => Promise<"restored" | "not_found" | "failed">;
   disconnectUser: () => Promise<void>;
   acceptCustomerInfo: (customerInfo: CustomerInfo) => Promise<void>;
   setEntitlement: (entitlement: EntitlementSnapshot) => void;
@@ -235,17 +236,29 @@ export const useMembership = create<MembershipState>((set, get) => ({
     }
   },
 
-  restorePurchases: async () => {
+  restorePurchases: async (source = "account_center") => {
     const ownerId = get().ownerId;
     if (!ownerId) return "failed";
+    void trackAnalyticsEvent(ownerId, { name: "restore_attempted", source });
     set({ loading: true, error: null });
     try {
       const customerInfo = await restoreRevenueCatPurchases();
       await applyCustomerInfo(ownerId, customerInfo);
       const status = snapshotFromCustomerInfo(customerInfo).status;
-      return status === "active" || status === "grace" ? "restored" : "not_found";
+      const result = status === "active" || status === "grace" ? "restored" : "not_found";
+      void trackAnalyticsEvent(ownerId, {
+        name: "restore_completed",
+        source,
+        result: result === "restored" ? "success" : "not_found",
+      });
+      return result;
     } catch (error) {
       if (get().ownerId === ownerId) set({ loading: false, error: message(error) });
+      void trackAnalyticsEvent(ownerId, {
+        name: "restore_completed",
+        source,
+        result: "failed",
+      });
       return "failed";
     }
   },
@@ -290,6 +303,12 @@ export const useMembership = create<MembershipState>((set, get) => ({
   },
 
   requestUpgrade: (feature, source) => {
+    const ownerId = get().ownerId;
+    void trackAnalyticsEvent(ownerId, {
+      name: "paywall_viewed",
+      source,
+      feature,
+    });
     set({ upgradeRequest: { feature, source, requestedAt: Date.now() } });
   },
 

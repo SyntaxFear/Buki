@@ -22,6 +22,8 @@ import { confirmAdult } from "@/store/parental-gate";
 import { useProfiles } from "@/store/profiles";
 import type { PadStyle } from "@/store/migrate";
 import { colors } from "@/theme";
+import { useAuth } from "@/store/auth";
+import { trackAnalyticsEvent } from "@/analytics/client";
 
 type SketchpadExportKind = "pdf" | "zip";
 type ExportKind = SketchpadExportKind | "archive" | "import";
@@ -58,6 +60,7 @@ export function ExportsScreen() {
   const children = useProfiles((state) => state.children);
   const activeChildId = useProfiles((state) => state.activeChildId);
   const canExport = useMembership((state) => state.capabilities.exportData);
+  const ownerId = useAuth((state) => state.user?.id ?? null);
   const requestUpgrade = useMembership((state) => state.requestUpgrade);
   const visiblePads = useMemo(
     () => pads.filter((pad) => pad.childId === activeChildId),
@@ -101,6 +104,13 @@ export function ExportsScreen() {
         UTI: kind === "pdf" ? "com.adobe.pdf" : "public.zip-archive",
         dialogTitle: result.filename,
       });
+      void trackAnalyticsEvent(ownerId, {
+        name: "export_used",
+        source: "share_sheet",
+        feature: "exportData",
+        exportKind: kind,
+        result: "success",
+      });
     } catch (error) {
       Alert.alert(
         `Could not create ${kind.toUpperCase()} export`,
@@ -129,6 +139,13 @@ export function ExportsScreen() {
         mimeType: "application/vnd.buki.archive",
         UTI: "com.parastashvili.buki.archive",
         dialogTitle: result.filename,
+      });
+      void trackAnalyticsEvent(ownerId, {
+        name: "export_used",
+        source: "share_sheet",
+        feature: "exportData",
+        exportKind: "buki_archive",
+        result: "success",
       });
     } catch (error) {
       Alert.alert("Could not create Buki archive", error instanceof Error ? error.message : "Please try again.");

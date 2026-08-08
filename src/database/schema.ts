@@ -187,6 +187,28 @@ CREATE INDEX IF NOT EXISTS media_checksum_idx
 ON media_files(owner_id, checksum, kind);
 `;
 
+const SCHEMA_V5 = `
+CREATE TABLE IF NOT EXISTS analytics_queue (
+  id TEXT PRIMARY KEY NOT NULL,
+  owner_id TEXT NOT NULL,
+  event_name TEXT NOT NULL,
+  source TEXT,
+  feature TEXT,
+  plan TEXT,
+  result TEXT,
+  export_kind TEXT,
+  app_version TEXT,
+  build_number TEXT,
+  occurred_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  available_at INTEGER NOT NULL,
+  last_error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS analytics_queue_owner_ready_idx
+ON analytics_queue(owner_id, available_at, occurred_at);
+`;
+
 export async function migrateDatabaseSchema(db: SQLiteDatabase): Promise<void> {
   await db.execAsync("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   const current = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
@@ -217,6 +239,13 @@ export async function migrateDatabaseSchema(db: SQLiteDatabase): Promise<void> {
     await db.withExclusiveTransactionAsync(async (tx) => {
       await tx.execAsync(SCHEMA_V4);
       await tx.execAsync("PRAGMA user_version = 4");
+    });
+  }
+
+  if (currentVersion < 5) {
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      await tx.execAsync(SCHEMA_V5);
+      await tx.execAsync("PRAGMA user_version = 5");
     });
   }
 

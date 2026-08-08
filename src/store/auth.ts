@@ -21,6 +21,7 @@ import { useProfiles } from "@/store/profiles";
 import { usePreferences } from "@/store/preferences";
 import { useCloudSync } from "@/store/sync";
 import { requestBukiAccountDeletion } from "@/privacy/account-data";
+import { disconnectAnalytics, initializeAnalytics } from "@/analytics/client";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -67,6 +68,7 @@ function errorMessage(error: unknown): string {
 
 async function applySessionNow(session: Session | null): Promise<void> {
   if (!session?.user) {
+    disconnectAnalytics();
     useCloudSync.getState().disconnectUser();
     await useMembership.getState().disconnectUser();
     await clearBukiAccount();
@@ -98,6 +100,7 @@ async function applySessionNow(session: Session | null): Promise<void> {
     profile,
     error: null,
   });
+  initializeAnalytics(session.user.id);
   await useMembership.getState().initializeForUser(session.user.id);
   await useDrawings.getState().reloadForAccount();
   await useProfiles.getState().reloadForAccount();

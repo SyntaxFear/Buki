@@ -22,6 +22,8 @@ import {
 import type { Drawing } from "@/store/drawings";
 import { confirmAdult } from "@/store/parental-gate";
 import { colors } from "@/theme";
+import { useAuth } from "@/store/auth";
+import { trackAnalyticsEvent } from "@/analytics/client";
 
 interface Props {
   visible: boolean;
@@ -46,6 +48,7 @@ function displayDate(value: number): string {
 }
 
 export function ArtworkExportSheet({ visible, drawing, padName, childName, onClose }: Props) {
+  const ownerId = useAuth((state) => state.user?.id ?? null);
   const previewRef = useRef<ViewShotRef>(null);
   const [format, setFormat] = useState<ArtworkImageExport>("card");
   const [previewReady, setPreviewReady] = useState(false);
@@ -94,6 +97,13 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
         UTI: format === "jpg" ? "public.jpeg" : "public.png",
         dialogTitle: artworkExportFilename(drawing, format),
       });
+      void trackAnalyticsEvent(ownerId, {
+        name: "export_used",
+        source: "share_sheet",
+        feature: "exportData",
+        exportKind: format === "card" ? "share_card" : format,
+        result: "success",
+      });
     } catch (error) {
       Alert.alert("Could not export artwork", error instanceof Error ? error.message : "Please try again.");
     } finally {
@@ -115,6 +125,13 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
       }
       const uri = await prepareFile();
       await MediaLibrary.Asset.create(uri);
+      void trackAnalyticsEvent(ownerId, {
+        name: "export_used",
+        source: "save_to_photos",
+        feature: "exportData",
+        exportKind: format === "card" ? "share_card" : format,
+        result: "success",
+      });
       Alert.alert("Saved to Photos", artworkExportFilename(drawing, format));
     } catch (error) {
       Alert.alert("Could not save artwork", error instanceof Error ? error.message : "Please try again.");
