@@ -54,7 +54,10 @@
         {
           "photosPermission": "Buki opens your photo library so you can import a drawing photo."
         }
-      ]
+      ],
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
