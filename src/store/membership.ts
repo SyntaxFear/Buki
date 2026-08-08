@@ -12,11 +12,15 @@ import {
   type EntitlementSnapshot,
   type ProFeature,
 } from "@/subscription/access";
-import { snapshotFromCustomerInfo } from "@/subscription/customer-info";
+import {
+  PRO_ENTITLEMENT_ID,
+  snapshotFromCustomerInfo,
+} from "@/subscription/customer-info";
 import {
   connectRevenueCatUser,
   disconnectRevenueCatUser,
   refreshRevenueCatCustomerInfo,
+  restoreRevenueCatPurchases,
 } from "@/subscription/revenuecat-client";
 
 export interface UpgradeRequest {
@@ -33,10 +37,12 @@ interface MembershipState {
   entitlement: EntitlementSnapshot;
   capabilities: Capabilities;
   managementUrl: string | null;
+  periodType: string | null;
   error: string | null;
   upgradeRequest: UpgradeRequest | null;
   initializeForUser: (ownerId: string) => Promise<void>;
   refreshMembership: () => Promise<void>;
+  restorePurchases: () => Promise<"restored" | "not_found" | "failed">;
   disconnectUser: () => Promise<void>;
   acceptCustomerInfo: (customerInfo: CustomerInfo) => Promise<void>;
   setEntitlement: (entitlement: EntitlementSnapshot) => void;
@@ -47,6 +53,8 @@ interface MembershipState {
 }
 
 const FREE_CAPABILITIES = resolveCapabilities("free");
+const MAX_TIMER_DELAY = 2_000_000_000;
+let expiryTimer: ReturnType<typeof setTimeout> | null = null;
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "Could not check Buki Pro access.";
@@ -58,16 +66,48 @@ function resolvedState(entitlement: EntitlementSnapshot) {
   return { entitlement: current, tier, capabilities: resolveCapabilities(tier) };
 }
 
+function clearExpiryTimer(): void {
+  if (expiryTimer) clearTimeout(expiryTimer);
+  expiryTimer = null;
+}
+
+function scheduleExpiryCheck(ownerId: string, entitlement: EntitlementSnapshot): void {
+  clearExpiryTimer();
+  if (
+    (entitlement.status !== "active" && entitlement.status !== "grace") ||
+    !entitlement.expiresAt
+  ) {
+    return;
+  }
+  const remaining = Date.parse(entitlement.expiresAt) - Date.now();
+  if (!Number.isFinite(remaining)) return;
+  const delay = Math.max(0, Math.min(remaining + 500, MAX_TIMER_DELAY));
+  expiryTimer = setTimeout(() => {
+    const state = useMembership.getState();
+    if (state.ownerId !== ownerId) return;
+    const current = entitlementAtTime(state.entitlement);
+    if (current.status === "expired") {
+      useMembership.setState({ ...resolvedState(current), periodType: null });
+      void saveBukiEntitlement(ownerId, current).catch(() => {});
+    } else {
+      scheduleExpiryCheck(ownerId, current);
+    }
+  }, delay);
+}
+
 async function applyCustomerInfo(ownerId: string, customerInfo: CustomerInfo): Promise<void> {
   if (useMembership.getState().ownerId !== ownerId) return;
   const entitlement = entitlementAtTime(snapshotFromCustomerInfo(customerInfo));
+  const periodType = customerInfo.entitlements.all[PRO_ENTITLEMENT_ID]?.periodType ?? null;
   useMembership.setState({
     ...resolvedState(entitlement),
     hydrated: true,
     loading: false,
     managementUrl: customerInfo.managementURL,
+    periodType,
     error: null,
   });
+  scheduleExpiryCheck(ownerId, entitlement);
   try {
     await saveBukiEntitlement(ownerId, entitlement);
   } catch (error) {
@@ -87,16 +127,19 @@ export const useMembership = create<MembershipState>((set, get) => ({
   entitlement: EMPTY_ENTITLEMENT,
   capabilities: FREE_CAPABILITIES,
   managementUrl: null,
+  periodType: null,
   error: null,
   upgradeRequest: null,
 
   initializeForUser: async (ownerId) => {
     if (get().ownerId === ownerId && (get().hydrated || get().loading)) return;
+    clearExpiryTimer();
     set({
       ownerId,
       hydrated: false,
       loading: true,
       managementUrl: null,
+      periodType: null,
       error: null,
       upgradeRequest: null,
     });
@@ -105,7 +148,9 @@ export const useMembership = create<MembershipState>((set, get) => ({
     try {
       cached = await loadBukiEntitlement(ownerId);
       if (get().ownerId !== ownerId) return;
-      set({ ...resolvedState(cached ?? EMPTY_ENTITLEMENT), hydrated: true });
+      const cachedEntitlement = entitlementAtTime(cached ?? EMPTY_ENTITLEMENT);
+      set({ ...resolvedState(cachedEntitlement), hydrated: true, periodType: null });
+      scheduleExpiryCheck(ownerId, cachedEntitlement);
     } catch (error) {
       console.warn("Could not load the cached Buki entitlement", error);
       if (get().ownerId === ownerId) {
@@ -151,7 +196,23 @@ export const useMembership = create<MembershipState>((set, get) => ({
     }
   },
 
+  restorePurchases: async () => {
+    const ownerId = get().ownerId;
+    if (!ownerId) return "failed";
+    set({ loading: true, error: null });
+    try {
+      const customerInfo = await restoreRevenueCatPurchases();
+      await applyCustomerInfo(ownerId, customerInfo);
+      const status = snapshotFromCustomerInfo(customerInfo).status;
+      return status === "active" || status === "grace" ? "restored" : "not_found";
+    } catch (error) {
+      if (get().ownerId === ownerId) set({ loading: false, error: message(error) });
+      return "failed";
+    }
+  },
+
   disconnectUser: async () => {
+    clearExpiryTimer();
     set({
       hydrated: true,
       loading: false,
@@ -160,6 +221,7 @@ export const useMembership = create<MembershipState>((set, get) => ({
       entitlement: EMPTY_ENTITLEMENT,
       capabilities: FREE_CAPABILITIES,
       managementUrl: null,
+      periodType: null,
       error: null,
       upgradeRequest: null,
     });
@@ -173,7 +235,10 @@ export const useMembership = create<MembershipState>((set, get) => ({
   },
 
   setEntitlement: (entitlement) => {
-    set({ ...resolvedState(entitlement), hydrated: true });
+    const current = entitlementAtTime(entitlement);
+    set({ ...resolvedState(current), hydrated: true });
+    const ownerId = get().ownerId;
+    if (ownerId) scheduleExpiryCheck(ownerId, current);
   },
 
   requestUpgrade: (feature, source) => {
@@ -182,7 +247,8 @@ export const useMembership = create<MembershipState>((set, get) => ({
 
   clearUpgradeRequest: () => set({ upgradeRequest: null }),
   markHydrated: () => set({ hydrated: true }),
-  resetMembership: () =>
+  resetMembership: () => {
+    clearExpiryTimer();
     set({
       hydrated: true,
       loading: false,
@@ -191,9 +257,11 @@ export const useMembership = create<MembershipState>((set, get) => ({
       entitlement: EMPTY_ENTITLEMENT,
       capabilities: FREE_CAPABILITIES,
       managementUrl: null,
+      periodType: null,
       error: null,
       upgradeRequest: null,
-    }),
+    });
+  },
 }));
 
 export function currentCapabilities(): Capabilities {

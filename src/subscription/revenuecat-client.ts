@@ -93,6 +93,10 @@ export function purchaseRevenueCatPackage(aPackage: PurchasesPackage): Promise<M
   return Purchases.purchasePackage(aPackage);
 }
 
+export function restoreRevenueCatPurchases(): Promise<CustomerInfo> {
+  return Purchases.restorePurchases();
+}
+
 export function isRevenueCatPurchaseCancelled(error: unknown): boolean {
   return (
     typeof error === "object" &&

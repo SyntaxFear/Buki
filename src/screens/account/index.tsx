@@ -92,7 +92,9 @@ export function AccountCenter() {
   const membershipLoading = useMembership((state) => state.loading);
   const membershipError = useMembership((state) => state.error);
   const managementUrl = useMembership((state) => state.managementUrl);
+  const periodType = useMembership((state) => state.periodType);
   const refreshMembership = useMembership((state) => state.refreshMembership);
+  const restorePurchases = useMembership((state) => state.restorePurchases);
   const requestUpgrade = useMembership((state) => state.requestUpgrade);
   const hapticsEnabled = usePreferences((state) => state.hapticsEnabled);
   const setHapticsEnabled = usePreferences((state) => state.setHapticsEnabled);
@@ -183,6 +185,33 @@ export function AccountCenter() {
             void signOut().then(() => {
               if (useAuth.getState().status === "signedOut") router.dismissTo("/");
             });
+          },
+        },
+      ],
+    );
+  };
+
+  const confirmRestorePurchases = async () => {
+    if (!(await confirmAdult("Restoring a purchase can move store membership to this Buki account."))) return;
+    const accountLabel = profile?.email ?? user?.email ?? profile?.displayName ?? "this account";
+    Alert.alert(
+      "Restore to this Buki account?",
+      `Buki Pro will move to ${accountLabel} if Apple finds an eligible purchase. Artwork from another Buki account does not move.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Restore",
+          onPress: () => {
+            void (async () => {
+              const result = await restorePurchases();
+              if (result === "restored") {
+                Alert.alert("Buki Pro restored", "Pro is now available on this Buki account.");
+              } else if (result === "not_found") {
+                Alert.alert("No purchase found", "Apple did not return an active Buki Pro purchase for this store account.");
+              } else {
+                Alert.alert("Restore unavailable", "Buki could not restore purchases. Check your connection and try again.");
+              }
+            })();
           },
         },
       ],
@@ -284,9 +313,11 @@ export function AccountCenter() {
             </View>
             {tier === "pro" ? (
               <Text style={styles.membershipFootnote}>
-                {renewalDate
-                  ? `${entitlement.willRenew ? "Renews" : "Access through"} ${renewalDate}`
-                  : entitlement.status === "grace" ? "Billing grace period" : "Active on this Buki account"}
+                {entitlement.status === "grace"
+                  ? "Billing grace period · your existing library remains available"
+                  : renewalDate
+                    ? `${periodType === "TRIAL" ? "Trial ends" : entitlement.willRenew ? "Renews" : "Access through"} ${renewalDate}`
+                    : "Active on this Buki account"}
               </Text>
             ) : (
               <ActionButton title="Discover Buki Pro" prominent onPress={() => void introducePro("cloudBackup", "account_membership")} />
@@ -305,8 +336,8 @@ export function AccountCenter() {
           />
           <SettingRow
             title="Restore purchases"
-            detail="Connects after RevenueCat purchase setup"
-            onPress={() => void guardedFutureAction("Restore purchases", "Purchase restoration is enabled in the RevenueCat implementation step.")}
+            detail="Transfer an eligible Apple purchase to this signed-in Buki account"
+            onPress={() => void confirmRestorePurchases()}
           />
         </Section>
 

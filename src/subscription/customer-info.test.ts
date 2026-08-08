@@ -52,6 +52,32 @@ describe("RevenueCat customer info mapping", () => {
     });
   });
 
+  it("keeps canceled subscriptions active until their paid period ends", () => {
+    expect(snapshotFromCustomerInfo(customerInfo({ willRenew: false }))).toMatchObject({
+      product: "yearly",
+      status: "active",
+      willRenew: false,
+    });
+  });
+
+  it("removes Pro after a refund or revocation", () => {
+    expect(snapshotFromCustomerInfo(customerInfo({ isActive: false }))).toMatchObject({
+      status: "expired",
+    });
+  });
+
+  it("keeps lifetime access active without an expiration date", () => {
+    expect(
+      snapshotFromCustomerInfo(
+        customerInfo({
+          productIdentifier: "buki_pro_lifetime",
+          expirationDate: null,
+          willRenew: false,
+        }),
+      ),
+    ).toMatchObject({ product: "lifetime", status: "active", expiresAt: null });
+  });
+
   it("treats an account with no Pro purchase as Free", () => {
     expect(snapshotFromCustomerInfo(customerInfo())).toMatchObject({
       product: "yearly",

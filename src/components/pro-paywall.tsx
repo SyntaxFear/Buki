@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { PurchasesOffering, PurchasesPackage } from "react-native-purchases";
 
 import { getPublicAppConfig } from "@/config/env";
+import { useAuth } from "@/store/auth";
 import { useDrawings } from "@/store/drawings";
 import { useMembership, type UpgradeRequest } from "@/store/membership";
 import { confirmAdult } from "@/store/parental-gate";
@@ -141,11 +142,15 @@ export function ProPaywallHost() {
   const tier = useMembership((state) => state.tier);
   const clearRequest = useMembership((state) => state.clearUpgradeRequest);
   const acceptCustomerInfo = useMembership((state) => state.acceptCustomerInfo);
+  const restorePurchases = useMembership((state) => state.restorePurchases);
+  const adultProfile = useAuth((state) => state.profile);
+  const user = useAuth((state) => state.user);
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
   const [selected, setSelected] = useState<PlanId>("yearly");
   const [trialEligible, setTrialEligible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -230,6 +235,36 @@ export function ProPaywallHost() {
     } finally {
       setPurchasing(false);
     }
+  };
+
+  const confirmRestore = async () => {
+    if (!(await confirmAdult("Restoring can move Apple purchase access to this Buki account."))) return;
+    const accountLabel = adultProfile?.email ?? user?.email ?? adultProfile?.displayName ?? "this account";
+    Alert.alert(
+      "Restore to this Buki account?",
+      `Buki Pro will move to ${accountLabel} if Apple finds an eligible purchase. Artwork from another Buki account does not move.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Restore",
+          onPress: () => {
+            setRestoring(true);
+            setError(null);
+            void restorePurchases().then((result) => {
+              setRestoring(false);
+              if (result === "restored") {
+                clearRequest();
+                Alert.alert("Buki Pro restored", "Pro is now available on this Buki account.");
+              } else if (result === "not_found") {
+                Alert.alert("No purchase found", "Apple did not return an active Buki Pro purchase for this store account.");
+              } else {
+                setError("Buki could not restore purchases. Check your connection and try again.");
+              }
+            });
+          },
+        },
+      ],
+    );
   };
 
   const config = getPublicAppConfig();
@@ -353,6 +388,14 @@ export function ProPaywallHost() {
 
           {error && plans.length ? <Text accessibilityRole="alert" style={styles.purchaseError}>{error}</Text> : null}
 
+          <Pressable
+            onPress={() => void confirmRestore()}
+            disabled={purchasing || restoring}
+            style={({ pressed }) => [styles.restoreButton, pressed && styles.pressed]}
+          >
+            {restoring ? <ActivityIndicator color={colors.titleTeal} /> : <Text style={styles.restoreLabel}>Restore Purchases</Text>}
+          </Pressable>
+
           <View style={styles.legalLinks}>
             <Pressable onPress={() => void openExternal(config.termsUrl, "Terms of Use")}><Text style={styles.legalLink}>Terms</Text></Pressable>
             <Text style={styles.legalDot}>·</Text>
@@ -412,6 +455,8 @@ const styles = StyleSheet.create({
   purchaseLabel: { fontSize: 17, fontWeight: "900", color: "#FFFFFF" },
   disclosure: { paddingHorizontal: 8, fontSize: 11, lineHeight: 16, color: colors.mutedText, textAlign: "center" },
   purchaseError: { color: "#A93232", fontSize: 13, lineHeight: 18, textAlign: "center" },
+  restoreButton: { minHeight: 44, alignItems: "center", justifyContent: "center" },
+  restoreLabel: { color: colors.titleTeal, fontSize: 14, fontWeight: "900" },
   legalLinks: { flexDirection: "row", justifyContent: "center", gap: 10, paddingTop: 2 },
   legalLink: { color: colors.titleTeal, fontSize: 13, fontWeight: "800", textDecorationLine: "underline" },
   legalDot: { color: colors.mutedText },
