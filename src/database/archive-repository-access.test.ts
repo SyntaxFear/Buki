@@ -1,3 +1,4 @@
+import { resolveCapabilities } from "@/subscription/access";
 import { activeLocalOwnerId } from "./account-repository";
 import { mergeImportedArchive, type ImportedArchiveLibrary } from "./archive-repository";
 import { loadLibrary, saveLibrary } from "./library-repository";
@@ -81,7 +82,10 @@ describe("Buki archive commit authorization", () => {
     };
 
     await expect(
-      mergeImportedArchive(db as never, archiveWithTwentyOneArtworks(), assertImportAllowed),
+      mergeImportedArchive(db as never, archiveWithTwentyOneArtworks(), {
+        getCapabilities: () => resolveCapabilities("pro"),
+        assertWriteAllowed: assertImportAllowed,
+      }),
     ).rejects.toThrow("Buki Pro is required");
 
     expect(saveLibraryMock).not.toHaveBeenCalled();

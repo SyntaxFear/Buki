@@ -2,6 +2,12 @@ import { File } from "expo-file-system";
 import type { SQLiteDatabase } from "expo-sqlite";
 
 import { migrateStoreData, type Drawing, type StoreData } from "@/store/migrate";
+import {
+  ContentLimitReachedError,
+  limitFor,
+  type Capabilities,
+  type ContentResource,
+} from "@/subscription/access";
 import { DEFAULT_CHILD_ID } from "./constants";
 import { activeLocalOwnerId, activePadPreferenceKey } from "./account-repository";
 import {
@@ -45,6 +51,41 @@ interface ArtworkRow {
 interface ArtworkTagRow {
   artwork_id: string;
   name: string;
+}
+
+export interface LibraryWriteAccess {
+  getCapabilities: () => Capabilities;
+  assertWriteAllowed?: () => void;
+}
+
+interface ExistingLibraryIds {
+  sketchpads: ReadonlySet<string>;
+  artworks: ReadonlySet<string>;
+}
+
+function assertResourceWithinLimit(
+  resource: Extract<ContentResource, "sketchpads" | "artworks">,
+  existingIds: ReadonlySet<string>,
+  nextIds: ReadonlySet<string>,
+  capabilities: Capabilities,
+): void {
+  const addsContent = [...nextIds].some((id) => !existingIds.has(id));
+  if (!addsContent) return;
+  const allowedTotal = Math.max(existingIds.size, limitFor(resource, capabilities));
+  if (nextIds.size > allowedTotal) throw new ContentLimitReachedError(resource);
+}
+
+export function assertLibrarySnapshotWithinCapabilities(
+  existing: ExistingLibraryIds,
+  data: StoreData,
+  capabilities: Capabilities,
+): void {
+  const nextPadIds = new Set(data.pads.map((pad) => pad.id));
+  const nextArtworkIds = new Set(
+    data.pads.flatMap((pad) => (data.drawingsByPad[pad.id] ?? []).map((drawing) => drawing.id)),
+  );
+  assertResourceWithinLimit("sketchpads", existing.sketchpads, nextPadIds, capabilities);
+  assertResourceWithinLimit("artworks", existing.artworks, nextArtworkIds, capabilities);
 }
 
 function fileExists(uri: string): boolean {
@@ -148,17 +189,27 @@ export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
 export async function saveLibrary(
   db: SQLiteDatabase,
   data: StoreData,
-  assertWriteAllowed?: () => void,
+  access: LibraryWriteAccess,
 ): Promise<void> {
   const now = Date.now();
   const ownerId = await activeLocalOwnerId(db);
   await db.withExclusiveTransactionAsync(async (tx) => {
-    const existingPadIds = ownerId
-      ? new Set((await tx.getAllAsync<{ id: string }>("SELECT id FROM sketchpads WHERE owner_id = ?", ownerId)).map((row) => row.id))
-      : new Set<string>();
-    const existingArtworkIds = ownerId
-      ? new Set((await tx.getAllAsync<{ id: string }>("SELECT id FROM artworks WHERE owner_id = ?", ownerId)).map((row) => row.id))
-      : new Set<string>();
+    const existingPadIds = new Set(
+      (await tx.getAllAsync<{ id: string }>(
+        `SELECT id FROM sketchpads
+         WHERE deleted_at IS NULL AND ((? IS NULL AND owner_id IS NULL) OR owner_id = ?)`,
+        ownerId,
+        ownerId,
+      )).map((row) => row.id),
+    );
+    const existingArtworkIds = new Set(
+      (await tx.getAllAsync<{ id: string }>(
+        `SELECT id FROM artworks
+         WHERE deleted_at IS NULL AND ((? IS NULL AND owner_id IS NULL) OR owner_id = ?)`,
+        ownerId,
+        ownerId,
+      )).map((row) => row.id),
+    );
     const existingTagIds = ownerId
       ? new Set((await tx.getAllAsync<{ id: string }>("SELECT id FROM tags WHERE owner_id = ?", ownerId)).map((row) => row.id))
       : new Set<string>();
@@ -176,7 +227,15 @@ export async function saveLibrary(
           ownerId,
         )
       : [];
-    assertWriteAllowed?.();
+    const assertAccess = () => {
+      access.assertWriteAllowed?.();
+      assertLibrarySnapshotWithinCapabilities(
+        { sketchpads: existingPadIds, artworks: existingArtworkIds },
+        data,
+        access.getCapabilities(),
+      );
+    };
+    assertAccess();
     const nextRelationIds = new Set<string>();
     const nextMediaIds = new Set<string>();
     const artworkIds: string[] = [];
@@ -368,6 +427,7 @@ export async function saveLibrary(
         }
       }
     }
+    assertAccess();
   });
 }
 

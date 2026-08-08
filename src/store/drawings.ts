@@ -12,7 +12,11 @@ import {
   type PadDecorationId,
 } from "@/pad-visuals";
 import { normalizeArtworkTags } from "@/organization/artwork-organizer";
-import { canCreateContent, type ContentCounts } from "@/subscription/access";
+import {
+  canCreateContent,
+  isContentLimitReachedError,
+  type ContentCounts,
+} from "@/subscription/access";
 import { currentCapabilities, useMembership } from "@/store/membership";
 import { usePreferences } from "@/store/preferences";
 import {
@@ -105,14 +109,17 @@ export function activePadOf(s: { pads: Sketchpad[]; activePadId: string }): Sket
   return s.pads.find((p) => p.id === s.activePadId);
 }
 
-function persist(s: { activePadId: string; pads: Sketchpad[]; drawingsByPad: Record<string, Drawing[]> }): void {
+function persist(
+  s: { activePadId: string; pads: Sketchpad[]; drawingsByPad: Record<string, Drawing[]> },
+  onError?: (error: unknown) => void,
+): void {
   const data: StoreData = {
     version: 5,
     activePadId: s.activePadId,
     pads: s.pads,
     drawingsByPad: s.drawingsByPad,
   };
-  enqueueLibrarySnapshot(data);
+  enqueueLibrarySnapshot(data, currentCapabilities, onError);
 }
 
 function deleteMediaFiles(items: Array<{ uri: string; photoUri?: string }>): void {
@@ -248,7 +255,19 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     const isFirstArtwork = Object.values(drawingsByPad).every((drawings) => drawings.length === 0);
     const nextByPad = { ...drawingsByPad, [activePadId]: [...current, drawing] };
     set({ drawingsByPad: nextByPad, pending: null });
-    persist({ activePadId, pads, drawingsByPad: nextByPad });
+    persist({ activePadId, pads, drawingsByPad: nextByPad }, (error) => {
+      if (!isContentLimitReachedError(error, "artworks")) return;
+      deleteMediaFiles([drawing]);
+      set((state) => ({
+        drawingsByPad: Object.fromEntries(
+          Object.entries(state.drawingsByPad).map(([padId, drawings]) => [
+            padId,
+            drawings.filter((item) => item.id !== drawing.id),
+          ]),
+        ),
+      }));
+      useMembership.getState().requestUpgrade("artworks", "artwork_limit_commit");
+    });
     if (isFirstArtwork) setTimeout(() => introduceProAfterFirstArtwork(), 700);
     return true;
   },
@@ -424,7 +443,7 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
   },
 
   createPad: (name, style, design, pageColor, childId, border = "none", decoration = "none") => {
-    const { pads, drawingsByPad } = get();
+    const { pads, drawingsByPad, activePadId: previousActivePadId } = get();
     if (!canCreateContent("sketchpads", contentCountsOf({ pads, drawingsByPad }), currentCapabilities())) {
       useMembership.getState().requestUpgrade("sketchpads", "sketchpad_limit");
       return null;
@@ -451,7 +470,25 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     const nextPads = [...pads, pad];
     const nextByPad = { ...drawingsByPad, [pad.id]: [] };
     set({ pads: nextPads, drawingsByPad: nextByPad, activePadId: pad.id });
-    persist({ activePadId: pad.id, pads: nextPads, drawingsByPad: nextByPad });
+    persist({ activePadId: pad.id, pads: nextPads, drawingsByPad: nextByPad }, (error) => {
+      if (!isContentLimitReachedError(error, "sketchpads")) return;
+      set((state) => {
+        const rollbackPads = state.pads.filter((item) => item.id !== pad.id);
+        const rollbackDrawings = { ...state.drawingsByPad };
+        delete rollbackDrawings[pad.id];
+        return {
+          pads: rollbackPads,
+          drawingsByPad: rollbackDrawings,
+          activePadId:
+            state.activePadId === pad.id
+              ? (rollbackPads.some((item) => item.id === previousActivePadId)
+                  ? previousActivePadId
+                  : (rollbackPads[0]?.id ?? ""))
+              : state.activePadId,
+        };
+      });
+      useMembership.getState().requestUpgrade("sketchpads", "sketchpad_limit_commit");
+    });
     return pad.id;
   },
 

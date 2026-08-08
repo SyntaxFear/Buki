@@ -33,10 +33,11 @@ import {
   loadLocalEntitlementSnapshot,
   saveLocalEntitlementSnapshot,
 } from "./entitlement-repository";
-import type { EntitlementSnapshot } from "@/subscription/access";
+import type { Capabilities, EntitlementSnapshot } from "@/subscription/access";
 import { notifySyncQueueChanged } from "@/sync/signals";
 import {
   mergeImportedArchive,
+  type ArchiveImportAccess,
   type ImportedArchiveLibrary,
 } from "./archive-repository";
 import {
@@ -178,11 +179,16 @@ export function loadLibrarySnapshot(): Promise<StoreData> {
   return loadLibrary(requireBukiDatabase());
 }
 
-export function enqueueLibrarySnapshot(data: StoreData): void {
+export function enqueueLibrarySnapshot(
+  data: StoreData,
+  getCapabilities: () => Capabilities,
+  onError?: (error: unknown) => void,
+): void {
   writeQueue = writeQueue
-    .then(() => saveLibrary(requireBukiDatabase(), data))
+    .then(() => saveLibrary(requireBukiDatabase(), data, { getCapabilities }))
     .then(() => notifySyncQueueChanged())
     .catch((error) => {
+      onError?.(error);
       console.warn("Failed to persist Buki library", error);
     });
 }
@@ -193,11 +199,11 @@ export async function flushLibraryWrites(): Promise<void> {
 
 export async function importBukiLibraryArchive(
   imported: ImportedArchiveLibrary,
-  assertImportAllowed: () => void,
+  access: ArchiveImportAccess,
 ) {
-  assertImportAllowed();
+  access.assertWriteAllowed();
   const db = requireBukiDatabase();
-  const result = await mergeImportedArchive(db, imported, assertImportAllowed);
+  const result = await mergeImportedArchive(db, imported, access);
   const ownerId = await activeLocalOwnerId(db);
   if (ownerId) await enqueueFullAccountSnapshot(db, ownerId);
   notifySyncQueueChanged();

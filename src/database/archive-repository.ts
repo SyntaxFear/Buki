@@ -2,7 +2,11 @@ import type { SQLiteDatabase } from "expo-sqlite";
 
 import type { Drawing, Sketchpad, StoreData } from "@/store/migrate";
 import { activeLocalOwnerId } from "./account-repository";
-import { loadLibrary, saveLibrary } from "./library-repository";
+import {
+  loadLibrary,
+  saveLibrary,
+  type LibraryWriteAccess,
+} from "./library-repository";
 
 export interface ImportedArchiveChildRecord {
   id: string;
@@ -20,10 +24,14 @@ export interface ImportedArchiveLibrary {
   mediaChecksums: Record<string, { cutout: string; original?: string }>;
 }
 
+export interface ArchiveImportAccess extends LibraryWriteAccess {
+  assertWriteAllowed: () => void;
+}
+
 export async function mergeImportedArchive(
   db: SQLiteDatabase,
   imported: ImportedArchiveLibrary,
-  assertImportAllowed: () => void,
+  access: ArchiveImportAccess,
 ): Promise<StoreData> {
   const ownerId = await activeLocalOwnerId(db);
   if (!ownerId) throw new Error("Sign in before importing a Buki archive.");
@@ -44,9 +52,9 @@ export async function mergeImportedArchive(
   };
 
   try {
-    assertImportAllowed();
+    access.assertWriteAllowed();
     await db.withExclusiveTransactionAsync(async (tx) => {
-      assertImportAllowed();
+      access.assertWriteAllowed();
       for (const [index, child] of imported.children.entries()) {
         await tx.runAsync(
           `INSERT INTO child_profiles (
@@ -64,9 +72,10 @@ export async function mergeImportedArchive(
           now,
         );
       }
+      access.assertWriteAllowed();
     });
-    assertImportAllowed();
-    await saveLibrary(db, next, assertImportAllowed);
+    access.assertWriteAllowed();
+    await saveLibrary(db, next, access);
     await db.withExclusiveTransactionAsync(async (tx) => {
       for (const [artworkId, checksums] of Object.entries(imported.mediaChecksums)) {
         await tx.runAsync(

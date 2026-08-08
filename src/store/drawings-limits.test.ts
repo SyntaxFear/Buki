@@ -47,7 +47,7 @@ jest.mock("@/store/preferences", () => ({
   },
 }));
 
-import { resolveCapabilities } from "@/subscription/access";
+import { ContentLimitReachedError, resolveCapabilities } from "@/subscription/access";
 import type { Drawing, Sketchpad } from "./migrate";
 import { useDrawings } from "./drawings";
 
@@ -126,5 +126,46 @@ describe("artwork limit mutations", () => {
     mockCapabilities = resolveCapabilities("pro");
     expect(useDrawings.getState().requestArtworkCreation("artwork_limit")).toBe(true);
     expect(mockRequestUpgrade).not.toHaveBeenCalled();
+  });
+
+  it("removes a new artwork when the database rejects an expiry race", () => {
+    mockCapabilities = resolveCapabilities("pro");
+    mockPersist.mockImplementationOnce(
+      (_data: unknown, _getCapabilities: unknown, onError: (error: unknown) => void) => {
+        mockCapabilities = resolveCapabilities("free");
+        onError(new ContentLimitReachedError("artworks"));
+      },
+    );
+
+    expect(useDrawings.getState().commitPending()).toBe(true);
+    expect(useDrawings.getState().drawingsByPad[pad.id]).toHaveLength(20);
+    expect(mockDeletedFiles).toEqual([
+      "file:///pending-cutout.png",
+      "file:///pending-photo.jpg",
+    ]);
+    expect(mockRequestUpgrade).toHaveBeenCalledWith("artworks", "artwork_limit_commit");
+  });
+
+  it("removes a new sketchpad when the database rejects an expiry race", () => {
+    mockCapabilities = resolveCapabilities("pro");
+    mockPersist.mockImplementationOnce(
+      (_data: unknown, _getCapabilities: unknown, onError: (error: unknown) => void) => {
+        mockCapabilities = resolveCapabilities("free");
+        onError(new ContentLimitReachedError("sketchpads"));
+      },
+    );
+
+    const created = useDrawings.getState().createPad(
+      "Second",
+      "spread",
+      "sunshine",
+      undefined,
+      "child-a",
+    );
+
+    expect(created).not.toBeNull();
+    expect(useDrawings.getState().pads).toEqual([pad]);
+    expect(useDrawings.getState().activePadId).toBe(pad.id);
+    expect(mockRequestUpgrade).toHaveBeenCalledWith("sketchpads", "sketchpad_limit_commit");
   });
 });

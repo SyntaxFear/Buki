@@ -543,8 +543,11 @@ export async function importBukiArchive(uri: string): Promise<BukiArchiveImportR
       }
     }
 
-    await importBukiLibraryArchive(imported, () => {
-      requireArchiveAccess("archive_import_commit");
+    await importBukiLibraryArchive(imported, {
+      getCapabilities: currentCapabilities,
+      assertWriteAllowed: () => {
+        requireArchiveAccess("archive_import_commit");
+      },
     });
     committed = true;
     await Promise.allSettled([
