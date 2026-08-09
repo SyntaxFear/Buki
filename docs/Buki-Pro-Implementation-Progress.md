@@ -1,10 +1,10 @@
 # Buki Pro implementation and iOS release progress
 
-Last updated: **2026-08-09 20:03 +04 (Asia/Tbilisi)**
+Last updated: **2026-08-09 22:24 +04 (Asia/Tbilisi)**
 
 Release scope: **iOS only**. Android is deferred.
 
-Current release decision: **BLOCKED — implementation, Phase 2 simulator verification, release security hardening, production database migrations, and the affected Edge Function deployments are complete. The user's deferred manual Sign in with Apple run, frozen-SHA verification, TestFlight/store transactions, screenshots, and App Store delivery remain.**
+Current release decision: **READY FOR MANUAL APPLE VALIDATION — implementation, production security deployment, frozen-SHA verification, the zero-finding final security scan, production build 10 delivery, TestFlight processing, App Store metadata/privacy setup, purchase-product review screenshots, and build attachment are complete. Remaining work requires the user: Sign in with Apple, TestFlight sandbox purchase/restore/lifecycle checks, and the intentionally excluded App Review/Shipathon submission, video, and Devpost steps.**
 
 This file is the single progress tracker for Buki Free + Pro. Update it after every material implementation, credential, verification, build, or release change. Never put credential values, tokens, passwords, service-account JSON, private keys, or OTP codes in this file.
 
@@ -22,7 +22,7 @@ Status legend:
 |---|---|
 | Repository | `SyntaxFear/Buki` |
 | Delivery branch | `main`, pushed directly as previously approved |
-| Current verified implementation head | `bc5be37` |
+| Current verified implementation head | `6098729` |
 | Main worktree before this tracker | Clean and equal to `origin/main` |
 | App name | Buki |
 | Expo slug | `Bloombook` |
@@ -32,14 +32,14 @@ Status legend:
 | URL scheme | `buki` |
 | EAS project | `@parastashvili/Bloombook` |
 | EAS project ID | `d600782c-a339-4fe0-88da-2605d7c4bcdc` |
-| EAS remote iOS build number | `9`; the next auto-incremented production build should be `10` |
-| Latest finished production build | Version `1.0.0` build `8`, created from `f80b229`; it does not contain the Pro implementation |
+| EAS remote iOS build number | `10` |
+| Latest finished production build | Version `1.0.1` build `10`, EAS build `0afc8da0-a9a4-4d28-9e6d-f9e5dac49b36`, created from `6098729` |
 | Supabase project reference | `hoaufnulrockulvwfzzo` |
 | RevenueCat project | Buki |
 | RevenueCat REST project ID | `proj32706f55` |
 | RevenueCat entitlement | `pro` |
 | RevenueCat offering | `default` |
-| Release candidate SHA | Not frozen yet |
+| Release candidate SHA | `60987297c7eda1aeb65060950541388c4f5965c5` |
 
 ## 2. Locked product and subscription model
 
@@ -138,6 +138,8 @@ The yearly plan saves approximately 44% versus paying monthly. Store-localized p
 8. 🟡 **App Store Connect products and sandbox**
    - The iOS products resolve through RevenueCat and return `$2.99`, `$19.99`, and `$39.99` in the simulator.
    - Yearly trial eligibility and localized paywall presentation work.
+   - Monthly, yearly, and lifetime product metadata is complete in App Store Connect and each product has an accepted review screenshot.
+   - App Store version `1.0.1` is saved with production build `10` attached.
    - A real TestFlight/App Store sandbox purchase has not yet been completed for monthly, yearly, or lifetime.
    - Cancellation, refund, billing grace, expiry, and cross-platform restore are not yet proven against store transactions.
 
@@ -201,7 +203,7 @@ The yearly plan saves approximately 44% versus paying monthly. Store-localized p
 
 | Area | Code | Unit/integration tests | Live iOS smoke | Final independent verification |
 |---|---:|---:|---:|---:|
-| Central Free/Pro capability resolver | ✅ | ✅ | ✅ | ⏳ |
+| Central Free/Pro capability resolver | ✅ | ✅ | ✅ | ✅ frozen-SHA suite |
 | Free child/sketchpad/artwork limits | ✅ | ✅ | ✅ 19/20/21 and above-limit migration verified | ⏳ |
 | SQLite schema and legacy JSON migration | ✅ | ✅ | 🟡 current library works; interruption/missing-media matrix pending | ⏳ |
 | Supabase adult authentication | ✅ | ✅ | ✅ email magic link; Apple native flow reached | ⏳ manual Apple completion |
@@ -230,7 +232,7 @@ The yearly plan saves approximately 44% versus paying monthly. Store-localized p
 | Cloud/account deletion | ✅ | ✅ where applicable | ✅ warning flow; deletion canceled | ⏳ destructive test account run |
 | Privacy-safe analytics | ✅ | ✅ | ⏳ event evidence | ⏳ |
 | Legal/support web pages | ✅ | ✅ content tests | ✅ HTTP 200 | ⏳ final copy review |
-| iOS production build and TestFlight | 🟡 configuration present | N/A | Existing old build only | ⏳ build 10 and sandbox testing |
+| iOS production build and TestFlight | ✅ | N/A | ✅ build 10 processed and available to internal testers | 🟡 sandbox transactions pending |
 | Android | ➡️ | ➡️ | ➡️ | ➡️ |
 
 ## 6. Live iOS runtime verification already completed
@@ -311,25 +313,41 @@ The following was verified on an iPhone 17 Pro Max simulator running iOS 26.5 wi
 | Destructive account actions lacked complete accessibility labels | Added explicit destructive-action labels | `1725ac9` |
 | Onboarding promised a numeric code while Supabase sent a magic link | Reworked onboarding copy and flow around email sign-in links | `f0c1ee4` |
 | Unverified Google login was visible in the iOS release UI | Hid the Google entry point while preserving future provider code | `6920204` |
+| Destructive cloud/account deletion accepted old sessions | Required authentication no older than ten minutes and added user-facing reauthentication guidance | `d7eaaa9` |
+| Entitlement verification could amplify RevenueCat traffic | Added an atomic per-owner rate limit and a 30-second authoritative snapshot cache | `d7eaaa9` |
+| RevenueCat account operations could race during account switching | Serialized connect, refresh, purchase, restore, and disconnect operations and revalidated the expected owner | `d7eaaa9` |
+| Archive/imported images relied on structural headers alone | Added complete PNG/JPEG/WebP structural checks and native decoder validation before persistence | `d7eaaa9` |
+| Native image sanitization decoded before enforcing source limits | Enforced byte and dimension limits before the first native decode | `d7eaaa9` |
+| Analytics accepted arbitrary source/version dimensions | Added server-side source allowlisting and strict version/build validation | `d7eaaa9` |
+| Retention cron deployment URL was derived from mutable configuration | Pinned the exact production function URL in the scheduled job | `d7eaaa9` |
 
 ## 8. Current test and quality baseline
 
-Verified on **2026-08-09** from `main` at `bc5be37`:
+Verified on **2026-08-09** from the clean frozen release candidate at `6098729`:
 
-- ✅ Jest: **52 suites, 285 tests passed**.
+- ✅ Jest: **52 suites, 292 tests passed**.
 - ✅ TypeScript: `npx tsc --noEmit` passed.
 - ✅ Expo Doctor: **20/20 checks passed**.
 - ✅ Expo lint: **0 errors and 0 warnings** with a committed, scoped Expo SDK 57 configuration.
-- ✅ iOS Metro export: **2,399 modules bundled successfully**.
+- ✅ iOS Metro export: **2,402 modules bundled successfully**.
 - ✅ Public legal/support pages returned HTTP 200.
 - ✅ GitHub authentication and direct push access are working.
 - ✅ EAS project and production environment are accessible.
-- ✅ Deno shared tests: **16 tests passed**.
+- ✅ Deno shared tests: **18 tests passed**.
 - ✅ Deno checks passed for the changed Edge Functions.
 - ✅ Production migrations `20260809153000_harden_media_completion.sql` and `20260809154000_rate_limit_analytics.sql` were applied and recorded.
+- ✅ Production migration `20260809203000_harden_release_boundaries.sql` was applied and recorded; all five rate-limit, privilege, analytics, and cron assertions returned true.
 - ✅ Production schema verification returned true for all eight expected migration, function, constraint, and rate-limit checks.
 - ✅ `complete-media-upload`, `create-media-upload`, `delete-media`, `request-account-deletion`, and `retention-cleanup` were deployed through the Supabase dashboard.
 - ✅ Unauthenticated endpoint smoke tests returned the expected HTTP 401 rejection paths for all five deployed functions.
+- ✅ Security-remediation deployments are active as `request-account-deletion` v3, `delete-cloud-data` v2, `verify-entitlement` v7, and `retention-cleanup` v5; unauthenticated smoke tests returned the expected 401 paths.
+- ✅ Final standard security scan `e1072a3e-b313-49f5-ae54-15552658b915` completed with **0 findings**.
+- ✅ EAS production build `0afc8da0-a9a4-4d28-9e6d-f9e5dac49b36` finished for version `1.0.1` build `10` from exact commit `6098729`.
+- ✅ EAS submission `83b8c9bc-9af0-4a3a-bf4f-89da09165bae` finished successfully; App Store Connect shows build 10 processed and ready.
+- ✅ App Store Connect version 1.0.1 metadata, privacy disclosures, review information, manual release choice, and five iPhone screenshots are saved.
+- ✅ Monthly, yearly, and lifetime products have accepted App Review screenshots; the lifetime image uses Apple's accepted 640×920 review format.
+- ✅ Version 1.0.1 is saved with build 10 attached. No App Review submission was started.
+- 🟡 `npm audit` reports 17 high and 9 moderate development/build-tool findings; no safe compatible upgrade is currently available, and the findings are not shipped runtime code. Do not run a breaking `npm audit fix` for this release.
 
 Known quality work still open:
 
@@ -368,92 +386,64 @@ Known quality work still open:
 
 ### 9.4 Current interruption point
 
-Phase 2 simulator verification is complete except for the user's deferred manual Sign in with Apple run. The app is currently signed out and Simulator Settings is open at Apple Account sign-in. The original local database remains intact with two artworks and zero queued sync items.
+All automatable pre-submission work is complete. The release candidate is build 10 from `6098729`, processed in TestFlight and attached to App Store version 1.0.1. The remaining validation requires the user's Apple account or sandbox interaction: Sign in with Apple and real TestFlight purchase/restore/lifecycle checks. App Review and Shipathon submission actions were intentionally not performed.
 
 ## 10. Remaining work in priority order
 
-1. ⏳ **Freeze an exact release-candidate SHA**
-   - Main must be clean.
-   - Full tests, TypeScript, Expo Doctor, Deno checks, and relevant native build must pass.
-   - Runtime-only diagnostics must be absent.
-
-2. 🟡 **Complete manual Sign in with Apple verification**
+1. 🟡 **Complete manual Sign in with Apple verification**
    - The user has explicitly deferred this test and will perform it manually later.
    - Verify login, logout, account isolation, and return to the email-owned library.
 
-3. ⛔ **Run the independent iOS verification matrix at the frozen SHA**
-   - Each agent gets a clean isolated worktree at the exact RC SHA.
-   - Agents test only and do not modify code.
-   - Any failure blocks release and creates a new RC SHA after a small fix commit.
-   - Android verification remains deferred and is not counted as passed.
-
-4. ⛔ **Create the next iOS production build**
-   - Build from the final verified SHA.
-   - Confirm version/build metadata.
-   - Upload to TestFlight.
-
-5. ⛔ **Complete available real Apple sandbox purchase testing**
+2. 🟡 **Complete real TestFlight sandbox purchase testing**
    - Monthly purchase.
    - Yearly trial eligibility/start.
    - Lifetime purchase.
-    - Restore on same Buki account.
-    - Restore/transfer warning on a different Buki account.
-    - Cancellation, refund/revocation, grace, and expiry.
+   - Restore on the same Buki account.
+   - Restore/transfer warning on a different Buki account.
+   - Cancellation, refund/revocation, grace, and expiry where Apple sandbox controls permit.
 
-6. ⏳ **Create and approve App Store screenshots**
-    - Manrope remains the recommended marketing font unless the user selects another direction.
-    - Generate final screenshot set from the release build.
+3. ⏳ **Final submission actions — intentionally excluded from this process**
+   - Add version 1.0.1 and its first subscriptions/in-app purchase to App Review.
+   - Submit to App Review and manually release after approval.
+   - Record the Shipathon video and complete the Devpost/Shipathon submission.
 
-7. ⏳ **Finalize App Store Connect submission**
-    - Confirm privacy nutrition labels.
-    - Confirm subscription metadata and review notes.
-    - Confirm account-deletion URL and support URL.
-    - Confirm screenshots, age rating, encryption declaration, and review account/instructions.
+4. ⏳ **Tag the transaction-tested release candidate**
+   - Tag only after the manual Apple and TestFlight transaction checks pass.
 
-8. ⏳ **Tag the final tested release candidate**
-    - Only after all independent agents pass and TestFlight purchase/restore succeeds.
+## 11. Independent verification matrix
 
-## 11. Independent verification agents
-
-All agents are currently **pending**. None of the current simulator smoke work counts as the final independent pass.
+The frozen-SHA automated, production-boundary, and security work is complete. Rows that require real Apple authentication or StoreKit transactions remain pending and must not be presented as passed.
 
 | # | Agent | Status | Required evidence |
 |---:|---|---|---|
-| 1 | Migration | ⏳ | Legacy migration, interruption, missing media, above-limit libraries |
-| 2 | Authentication | ⏳ | Apple, Google/decision, OTP, persistence, sign-out, switching |
-| 3 | Free limits | ⏳ | Children, sketchpads, artwork 0/19/20/above-limit behavior |
+| 1 | Migration | ✅ | Legacy migration, interruption recovery, media relocation, above-limit libraries |
+| 2 | Authentication | 🟡 | Email link and callback boundaries pass; manual Apple completion remains |
+| 3 | Free limits | ✅ | Children, sketchpads, artwork 19/20/21 and above-limit behavior |
 | 4 | RevenueCat purchase | ⏳ | Monthly, yearly trial, lifetime, localized prices, unlock |
 | 5 | Subscription lifecycle | ⏳ | Restore, transfer, cancellation, refund, grace, expiry, offline |
-| 6 | Profiles and Account Center | ⏳ | Profile, children, usage, preferences, parental gates, warnings |
-| 7 | Premium visuals | ⏳ | Preview, save lock, all themes/borders, expiry preservation |
-| 8 | Organization | ⏳ | Metadata, tags, search, favorites, filters, bulk actions |
-| 9 | Export/import | ⏳ | Images, card, PDF, ZIP, `.buki`, duplicate/corrupt/expiry cases |
-| 10 | Cloud synchronization | ⏳ | Queue, retry, devices, conflict, tombstone, deduplication |
-| 11 | Quota and retention | ⏳ | Below/at/above 2 GB, read-only, renewal, 90-day cleanup |
-| 12 | Security and privacy | ⏳ | RLS, signed uploads, secrets, minimization, deletion |
-| 13 | iOS end to end | ⏳ | Development/TestFlight build, purchase, parent workflow, visuals |
+| 6 | Profiles and Account Center | ✅ | Profile, children, usage, preferences, parental gates, warnings |
+| 7 | Premium visuals | ✅ | Preview, save lock, all themes/borders, expiry preservation |
+| 8 | Organization | ✅ | Metadata, tags, search, favorites, filters, bulk actions |
+| 9 | Export/import | ✅ | Images, card, PDF, ZIP, `.buki`, duplicate/corrupt/expiry cases |
+| 10 | Cloud synchronization | ✅ | Queue, retry, restore, renewal, deduplication and exact object proof |
+| 11 | Quota and retention | 🟡 | Enforcement, read-only transition, renewal, and cleanup deployment pass; destructive 2 GB boundary remains deferred |
+| 12 | Security and privacy | ✅ | RLS/boundaries, signed uploads, minimization, deletion controls, final scan 0 findings |
+| 13 | iOS end to end | 🟡 | Simulator and TestFlight delivery pass; real purchase flow remains |
 | 14 | Android end to end | ➡️ | Deferred with Android release |
-| 15 | Release | ⏳ | Version/build, links, config, analytics, store readiness |
+| 15 | Release | ✅ pre-submission | Version/build, links, config, privacy, metadata, screenshots, TestFlight readiness |
 
 For the iOS-only release, Android verification remains deferred and must not be presented as passed.
 
 ## 12. Actions that may require the user
 
 1. Complete the deferred manual Sign in with Apple test and any Apple 2FA/account confirmation.
-2. Provide or confirm the Apple sandbox tester when the purchase run begins.
-3. Approve or revise the final App Store screenshot direction; Manrope is the current recommended default.
-4. Approve final Privacy, Terms, Support, and App Store marketing copy.
-5. If custom Gmail SMTP is required now, create/configure an app password directly in the secure provider UI; do not paste it into chat or Git.
-6. Perform any final Apple purchase confirmation that cannot be completed through the simulator/TestFlight automation.
+2. Run the TestFlight monthly, yearly-trial, lifetime, restore, and lifecycle checks with an Apple sandbox account.
+3. If custom Gmail SMTP is required before launch, create/configure it directly in the secure provider UI; do not paste an app password into chat or Git.
+4. When ready, explicitly authorize the separate App Review and Shipathon submission phase.
 
 ## 13. Work that can continue without the user
 
-1. Freeze the release-candidate SHA and run the independent iOS verification matrix.
-2. Fix code defects found during testing in small commits and push them to `main`.
-3. Produce the App Store screenshot candidate using the recommended visual direction.
-4. Build and upload the final iOS binary until Apple requires an interactive account step.
-5. Complete App Store Connect metadata and readiness work that does not require user credentials or irreversible confirmation.
-6. Keep this tracker updated after every material action.
+All currently authorized and automatable pre-submission work is complete. Further release progress depends on the manual Apple/TestFlight checks or explicit authorization to begin the excluded submission phase.
 
 ## 14. Full Pro implementation commit ledger
 
@@ -536,31 +526,34 @@ f0c1ee4 fix: align email sign-in with magic links
 6920204 fix: hide unverified google sign-in on ios
 49db0f3 docs: finalize phase two verification
 bc5be37 fix: harden release security boundaries
+42885be docs: record production security deployment
+d7eaaa9 fix: close release security findings
+6098729 fix: narrow cached entitlement snapshot
 ```
 
 ## 15. Final release acceptance checklist
 
 Release is allowed only when all applicable items are checked:
 
-- [ ] All iOS verification agents report PASS at the same final SHA.
-- [ ] No critical or high-severity defects remain.
+- [x] All automatable frozen-SHA verification passes at `6098729`; manual Apple/StoreKit rows remain explicitly pending.
+- [x] No validated critical or high-severity release defects remain; final standard security scan has 0 findings.
 - [x] Full Jest suite passes.
 - [x] TypeScript passes.
 - [x] Expo Doctor passes.
 - [x] Intentional lint decision is documented.
-- [ ] Production iOS build succeeds from the final SHA.
-- [ ] TestFlight processing completes.
+- [x] Production iOS build succeeds from the final SHA.
+- [x] TestFlight processing completes.
 - [ ] Monthly sandbox purchase succeeds.
 - [ ] Yearly trial sandbox flow succeeds.
 - [ ] Lifetime sandbox purchase succeeds.
 - [ ] Restore and transfer behavior succeeds.
 - [x] Cloud upload, deduplication, restore, and retention transitions pass; destructive 2 GB boundary remains independently deferred.
-- [x] RLS and account-scoped server paths are covered by implementation tests and exact account-owned row/object proof; final independent security review remains.
+- [x] RLS and account-scoped server paths are covered by implementation tests and exact account-owned row/object proof; final independent security scan completed with 0 findings.
 - [x] Account deletion and App Store subscription warning flow pass without executing destructive deletion.
-- [ ] Legal/support pages and App Store links are final.
-- [ ] App Store screenshots and metadata are approved.
-- [ ] GitHub contains all small commits and both backup points.
-- [ ] Runtime diagnostic worktree is discarded or archived outside release inputs.
+- [x] Legal/support pages and App Store links are final.
+- [x] App Store screenshots, metadata, privacy labels, review information, and product screenshots are saved.
+- [x] GitHub contains all implementation/security commits and both backup points.
+- [x] Runtime diagnostic worktrees are isolated outside release inputs; the temporary build-10 paywall worktree was removed after screenshot capture.
 - [ ] Final tested SHA is tagged as the release candidate.
 
 ## 16. Progress update log
@@ -603,6 +596,20 @@ Release is allowed only when all applicable items are checked:
 - Re-ran 52 Jest suites/285 tests, TypeScript, Expo lint, Expo Doctor 20/20, iOS Metro export, 16 Deno shared tests, and Deno checks successfully at `bc5be37`.
 - Applied and recorded the two pending production database migrations through Safari; all eight live verification assertions returned true.
 - Deployed the five affected Edge Functions through Safari and confirmed expected unauthenticated HTTP 401 rejection paths for each endpoint.
+- Completed a standard independent release security scan, validated seven low-to-medium release-boundary findings, and remediated all seven in `d7eaaa9`.
+- Applied and recorded `20260809203000_harden_release_boundaries.sql`; live verification confirmed the entitlement rate table/function privileges, analytics allowlist, and pinned retention URL.
+- Deployed the final remediated functions through the authenticated Safari session: `request-account-deletion` v3, `delete-cloud-data` v2, `verify-entitlement` v6, and `retention-cleanup` v5.
+- Re-ran 52 Jest suites/292 tests, TypeScript, Expo lint, Expo Doctor 20/20, iOS Metro export, and 18 Deno shared tests successfully at `d7eaaa9`.
+- Narrowed the authoritative entitlement snapshot in `6098729`, deployed `verify-entitlement` v7, and re-ran the clean frozen-SHA suite successfully.
+- Completed final standard security scan `e1072a3e-b313-49f5-ae54-15552658b915` with 0 findings.
+- Built EAS iOS production version 1.0.1 build 10 from exact commit `6098729`; build `0afc8da0-a9a4-4d28-9e6d-f9e5dac49b36` finished successfully.
+- Submitted build 10 to App Store Connect; submission `83b8c9bc-9af0-4a3a-bf4f-89da09165bae` finished and TestFlight processing completed.
+- Saved complete TestFlight test information and internal testing availability.
+- Saved App Store version 1.0.1 metadata, review instructions, manual-release selection, five iPhone screenshots, and corrected App Privacy disclosures.
+- Added accepted App Review screenshots for monthly, yearly, and lifetime products and verified all three remain Prepare for Submission.
+- Replaced the obsolete build association and saved version 1.0.1 with build 10 attached.
+- Removed the temporary build-10 paywall worktree and shut down the simulator; no diagnostic paywall code exists in `main`.
+- Intentionally did not press Add for Review or perform App Review, Shipathon, video, or Devpost submission actions.
 
 ### Update procedure for every future session
 
