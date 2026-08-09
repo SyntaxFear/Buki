@@ -1,43 +1,76 @@
+import * as LocalAuthentication from "expo-local-authentication";
 import { create } from "zustand";
 
-interface Challenge {
-  left: number;
-  right: number;
+interface AdultConfirmation {
   reason: string;
 }
 
 interface ParentalGateState {
-  challenge: Challenge | null;
+  confirmation: AdultConfirmation | null;
   resolve: ((confirmed: boolean) => void) | null;
+  busy: boolean;
+  error: string | null;
   request: (reason: string) => Promise<boolean>;
-  answer: (value: string) => boolean;
+  confirm: () => Promise<boolean>;
   cancel: () => void;
 }
 
+function authenticationError(error: string): string {
+  if (error === "not_available" || error === "not_enrolled" || error === "passcode_not_set") {
+    return "Set up Face ID, Touch ID, or a device passcode in Settings before using protected Buki actions.";
+  }
+  if (error === "lockout") {
+    return "Device authentication is temporarily locked. Unlock the device with its passcode, then try again.";
+  }
+  if (error === "user_cancel" || error === "system_cancel" || error === "app_cancel") {
+    return "Adult confirmation was canceled.";
+  }
+  return "Buki could not confirm the device owner. Please try again.";
+}
+
 export const useParentalGate = create<ParentalGateState>((set, get) => ({
-  challenge: null,
+  confirmation: null,
   resolve: null,
+  busy: false,
+  error: null,
 
   request: (reason) => {
     get().resolve?.(false);
-    const left = 4 + Math.floor(Math.random() * 6);
-    const right = 3 + Math.floor(Math.random() * 7);
     return new Promise<boolean>((resolve) => {
-      set({ challenge: { left, right, reason }, resolve });
+      set({ confirmation: { reason }, resolve, busy: false, error: null });
     });
   },
 
-  answer: (value) => {
-    const { challenge, resolve } = get();
-    if (!challenge || Number(value) !== challenge.left + challenge.right) return false;
-    set({ challenge: null, resolve: null });
-    resolve?.(true);
-    return true;
+  confirm: async () => {
+    const { confirmation, resolve, busy } = get();
+    if (!confirmation || busy) return false;
+    set({ busy: true, error: null });
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Confirm you’re an adult",
+        fallbackLabel: "Use Device Passcode",
+        cancelLabel: "Cancel",
+        disableDeviceFallback: false,
+      });
+      if (get().confirmation !== confirmation || get().resolve !== resolve) return false;
+      if (!result.success) {
+        set({ busy: false, error: authenticationError(result.error) });
+        return false;
+      }
+      set({ confirmation: null, resolve: null, busy: false, error: null });
+      resolve?.(true);
+      return true;
+    } catch {
+      if (get().confirmation !== confirmation || get().resolve !== resolve) return false;
+      set({ busy: false, error: "Buki could not start device-owner authentication." });
+      return false;
+    }
   },
 
   cancel: () => {
-    const resolve = get().resolve;
-    set({ challenge: null, resolve: null });
+    const { resolve, busy } = get();
+    if (busy) return;
+    set({ confirmation: null, resolve: null, busy: false, error: null });
     resolve?.(false);
   },
 }));

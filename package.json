@@ -27,6 +27,7 @@
     "expo-image-manipulator": "~57.0.8",
     "expo-image-picker": "~57.0.8",
     "expo-linking": "~57.0.5",
+    "expo-local-authentication": "~57.0.2",
     "expo-media-library": "~57.0.3",
     "expo-network": "~57.0.1",
     "expo-print": "~57.0.1",

@@ -1,67 +1,52 @@
-import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useParentalGate } from "@/store/parental-gate";
 import { colors } from "@/theme";
 
 export function ParentalGateHost() {
-  const challenge = useParentalGate((state) => state.challenge);
-  const answer = useParentalGate((state) => state.answer);
+  const confirmation = useParentalGate((state) => state.confirmation);
+  const confirm = useParentalGate((state) => state.confirm);
   const cancel = useParentalGate((state) => state.cancel);
-  const [value, setValue] = useState("");
-  const [incorrect, setIncorrect] = useState(false);
-
-  useEffect(() => {
-    setValue("");
-    setIncorrect(false);
-  }, [challenge]);
+  const busy = useParentalGate((state) => state.busy);
+  const error = useParentalGate((state) => state.error);
 
   return (
-    <Modal visible={Boolean(challenge)} transparent animationType="fade" onRequestClose={cancel}>
-      <KeyboardAvoidingView
-        behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
-        style={styles.backdrop}
-      >
+    <Modal visible={Boolean(confirmation)} transparent animationType="fade" onRequestClose={cancel}>
+      <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.eyebrow}>GROWN-UPS ONLY</Text>
-          <Text style={styles.title}>Quick parent check</Text>
-          <Text style={styles.copy}>{challenge?.reason}</Text>
-          <Text style={styles.question}>
-            What is {challenge?.left} + {challenge?.right}?
-          </Text>
-          <TextInput
-            value={value}
-            onChangeText={(next) => {
-              setValue(next);
-              setIncorrect(false);
-            }}
-            keyboardType="number-pad"
-            textContentType="oneTimeCode"
-            autoFocus
-            maxLength={3}
-            style={[styles.input, incorrect && styles.inputError]}
-            accessibilityLabel="Parent check answer"
-          />
-          {incorrect ? (
+          <Text style={styles.title}>Confirm with this device</Text>
+          <Text style={styles.copy}>{confirmation?.reason}</Text>
+          <View style={styles.deviceNotice}>
+            <Text style={styles.deviceNoticeTitle}>Face ID, Touch ID, or device passcode</Text>
+            <Text style={styles.deviceNoticeCopy}>
+              Buki asks iOS to confirm the device owner. Buki never receives or stores biometric data.
+            </Text>
+          </View>
+          {error ? (
             <Text accessibilityRole="alert" style={styles.error}>
-              That answer does not match. Please try again.
+              {error}
             </Text>
           ) : null}
           <View style={styles.actions}>
-            <Pressable onPress={cancel} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
+            <Pressable
+              disabled={busy}
+              onPress={cancel}
+              style={({ pressed }) => [styles.secondary, (pressed || busy) && styles.pressed]}
+            >
               <Text style={styles.secondaryLabel}>Cancel</Text>
             </Pressable>
             <Pressable
-              onPress={() => {
-                if (!answer(value)) setIncorrect(true);
-              }}
-              style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
+              accessibilityLabel="Verify adult with device authentication"
+              disabled={busy}
+              onPress={() => void confirm()}
+              style={({ pressed }) => [styles.primary, (pressed || busy) && styles.pressed]}
             >
-              <Text style={styles.primaryLabel}>Continue</Text>
+              {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryLabel}>Verify adult</Text>}
             </Pressable>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -87,20 +72,17 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 12, fontWeight: "900", letterSpacing: 1.1, color: colors.titleCoral },
   title: { fontSize: 24, fontWeight: "900", color: colors.ink },
   copy: { fontSize: 15, lineHeight: 21, color: colors.mutedText },
-  question: { fontSize: 20, fontWeight: "800", color: colors.ink, paddingTop: 4 },
-  input: {
-    minHeight: 54,
+  deviceNotice: {
     borderRadius: 15,
     borderCurve: "continuous",
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.page,
-    textAlign: "center",
-    fontSize: 22,
-    fontWeight: "800",
-    color: colors.ink,
+    padding: 14,
+    gap: 5,
   },
-  inputError: { borderColor: "#B23B3B" },
+  deviceNoticeTitle: { color: colors.ink, fontSize: 15, fontWeight: "800" },
+  deviceNoticeCopy: { color: colors.mutedText, fontSize: 13, lineHeight: 18 },
   error: { color: "#A93232", fontSize: 13, lineHeight: 18 },
   actions: { flexDirection: "row", gap: 10, paddingTop: 4 },
   secondary: {
@@ -123,5 +105,5 @@ const styles = StyleSheet.create({
   },
   secondaryLabel: { color: colors.ink, fontSize: 16, fontWeight: "800" },
   primaryLabel: { color: "#FFFFFF", fontSize: 16, fontWeight: "800" },
-  pressed: { opacity: 0.76, transform: [{ scale: 0.99 }] },
+  pressed: { opacity: 0.6, transform: [{ scale: 0.99 }] },
 });

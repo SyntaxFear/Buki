@@ -83,6 +83,12 @@
       "expo-secure-store",
       "expo-sharing",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Buki uses Face ID to confirm an adult before purchases, exports, and account changes."
+        }
+      ],
+      [
         "expo-media-library",
         {
           "photosPermission": "Buki accesses Photos only when an adult chooses artwork to import.",
