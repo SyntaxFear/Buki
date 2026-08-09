@@ -69,6 +69,16 @@ export interface LibraryWriteAccess {
   assertWriteAllowed?: () => void;
 }
 
+export type LibraryMediaChecksums = Record<
+  string,
+  { cutout: string; original?: string }
+>;
+
+export interface LibrarySaveOptions {
+  mediaChecksums?: LibraryMediaChecksums;
+  expectedOwnerId?: string;
+}
+
 interface ExistingLibraryIds {
   sketchpads: ReadonlySet<string>;
   artworks: ReadonlySet<string>;
@@ -246,9 +256,13 @@ export async function saveLibrary(
   db: SQLiteDatabase,
   data: StoreData,
   access: LibraryWriteAccess,
+  options: LibrarySaveOptions = {},
 ): Promise<void> {
   const now = Date.now();
   const ownerId = await activeLocalOwnerId(db);
+  if (options.expectedOwnerId !== undefined && ownerId !== options.expectedOwnerId) {
+    throw new Error("The active Buki account changed before the library write.");
+  }
   await db.withExclusiveTransactionAsync(async (tx) => {
     const existingPads = await tx.getAllAsync<{
       id: string;
@@ -412,7 +426,13 @@ export async function saveLibrary(
         );
 
         const tagIds = await replaceArtworkTags(tx, drawing, ownerId, now);
-        const mediaIds = await upsertMediaRows(tx, drawing, ownerId, now);
+        const mediaIds = await upsertMediaRows(
+          tx,
+          drawing,
+          ownerId,
+          now,
+          options.mediaChecksums?.[drawing.id],
+        );
         for (const mediaId of mediaIds) nextMediaIds.add(mediaId);
         if (ownerId) {
           await enqueueCurrentArtwork(tx, ownerId, drawing.id);
@@ -583,20 +603,40 @@ async function upsertMediaRows(
   drawing: Drawing,
   ownerId: string | null,
   now: number,
+  checksums?: { cutout: string; original?: string },
 ): Promise<string[]> {
   const rows = [
-    { id: `${drawing.id}:cutout`, kind: "cutout", uri: drawing.uri, mime: "image/png" },
-    { id: `${drawing.id}:preview`, kind: "preview", uri: drawing.uri, mime: "image/png" },
+    {
+      id: `${drawing.id}:cutout`,
+      kind: "cutout",
+      uri: drawing.uri,
+      mime: "image/png",
+      checksum: checksums?.cutout ?? null,
+    },
+    {
+      id: `${drawing.id}:preview`,
+      kind: "preview",
+      uri: drawing.uri,
+      mime: "image/png",
+      checksum: null,
+    },
     ...(drawing.photoUri
-      ? [{ id: `${drawing.id}:original`, kind: "original", uri: drawing.photoUri, mime: "image/jpeg" }]
+      ? [{
+          id: `${drawing.id}:original`,
+          kind: "original",
+          uri: drawing.photoUri,
+          mime: "image/jpeg",
+          checksum: checksums?.original ?? null,
+        }]
       : []),
   ];
 
   for (const row of rows) {
     await db.runAsync(
       `INSERT INTO media_files (
-        id, owner_id, artwork_id, kind, local_uri, byte_size, mime_type, upload_state, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'local', ?, ?)
+        id, owner_id, artwork_id, kind, local_uri, checksum, byte_size, mime_type,
+        upload_state, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local', ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         local_uri = excluded.local_uri,
         remote_path = CASE
@@ -604,8 +644,8 @@ async function upsertMediaRows(
           ELSE media_files.remote_path
         END,
         checksum = CASE
-          WHEN media_files.local_uri IS NOT excluded.local_uri THEN NULL
-          ELSE media_files.checksum
+          WHEN media_files.local_uri IS NOT excluded.local_uri THEN excluded.checksum
+          ELSE COALESCE(excluded.checksum, media_files.checksum)
         END,
         byte_size = CASE
           WHEN media_files.local_uri IS NOT excluded.local_uri THEN excluded.byte_size
@@ -625,6 +665,7 @@ async function upsertMediaRows(
       drawing.id,
       row.kind,
       row.uri,
+      row.checksum,
       fileSize(row.uri),
       row.mime,
       drawing.addedAt,

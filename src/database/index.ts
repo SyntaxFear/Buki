@@ -7,7 +7,6 @@ import { loadLibrary, saveLibrary } from "./library-repository";
 import { migrateDatabaseSchema } from "./schema";
 import {
   activateLocalAccount,
-  activeLocalOwnerId,
   clearActiveLocalAccount,
   getLocalAdultProfile,
   updateLocalAdultProfile,
@@ -50,7 +49,6 @@ import {
   markLocalSyncCompleted,
   setLocalAutomaticBackup,
 } from "./sync-repository";
-import { enqueueFullAccountSnapshot } from "./sync-serialization";
 import {
   loadLocalMediaFile,
   markLocalMediaFailed,
@@ -204,8 +202,6 @@ export async function importBukiLibraryArchive(
   access.assertWriteAllowed();
   const db = requireBukiDatabase();
   const result = await mergeImportedArchive(db, imported, access);
-  const ownerId = await activeLocalOwnerId(db);
-  if (ownerId) await enqueueFullAccountSnapshot(db, ownerId);
   notifySyncQueueChanged();
   return result;
 }

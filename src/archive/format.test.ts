@@ -2,6 +2,7 @@ import {
   BUKI_ARCHIVE_FORMAT,
   BUKI_ARCHIVE_VERSION,
   archiveMedia,
+  isSafeArchiveEntryPath,
   parseBukiArchiveManifest,
   type BukiArchiveManifest,
 } from "./format";
@@ -64,6 +65,17 @@ describe("Buki archive format", () => {
     expect(() => parseBukiArchiveManifest({ ...manifest, version: 2 })).toThrow("Invalid Buki archive manifest");
   });
 
+  it("rejects invalid archive dates and unsafe numeric timestamps", () => {
+    expect(() => parseBukiArchiveManifest({
+      ...manifest,
+      exportedAt: "not-a-date",
+    })).toThrow("Invalid Buki archive manifest");
+    expect(() => parseBukiArchiveManifest({
+      ...manifest,
+      children: [{ ...manifest.children[0], createdAt: 1.5 }],
+    })).toThrow("Invalid Buki archive manifest");
+  });
+
   it("rejects path traversal and malformed checksums", () => {
     const artwork = manifest.artworks[0];
     expect(() => parseBukiArchiveManifest({
@@ -102,5 +114,14 @@ describe("Buki archive format", () => {
         },
       }],
     })).toThrow("inconsistent original-photo metadata");
+  });
+
+  it("accepts only the documented archive entry paths", () => {
+    expect(isSafeArchiveEntryPath("manifest.json")).toBe(true);
+    expect(isSafeArchiveEntryPath("README.txt")).toBe(true);
+    expect(isSafeArchiveEntryPath("media/artwork-000001/cutout.png")).toBe(true);
+    expect(isSafeArchiveEntryPath("media/artwork-000001/../../private.txt")).toBe(false);
+    expect(isSafeArchiveEntryPath("media\\artwork-000001\\cutout.png")).toBe(false);
+    expect(isSafeArchiveEntryPath("media/artwork-000001/cutout.png/extra")).toBe(false);
   });
 });

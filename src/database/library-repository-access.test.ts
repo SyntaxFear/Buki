@@ -394,4 +394,38 @@ describe("library repository capability boundary", () => {
 
     expect(tx.runAsync).toHaveBeenCalled();
   });
+
+  it("rejects an archive write if the active account changed before persistence", async () => {
+    const { db } = database();
+    activeLocalOwnerIdMock.mockResolvedValue("adult-b");
+
+    await expect(
+      saveLibrary(
+        db as never,
+        library(1),
+        { getCapabilities: () => resolveCapabilities("pro") },
+        { expectedOwnerId: "adult-a" },
+      ),
+    ).rejects.toThrow("active Buki account changed");
+
+    expect(db.withExclusiveTransactionAsync).not.toHaveBeenCalled();
+  });
+
+  it("stores verified import checksums in the atomic library write", async () => {
+    const { db, tx } = database();
+    const checksum = "a".repeat(64);
+
+    await saveLibrary(
+      db as never,
+      library(1),
+      { getCapabilities: () => resolveCapabilities("pro") },
+      { mediaChecksums: { "art-0": { cutout: checksum } } },
+    );
+
+    const mediaInsert = tx.runAsync.mock.calls.find(([sql]) =>
+      String(sql).includes("INSERT INTO media_files"),
+    );
+    expect(mediaInsert).toBeDefined();
+    expect(mediaInsert).toContain(checksum);
+  });
 });

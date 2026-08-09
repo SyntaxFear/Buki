@@ -13,14 +13,23 @@ export const BUKI_ARCHIVE_FORMAT = "buki-library-archive";
 export const BUKI_ARCHIVE_VERSION = 1;
 export const BUKI_ARCHIVE_MANIFEST_PATH = "manifest.json";
 
-const idSchema = z.string().min(1).max(200);
-const timestampSchema = z.number().finite().nonnegative();
+const idSchema = z.string().min(1).max(200).refine(
+  (value) => value === value.trim(),
+  "IDs cannot start or end with whitespace",
+);
+const timestampSchema = z.number().int().nonnegative().max(8_640_000_000_000_000);
+const exportedAtSchema = z.string().min(20).max(100).refine(
+  (value) =>
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+    && Number.isFinite(Date.parse(value)),
+  "Invalid archive export timestamp",
+);
 const mediaPathSchema = z.string().regex(/^media\/[a-z0-9-]+\/(cutout|original)\.(png|jpg|jpeg|heic|webp)$/);
 
 const mediaSchema = z.strictObject({
   path: mediaPathSchema,
   checksum: z.string().regex(/^[a-f0-9]{64}$/),
-  byteSize: z.number().int().positive(),
+  byteSize: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   mimeType: z.enum(["image/png", "image/jpeg", "image/heic", "image/webp"]),
 });
 
@@ -73,8 +82,8 @@ const artworkSchema = z.strictObject({
 const manifestSchema = z.strictObject({
   format: z.literal(BUKI_ARCHIVE_FORMAT),
   version: z.literal(BUKI_ARCHIVE_VERSION),
-  exportedAt: z.string().min(1).max(100),
-  appVersion: z.string().min(1).max(50),
+  exportedAt: exportedAtSchema,
+  appVersion: z.string().trim().min(1).max(50),
   children: z.array(childSchema).max(1_000),
   sketchpads: z.array(sketchpadSchema).max(100_000),
   artworks: z.array(artworkSchema).max(1_000_000),
