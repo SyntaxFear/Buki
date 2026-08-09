@@ -17,12 +17,19 @@ import {
   persistRevenueCatVerification,
   verifyRevenueCatPro,
 } from "../_shared/revenuecat.ts";
+import { removableStaleUploadPaths } from "../_shared/stale-upload.ts";
 
 type DueRetention = { claimed_owner_id: string };
 type DueEntitlementRefresh = { claimed_owner_id: string };
 type DueStorageSweep = {
   claimed_owner_id: string;
   claimed_final_sweep_after: string;
+};
+type StaleUploadReservation = {
+  claimed_reservation_id: string;
+  claimed_owner_id: string;
+  claimed_storage_path: string;
+  claimed_final_storage_path: string;
 };
 
 async function processEntitlementRefreshes(admin: SupabaseClient): Promise<{
@@ -119,6 +126,90 @@ async function processStorageSweeps(admin: SupabaseClient): Promise<{
   return { claimed: sweeps.length, removedObjects, completed, failed };
 }
 
+async function processStaleUploadReservations(admin: SupabaseClient): Promise<{
+  claimed: number;
+  released: number;
+  removedPaths: number;
+  failed: number;
+}> {
+  const claimed = await admin.rpc("claim_stale_media_upload_reservations", {
+    batch_limit: 50,
+  });
+  if (claimed.error) throw new Error("stale_upload_claim_failed");
+  const reservations = (claimed.data ?? []) as StaleUploadReservation[];
+  let released = 0;
+  let removedPaths = 0;
+  let failed = 0;
+
+  for (const reservation of reservations) {
+    try {
+      const paths = [
+        ...new Set([
+          reservation.claimed_storage_path,
+          reservation.claimed_final_storage_path,
+        ]),
+      ];
+
+      const referencedResult = await admin
+        .from("media_files")
+        .select("storage_path")
+        .eq("owner_id", reservation.claimed_owner_id)
+        .eq("upload_state", "uploaded")
+        .is("deleted_at", null)
+        .in("storage_path", paths);
+      if (referencedResult.error) {
+        throw new Error("stale_upload_reference_lookup_failed");
+      }
+      const referencedPaths = new Set(
+        ((referencedResult.data ?? []) as { storage_path: string }[])
+          .map((row) => row.storage_path),
+      );
+      const removablePaths = removableStaleUploadPaths({
+        ownerId: reservation.claimed_owner_id,
+        uploadPath: reservation.claimed_storage_path,
+        finalPath: reservation.claimed_final_storage_path,
+        referencedPaths,
+      });
+      if (removablePaths.length > 0) {
+        const removed = await admin.storage.from("buki-media").remove(
+          removablePaths,
+        );
+        if (removed.error) throw new Error("stale_upload_object_delete_failed");
+        removedPaths += removablePaths.length;
+      }
+
+      const finalized = await admin.rpc(
+        "finalize_stale_media_upload_reservation",
+        {
+          target_owner: reservation.claimed_owner_id,
+          target_reservation_id: reservation.claimed_reservation_id,
+          cleanup_error: null,
+        },
+      );
+      if (finalized.error) throw new Error("stale_upload_finalize_failed");
+      released += 1;
+    } catch (error) {
+      failed += 1;
+      const failure = error instanceof Error ? error.message : "unknown_error";
+      const recorded = await admin.rpc(
+        "finalize_stale_media_upload_reservation",
+        {
+          target_owner: reservation.claimed_owner_id,
+          target_reservation_id: reservation.claimed_reservation_id,
+          cleanup_error: failure,
+        },
+      );
+      if (recorded.error) {
+        console.error("stale upload cleanup failure could not be recorded", {
+          code: recorded.error.code,
+        });
+      }
+    }
+  }
+
+  return { claimed: reservations.length, released, removedPaths, failed };
+}
+
 async function validCronSecret(
   request: Request,
   admin: SupabaseClient,
@@ -146,6 +237,7 @@ Deno.serve(async (request) => {
     }
     const entitlementRefresh = await processEntitlementRefreshes(admin);
     const storageSweeps = await processStorageSweeps(admin);
+    const staleUploads = await processStaleUploadReservations(admin);
     const claimed = await admin.rpc("claim_due_cloud_retention", {
       batch_limit: 25,
     });
@@ -202,6 +294,7 @@ Deno.serve(async (request) => {
 
     return json(200, {
       entitlementRefresh,
+      staleUploads,
       retention: { claimed: owners.length, deleted, renewed, failed },
       storageSweeps,
     });

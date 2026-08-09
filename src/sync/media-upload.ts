@@ -101,6 +101,12 @@ async function invokeEdge(
     if (code === "account_session_changed") {
       throw new CloudMediaError("The Buki account changed while cloud backup was running.", code);
     }
+    if (code === "upload_cleanup_pending") {
+      throw new CloudMediaError("A previous cloud upload is still being cleaned up. Buki will retry.", code);
+    }
+    if (code === "upload_reservation_conflict") {
+      throw new CloudMediaError("This artwork changed while its cloud upload was being prepared.", code);
+    }
     throw new CloudMediaError("Buki could not finish the cloud media request.", code ?? "edge_request_failed");
   }
   const response = record(data);

@@ -69,6 +69,12 @@ Deno.serve(async (request) => {
     });
     if (error) {
       if (error.message.includes("cloud_access_required")) throw new HttpError(403, "cloud_access_required");
+      if (error.message.includes("upload_cleanup_pending")) {
+        throw new HttpError(409, "upload_cleanup_pending");
+      }
+      if (error.message.includes("upload_reservation_conflict")) {
+        throw new HttpError(409, "upload_reservation_conflict");
+      }
       console.error("reserve_media_upload failed", { code: error.code });
       throw new Error("reservation_failed");
     }

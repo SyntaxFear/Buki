@@ -18,6 +18,7 @@ type ReservationRow = {
   mime_type: string;
   status: string;
   expires_at: string;
+  final_storage_path?: string | null;
 };
 
 type CompletionRow = {
@@ -46,7 +47,7 @@ Deno.serve(async (request) => {
 
     const reservationResult = await admin
       .from("media_upload_reservations")
-      .select("id,owner_id,checksum,requested_bytes,storage_path,mime_type,status,expires_at")
+      .select("*")
       .eq("id", reservationId)
       .eq("owner_id", user.id)
       .maybeSingle();
@@ -54,6 +55,16 @@ Deno.serve(async (request) => {
     const reservation = reservationResult.data as ReservationRow | null;
     if (!reservation || reservation.status !== "reserved") {
       throw new HttpError(409, "upload_reservation_inactive");
+    }
+    if (Date.parse(reservation.expires_at) <= Date.now()) {
+      throw new HttpError(409, "upload_reservation_expired");
+    }
+    const finalStoragePath = reservation.final_storage_path ?? reservation.storage_path;
+    if (
+      !reservation.storage_path.startsWith(`${user.id}/`)
+      || !finalStoragePath.startsWith(`${user.id}/`)
+    ) {
+      throw new HttpError(409, "upload_reservation_path_invalid");
     }
 
     const bucket = admin.storage.from("buki-media");
@@ -81,13 +92,21 @@ Deno.serve(async (request) => {
       throw new HttpError(422, "uploaded_checksum_mismatch");
     }
 
+    if (reservation.storage_path !== finalStoragePath) {
+      const moved = await bucket.move(
+        reservation.storage_path,
+        finalStoragePath,
+      );
+      if (moved.error) throw new Error("uploaded_object_finalize_failed");
+    }
+
     const completed = await admin.rpc("complete_media_upload", {
       target_owner: user.id,
       target_reservation_id: reservation.id,
       actual_bytes: reservation.requested_bytes,
     });
     if (completed.error) {
-      await bucket.remove([reservation.storage_path]);
+      await bucket.remove([finalStoragePath]);
       await admin.rpc("release_media_upload_reservation", {
         target_owner: user.id,
         target_reservation_id: reservation.id,
@@ -97,8 +116,8 @@ Deno.serve(async (request) => {
     }
     const result = (completed.data as CompletionRow[] | null)?.[0];
     if (!result) throw new Error("upload_commit_missing");
-    if (result.deduplicated && result.storage_path !== reservation.storage_path) {
-      await bucket.remove([reservation.storage_path]);
+    if (result.deduplicated && result.storage_path !== finalStoragePath) {
+      await bucket.remove([finalStoragePath]);
     }
 
     return json(200, {
