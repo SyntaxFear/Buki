@@ -175,7 +175,7 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
               <Pressable
                 key={item}
                 onPress={() => setFormat(item)}
-                accessibilityRole="radio"
+                accessibilityRole="button"
                 accessibilityLabel={`${FORMAT_LABELS[item].title}, ${FORMAT_LABELS[item].detail}`}
                 accessibilityHint="Selects this artwork export format"
                 accessibilityState={{ selected: format === item }}
