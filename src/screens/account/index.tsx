@@ -797,7 +797,7 @@ function Metric({ value, label }: { value: string; label: string }) {
 
 function ActionButton({ title, onPress, prominent, destructive, busy, disabled }: { title: string; onPress: () => void; prominent?: boolean; destructive?: boolean; busy?: boolean; disabled?: boolean }) {
   return (
-    <Pressable disabled={busy || disabled} onPress={onPress} style={({ pressed }) => [styles.actionButton, prominent && styles.actionProminent, destructive && styles.actionDestructive, disabled && styles.disabled, pressed && styles.pressed]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy || disabled), busy: Boolean(busy) }} disabled={busy || disabled} onPress={onPress} style={({ pressed }) => [styles.actionButton, prominent && styles.actionProminent, destructive && styles.actionDestructive, disabled && styles.disabled, pressed && styles.pressed]}>
       {busy ? <ActivityIndicator color={destructive ? "#B43C3C" : prominent ? "#FFFFFF" : colors.titleTeal} /> : <Text style={[styles.actionLabel, prominent && styles.actionProminentLabel, destructive && styles.dangerText]}>{title}</Text>}
     </Pressable>
   );
@@ -808,7 +808,7 @@ function MiniAction({ label, accessibilityLabel, onPress, disabled, destructive 
 }
 
 function DangerButton({ title, onPress, busy }: { title: string; onPress: () => void; busy?: boolean }) {
-  return <Pressable disabled={busy} onPress={onPress} style={({ pressed }) => [styles.dangerButton, busy && styles.disabled, pressed && styles.rowPressed]}><Text style={styles.dangerText}>{title}</Text>{busy ? <ActivityIndicator color="#B43C3C" /> : <Text style={styles.dangerChevron}>›</Text>}</Pressable>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy), busy: Boolean(busy) }} disabled={busy} onPress={onPress} style={({ pressed }) => [styles.dangerButton, busy && styles.disabled, pressed && styles.rowPressed]}><Text style={styles.dangerText}>{title}</Text>{busy ? <ActivityIndicator color="#B43C3C" /> : <Text style={styles.dangerChevron}>›</Text>}</Pressable>;
 }
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
