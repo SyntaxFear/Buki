@@ -147,7 +147,7 @@ export function Scan() {
     const asset = picked.assets?.[0];
     if (
       asset
-      && ((asset.fileSize ?? 0) > MAX_SAFE_IMAGE_BYTES
+      && ((asset.fileSize !== undefined && asset.fileSize > MAX_SAFE_IMAGE_BYTES)
         || asset.width > MAX_SAFE_IMAGE_EDGE
         || asset.height > MAX_SAFE_IMAGE_EDGE
         || asset.width * asset.height > MAX_SAFE_IMAGE_PIXELS)

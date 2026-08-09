@@ -318,6 +318,30 @@ describe("authentication state boundaries", () => {
     expect(useAuth.getState()).toMatchObject({ status: "signedIn", user: adultB.user });
   });
 
+  it("does not activate a different account when purchase identity teardown fails", async () => {
+    const adultA = session("adult-a", "token-a");
+    const adultB = session("adult-b", "token-b");
+    mockGetSession.mockResolvedValue({ data: { session: adultA }, error: null });
+    await useAuth.getState().initialize();
+    const listener = mockAuthListener.mock.calls[0][0] as (
+      event: string,
+      next: Session | null,
+    ) => void;
+    mockDatabase.activateBukiAccount.mockClear();
+    mockMembershipState.disconnectUser.mockRejectedValueOnce(new Error("logout failed"));
+
+    listener("SIGNED_IN", adultB);
+    await flushAuthApplications();
+
+    expect(mockDatabase.activateBukiAccount).not.toHaveBeenCalled();
+    expect(mockMembershipState.initializeForUser).not.toHaveBeenCalledWith("adult-b");
+    expect(useAuth.getState()).toMatchObject({
+      status: "signedOut",
+      session: null,
+      user: null,
+    });
+  });
+
   it("requires Apple to return the request state before accepting its token", async () => {
     mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
     mockRandomUUID.mockReturnValueOnce("raw-nonce").mockReturnValueOnce("request-state");

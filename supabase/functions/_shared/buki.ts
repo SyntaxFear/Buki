@@ -22,6 +22,25 @@ export function requiredSecret(name: string): string {
   return value;
 }
 
+export const DESTRUCTIVE_ACTION_MAX_AUTH_AGE_MS = 10 * 60 * 1000;
+
+export function assertRecentAuthentication(
+  user: Pick<User, "last_sign_in_at">,
+  now = Date.now(),
+  maxAgeMs = DESTRUCTIVE_ACTION_MAX_AUTH_AGE_MS,
+): void {
+  const signedInAt = user.last_sign_in_at
+    ? Date.parse(user.last_sign_in_at)
+    : Number.NaN;
+  if (
+    !Number.isFinite(signedInAt) ||
+    signedInAt > now + 60_000 ||
+    now - signedInAt > maxAgeMs
+  ) {
+    throw new HttpError(403, "recent_authentication_required");
+  }
+}
+
 export async function authenticatedClients(request: Request): Promise<{
   user: User;
   admin: SupabaseClient;

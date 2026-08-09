@@ -1,6 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-import { authenticatedClients, handleError, json } from "../_shared/buki.ts";
+import {
+  assertRecentAuthentication,
+  authenticatedClients,
+  handleError,
+  json,
+} from "../_shared/buki.ts";
 import {
   purgeOwnerCloudContent,
   queueOwnerStorageSweep,
@@ -13,6 +18,7 @@ Deno.serve(async (request) => {
   }
   try {
     const { user, admin } = await authenticatedClients(request);
+    assertRecentAuthentication(user);
     const held = await admin
       .from("cloud_retention")
       .update({

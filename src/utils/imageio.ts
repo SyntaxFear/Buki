@@ -10,6 +10,10 @@ import { Directory, File, Paths } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
 import { extractDrawing, type Box } from "@/utils/cutout";
+import {
+  inspectSafeImage,
+  MAX_SAFE_IMAGE_BYTES,
+} from "@/utils/image-safety";
 
 const MAX_DECODE_EDGE = 1000;
 const SAVED_PHOTO_EDGE = 2048;
@@ -105,22 +109,14 @@ async function sanitizedImage(
   format: SaveFormat,
   compress: number,
 ): Promise<File> {
-  const inspection = ImageManipulator.manipulate(sourceUri);
-  let inspected: Awaited<ReturnType<typeof inspection.renderAsync>> | null = null;
+  const source = new File(sourceUri);
+  if (!source.exists || source.size <= 0 || source.size > MAX_SAFE_IMAGE_BYTES) {
+    throw new Error("The image file is too large.");
+  }
+  const metadata = inspectSafeImage(source.bytesSync());
   let resize: { width?: number; height?: number } | null = null;
-  try {
-    inspected = await inspection.renderAsync();
-    const width = inspected.width;
-    const height = inspected.height;
-    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-      throw new Error("Could not read image dimensions");
-    }
-    if (Math.max(width, height) > maxEdge) {
-      resize = width >= height ? { width: maxEdge } : { height: maxEdge };
-    }
-  } finally {
-    inspected?.release();
-    inspection.release();
+  if (Math.max(metadata.width, metadata.height) > maxEdge) {
+    resize = metadata.width >= metadata.height ? { width: maxEdge } : { height: maxEdge };
   }
 
   const output = ImageManipulator.manipulate(sourceUri);

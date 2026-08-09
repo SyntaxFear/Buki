@@ -14,7 +14,14 @@ type CustomerInfoHandler = (ownerId: string, customerInfo: CustomerInfo) => void
 
 let activeOwnerId: string | null = null;
 let installedListener: CustomerInfoUpdateListener | null = null;
+let revenueCatOperation: Promise<void> = Promise.resolve();
 const REVENUECAT_LOGOUT_ATTEMPTS = 3;
+
+function withRevenueCatLock<T>(operation: () => Promise<T>): Promise<T> {
+  const result = revenueCatOperation.then(operation, operation);
+  revenueCatOperation = result.then(() => undefined, () => undefined);
+  return result;
+}
 
 function isAnonymousRevenueCatId(appUserId: string): boolean {
   return appUserId.startsWith("$RCAnonymousID:");
@@ -74,25 +81,40 @@ export async function connectRevenueCatUser(
   ownerId: string,
   handler: CustomerInfoHandler,
 ): Promise<CustomerInfo | null> {
-  const customerInfo = await ensureConfigured(ownerId);
-  if (Platform.OS === "ios") {
-    const appUserId = await Purchases.getAppUserID();
-    if (appUserId !== ownerId) {
-      throw new Error("Buki could not verify the Apple purchase account.");
+  return withRevenueCatLock(async () => {
+    activeOwnerId = null;
+    if (installedListener) {
+      Purchases.removeCustomerInfoUpdateListener(installedListener);
+      installedListener = null;
     }
-  }
-  activeOwnerId = ownerId;
-  if (Platform.OS === "ios") {
-    if (installedListener) Purchases.removeCustomerInfoUpdateListener(installedListener);
-    installedListener = (updatedCustomerInfo) => handler(ownerId, updatedCustomerInfo);
-    Purchases.addCustomerInfoUpdateListener(installedListener);
-  }
-  return customerInfo;
+    const customerInfo = await ensureConfigured(ownerId);
+    if (Platform.OS === "ios") {
+      const appUserId = await Purchases.getAppUserID();
+      if (appUserId !== ownerId) {
+        throw new Error("Buki could not verify the Apple purchase account.");
+      }
+    }
+    activeOwnerId = ownerId;
+    if (Platform.OS === "ios") {
+      installedListener = (updatedCustomerInfo) => {
+        if (activeOwnerId === ownerId) handler(ownerId, updatedCustomerInfo);
+      };
+      Purchases.addCustomerInfoUpdateListener(installedListener);
+    }
+    return customerInfo;
+  });
 }
 
-export async function refreshRevenueCatCustomerInfo(): Promise<CustomerInfo | null> {
-  if (Platform.OS !== "ios" || !activeOwnerId) return null;
-  return Purchases.getCustomerInfo();
+export async function refreshRevenueCatCustomerInfo(
+  expectedOwnerId: string,
+): Promise<CustomerInfo | null> {
+  return withRevenueCatLock(async () => {
+    if (Platform.OS !== "ios") return null;
+    await requireRevenueCatUser(expectedOwnerId);
+    const customerInfo = await Purchases.getCustomerInfo();
+    await requireRevenueCatUser(expectedOwnerId);
+    return customerInfo;
+  });
 }
 
 export async function loadRevenueCatOffering(): Promise<PurchasesOffering> {
@@ -120,17 +142,21 @@ export async function purchaseRevenueCatPackage(
   aPackage: PurchasesPackage,
   expectedOwnerId: string,
 ): Promise<MakePurchaseResult> {
-  await requireRevenueCatUser(expectedOwnerId);
-  const result = await Purchases.purchasePackage(aPackage);
-  await requireRevenueCatUser(expectedOwnerId);
-  return result;
+  return withRevenueCatLock(async () => {
+    await requireRevenueCatUser(expectedOwnerId);
+    const result = await Purchases.purchasePackage(aPackage);
+    await requireRevenueCatUser(expectedOwnerId);
+    return result;
+  });
 }
 
 export async function restoreRevenueCatPurchases(expectedOwnerId: string): Promise<CustomerInfo> {
-  await requireRevenueCatUser(expectedOwnerId);
-  const customerInfo = await Purchases.restorePurchases();
-  await requireRevenueCatUser(expectedOwnerId);
-  return customerInfo;
+  return withRevenueCatLock(async () => {
+    await requireRevenueCatUser(expectedOwnerId);
+    const customerInfo = await Purchases.restorePurchases();
+    await requireRevenueCatUser(expectedOwnerId);
+    return customerInfo;
+  });
 }
 
 export function isRevenueCatPurchaseCancelled(error: unknown): boolean {
@@ -143,12 +169,14 @@ export function isRevenueCatPurchaseCancelled(error: unknown): boolean {
 }
 
 export async function disconnectRevenueCatUser(): Promise<void> {
-  activeOwnerId = null;
-  if (installedListener) {
-    Purchases.removeCustomerInfoUpdateListener(installedListener);
-    installedListener = null;
-  }
-  if (Platform.OS !== "ios" || !(await Purchases.isConfigured())) return;
-  const currentAppUserId = await Purchases.getAppUserID();
-  if (!isAnonymousRevenueCatId(currentAppUserId)) await logOutRevenueCatUser();
+  return withRevenueCatLock(async () => {
+    activeOwnerId = null;
+    if (installedListener) {
+      Purchases.removeCustomerInfoUpdateListener(installedListener);
+      installedListener = null;
+    }
+    if (Platform.OS !== "ios" || !(await Purchases.isConfigured())) return;
+    const currentAppUserId = await Purchases.getAppUserID();
+    if (!isAnonymousRevenueCatId(currentAppUserId)) await logOutRevenueCatUser();
+  });
 }

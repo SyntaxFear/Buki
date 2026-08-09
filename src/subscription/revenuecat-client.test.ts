@@ -80,7 +80,9 @@ describe("RevenueCat account identity cleanup", () => {
 
     await expect(connectRevenueCatUser("adult-b", jest.fn())).rejects.toThrow("logout failed");
     expect(mockPurchases.logIn).not.toHaveBeenCalled();
-    await expect(refreshRevenueCatCustomerInfo()).resolves.toBeNull();
+    await expect(refreshRevenueCatCustomerInfo("adult-b")).rejects.toThrow(
+      "still connecting",
+    );
     expect(mockPurchases.getCustomerInfo).not.toHaveBeenCalled();
   });
 
@@ -115,5 +117,37 @@ describe("RevenueCat account identity cleanup", () => {
 
     await expect(restoreRevenueCatPurchases("adult-a")).rejects.toThrow("could not verify");
     expect(mockPurchases.restorePurchases).not.toHaveBeenCalled();
+  });
+
+  it("serializes purchase and disconnect before changing SDK identity", async () => {
+    mockPurchases.getCustomerInfo.mockResolvedValue({});
+    mockPurchases.logOut.mockResolvedValue({});
+    await connectRevenueCatUser("adult-a", jest.fn());
+    let finishPurchase: (value: { customerInfo: object }) => void = () => {};
+    mockPurchases.purchasePackage.mockReturnValue(new Promise((resolve) => {
+      finishPurchase = resolve;
+    }));
+
+    const purchase = purchaseRevenueCatPackage({} as never, "adult-a");
+    await Promise.resolve();
+    const disconnect = disconnectRevenueCatUser();
+    expect(mockPurchases.logOut).not.toHaveBeenCalled();
+
+    finishPurchase({ customerInfo: {} });
+    await expect(purchase).resolves.toEqual({ customerInfo: {} });
+    await expect(disconnect).resolves.toBeUndefined();
+    expect(mockPurchases.logOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("pins refresh results to the expected owner", async () => {
+    mockPurchases.getCustomerInfo.mockResolvedValue({});
+    await connectRevenueCatUser("adult-a", jest.fn());
+    mockPurchases.getAppUserID
+      .mockResolvedValueOnce("adult-a")
+      .mockResolvedValueOnce("adult-b");
+
+    await expect(refreshRevenueCatCustomerInfo("adult-a")).rejects.toThrow(
+      "could not verify",
+    );
   });
 });

@@ -246,7 +246,7 @@ export const useMembership = create<MembershipState>((set, get) => ({
     if (!ownerId) return;
     set({ loading: true, error: null });
     try {
-      const customerInfo = await refreshRevenueCatCustomerInfo();
+      const customerInfo = await refreshRevenueCatCustomerInfo(ownerId);
       if (customerInfo) await applyCustomerInfo(ownerId, customerInfo);
       else set({ loading: false });
     } catch (error) {

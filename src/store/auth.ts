@@ -152,7 +152,20 @@ async function applySessionNow(session: Session | null): Promise<void> {
   const previousUserId = useAuth.getState().user?.id ?? lastAppliedUserId ?? null;
   if (previousUserId && previousUserId !== session.user.id) {
     await flushLibraryWrites();
-    await resetAccountState(false);
+    const cleanupError = await resetAccountState(false);
+    if (cleanupError) {
+      useAuth.setState({
+        hydrated: true,
+        status: "signedOut",
+        session: null,
+        user: null,
+        profile: null,
+        otpEmail: null,
+      });
+      throw new Error(
+        "Buki could not fully disconnect the previous account or purchase identity. Close and reopen Buki before signing in to another account.",
+      );
+    }
   }
   await activateBukiAccount(session.user);
   const profile = await loadAdultProfile(session.user.id);

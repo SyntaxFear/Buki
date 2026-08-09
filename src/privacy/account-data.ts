@@ -22,9 +22,12 @@ async function invokePrivacyFunction(name: string): Promise<void> {
   const { data, error } = await getSupabaseClient().functions.invoke(name, { body: {} });
   if (error) {
     const code = await edgeErrorCode(error);
-    throw new Error(code === "invalid_session"
-      ? "Please sign in again before changing account data."
-      : "Buki could not complete this privacy request. Please try again.");
+    if (code === "invalid_session" || code === "recent_authentication_required") {
+      throw new Error(
+        "For your security, sign out and sign back in before changing account data.",
+      );
+    }
+    throw new Error("Buki could not complete this privacy request. Please try again.");
   }
   if (object(data)?.deleted !== true) {
     throw new Error("Buki received an invalid privacy response.");

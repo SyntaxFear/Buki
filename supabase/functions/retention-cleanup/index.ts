@@ -249,6 +249,13 @@ Deno.serve(async (request) => {
       .delete({ count: "exact" })
       .lt("updated_at", new Date(Date.now() - (2 * 24 * 60 * 60 * 1000)).toISOString());
     if (analyticsRateLimitCleanup.error) throw new Error("analytics_rate_limit_cleanup_failed");
+    const entitlementRateLimitCleanup = await admin
+      .from("entitlement_verification_rate_limits")
+      .delete({ count: "exact" })
+      .lt("updated_at", new Date(Date.now() - (2 * 24 * 60 * 60 * 1000)).toISOString());
+    if (entitlementRateLimitCleanup.error) {
+      throw new Error("entitlement_rate_limit_cleanup_failed");
+    }
     const claimed = await admin.rpc("claim_due_cloud_retention", {
       batch_limit: 25,
     });

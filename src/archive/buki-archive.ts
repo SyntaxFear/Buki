@@ -1,6 +1,7 @@
 import * as Application from "expo-application";
 import { randomUUID } from "expo-crypto";
 import { Directory, File, FileMode, Paths } from "expo-file-system";
+import { ImageManipulator } from "expo-image-manipulator";
 import {
   Unzip,
   UnzipInflate,
@@ -73,6 +74,23 @@ async function sha256File(file: File): Promise<string> {
   const bytes = await file.bytes();
   const digest = await sha256Digest(bytes);
   return bytesToHex(new Uint8Array(digest));
+}
+
+async function assertImageDecodes(file: File): Promise<void> {
+  const context = ImageManipulator.manipulate(file.uri);
+  let rendered: Awaited<ReturnType<typeof context.renderAsync>> | null = null;
+  try {
+    context.resize({ width: 1 });
+    rendered = await context.renderAsync();
+    if (rendered.width !== 1 || rendered.height <= 0) {
+      throw new Error("The image decoder returned invalid dimensions.");
+    }
+  } catch {
+    throw new Error("The archive contains an image that cannot be decoded safely.");
+  } finally {
+    rendered?.release();
+    context.release();
+  }
 }
 
 function photoFormat(uri: string): { extension: string; mimeType: BukiArchiveMedia["mimeType"] } {
@@ -443,6 +461,7 @@ async function readAndVerifyManifest(extracted: ExtractedArchive): Promise<BukiA
       throw new Error(`The checksum check failed for ${media.path}.`);
     }
     assertSafeImageClaim(await file.bytes(), media.mimeType);
+    await assertImageDecodes(file);
   }
   return manifest;
 }

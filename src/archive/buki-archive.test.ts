@@ -7,10 +7,25 @@ const mockLoadLibrarySnapshot = jest.fn();
 const mockRequireExportAccess = jest.fn();
 const mockReloadDrawings = jest.fn();
 const mockReloadProfiles = jest.fn();
+const mockImageRender = jest.fn(async () => ({
+  width: 1,
+  height: 1,
+  release: jest.fn(),
+}));
 let mockCopyFailureDestinationPrefix: string | null = null;
 
 jest.mock("expo-application", () => ({
   nativeApplicationVersion: "1.0.1",
+}));
+
+jest.mock("expo-image-manipulator", () => ({
+  ImageManipulator: {
+    manipulate: jest.fn(() => ({
+      resize: jest.fn(),
+      renderAsync: () => mockImageRender(),
+      release: jest.fn(),
+    })),
+  },
 }));
 
 jest.mock("expo-crypto", () => {
@@ -201,10 +216,9 @@ interface MockFileSystem {
 
 const mockFileSystem = jest.requireMock("expo-file-system") as MockFileSystem;
 const artworkBytes = Uint8Array.from([
-  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13,
-  73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1,
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, 181, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 100, 248, 15, 0, 1, 5, 1, 1, 39, 24, 227, 102, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
 ]);
-const ARTWORK_CHECKSUM = "a930c2bb4e61c0682068f71c4ef427eefbb07098ecea9390e445e7af4b66a384";
+const ARTWORK_CHECKSUM = "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460";
 
 function baseManifest(mediaBytes: Uint8Array = artworkBytes): BukiArchiveManifest {
   return {
@@ -292,6 +306,11 @@ describe("Buki archive ZIP integration", () => {
     mockRequireExportAccess.mockReset();
     mockReloadDrawings.mockReset().mockResolvedValue(undefined);
     mockReloadProfiles.mockReset().mockResolvedValue(undefined);
+    mockImageRender.mockReset().mockResolvedValue({
+      width: 1,
+      height: 1,
+      release: jest.fn(),
+    });
     mockCopyFailureDestinationPrefix = null;
   });
 
@@ -411,6 +430,16 @@ describe("Buki archive ZIP integration", () => {
     expect([...mockFileSystem.__files.keys()]).not.toEqual(
       expect.arrayContaining([expect.stringContaining("buki-import-")]),
     );
+  });
+
+  it("rejects structurally valid media when the native decoder cannot read it", async () => {
+    mockFileSystem.__files.set("mem://undecodable.buki", archiveBytes());
+    mockImageRender.mockRejectedValueOnce(new Error("decode failed"));
+
+    await expect(importBukiArchive("mem://undecodable.buki")).rejects.toThrow(
+      "cannot be decoded safely",
+    );
+    expect(mockImportBukiLibraryArchive).not.toHaveBeenCalled();
   });
 
   it("removes copied media if Pro access expires at the import commit", async () => {

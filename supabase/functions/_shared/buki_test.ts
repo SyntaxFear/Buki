@@ -1,4 +1,8 @@
-import { assertExpectedOwner, HttpError } from "./buki.ts";
+import {
+  assertExpectedOwner,
+  assertRecentAuthentication,
+  HttpError,
+} from "./buki.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -40,4 +44,27 @@ Deno.test("expected owner rejects malformed account identifiers", () => {
   assert(caught instanceof HttpError, "expected a malformed owner error");
   assert(caught.status === 400, "expected a malformed request response");
   assert(caught.code === "invalid_ownerId", "expected stable validation code");
+});
+
+Deno.test("recent authentication accepts a fresh provider sign-in", () => {
+  assertRecentAuthentication(
+    { last_sign_in_at: "2026-08-09T16:00:00.000Z" },
+    Date.parse("2026-08-09T16:09:59.000Z"),
+  );
+});
+
+Deno.test("recent authentication rejects stale or invalid sign-ins", () => {
+  for (const last_sign_in_at of ["2026-08-09T15:49:59.000Z", undefined, "invalid"]) {
+    let caught: unknown;
+    try {
+      assertRecentAuthentication(
+        { last_sign_in_at },
+        Date.parse("2026-08-09T16:00:00.000Z"),
+      );
+    } catch (error) {
+      caught = error;
+    }
+    assert(caught instanceof HttpError, "expected recent authentication error");
+    assert(caught.code === "recent_authentication_required", "expected stable auth age code");
+  }
 });
