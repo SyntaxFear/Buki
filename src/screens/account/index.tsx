@@ -593,8 +593,11 @@ export function AccountCenter() {
             right={
               <Switch
                 value={automaticBackup && capabilities.cloudBackup && cloudUploadsEnabled}
-                disabled={!capabilities.cloudBackup}
-                onValueChange={(value) => void setAutomaticBackup(value)}
+                accessibilityLabel="Automatic backup"
+                onValueChange={(value) => {
+                  if (capabilities.cloudBackup) void setAutomaticBackup(value);
+                  else void introducePro("cloudBackup", "account_backup_toggle");
+                }}
               />
             }
             onPress={!capabilities.cloudBackup
