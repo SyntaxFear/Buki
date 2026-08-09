@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(65);
+select plan(69);
 
 select has_table('public', 'adult_profiles', 'adult_profiles exists');
 select has_table('public', 'child_profiles', 'child_profiles exists');
@@ -264,6 +264,44 @@ select is(
    where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
   0::bigint,
   'a rejected hardened reservation leaves no temporary quota charge'
+);
+update public.storage_usage
+set bytes_used = 0
+where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369';
+select lives_ok(
+  $$select * from public.reserve_media_upload(
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+    'quota-media-complete',
+    'quota-artwork',
+    'cutout',
+    repeat('c', 64),
+    10,
+    'image/png',
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369/complete.png'
+  )$$,
+  'a normal upload receives the hardened temporary reservation'
+);
+select lives_ok(
+  $$select * from public.complete_media_upload(
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+    (select id from public.media_upload_reservations
+     where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'
+       and media_id = 'quota-media-complete'),
+    10
+  )$$,
+  'completion converts the hardened reservation to measured usage'
+);
+select is(
+  (select bytes_reserved from public.storage_usage
+   where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  0::bigint,
+  'completion releases the full pending quota charge'
+);
+select is(
+  (select bytes_used from public.storage_usage
+   where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  10::bigint,
+  'completion charges only the verified object size'
 );
 select has_function(
   'public',
