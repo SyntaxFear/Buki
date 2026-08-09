@@ -88,7 +88,20 @@ export function FlipPad({
   const underUnit = flip ? (dir > 0 ? flip.to : flip.from) : page;
   const frontUnit = flip ? (dir > 0 ? flip.from : flip.to) : null;
 
-  const lookup = useImageCache(drawings.map((d) => d.uri));
+  const preloadUris = useMemo(() => {
+    const units = new Set([page - 1, page, page + 1, underUnit]);
+    if (frontUnit !== null) units.add(frontUnit);
+    const uris: string[] = [];
+    for (const unit of units) {
+      if (unit < 0) continue;
+      for (let slot = 0; slot < cap; slot += 1) {
+        const drawing = drawings[unit * cap + slot];
+        if (drawing) uris.push(drawing.uri);
+      }
+    }
+    return uris;
+  }, [cap, drawings, frontUnit, page, underUnit]);
+  const lookup = useImageCache(preloadUris);
   const imageFor = (drawing: Drawing | undefined): SkImage | null =>
     drawing ? lookup(drawing.uri) : null;
   const unitDrawings = (unit: number | null): Drawing[] => {

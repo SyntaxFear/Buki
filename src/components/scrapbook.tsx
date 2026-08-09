@@ -127,9 +127,19 @@ export function Scrapbook({
   const frontFace = flip ? (dir > 0 ? drawings[2 * fromIdx + 1] : drawings[2 * toIdx + 1]) : undefined;
   const backFace = flip ? (dir > 0 ? drawings[2 * toIdx] : drawings[2 * fromIdx]) : undefined;
 
-  // Persistent cache: every drawing in the pad stays decoded, so flips and
-  // spread changes render synchronously with no image pop-in
-  const lookup = useImageCache(drawings.map((d) => d.uri));
+  const preloadUris = useMemo(() => {
+    const units = new Set([spread - 1, spread, spread + 1, fromIdx, toIdx]);
+    const uris: string[] = [];
+    for (const unit of units) {
+      if (unit < 0) continue;
+      const left = drawings[unit * 2];
+      const right = drawings[unit * 2 + 1];
+      if (left) uris.push(left.uri);
+      if (right) uris.push(right.uri);
+    }
+    return uris;
+  }, [drawings, fromIdx, spread, toIdx]);
+  const lookup = useImageCache(preloadUris);
   const imageFor = (drawing: Drawing | undefined): SkImage | null =>
     drawing ? lookup(drawing.uri) : null;
 
