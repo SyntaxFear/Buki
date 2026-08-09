@@ -779,7 +779,15 @@ function SettingRow({ title, detail, right, onPress }: { title: string; detail?:
     </>
   );
   return onPress ? (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.settingRow, pressed && styles.rowPressed]}>{content}</Pressable>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityHint={detail}
+      onPress={onPress}
+      style={({ pressed }) => [styles.settingRow, pressed && styles.rowPressed]}
+    >
+      {content}
+    </Pressable>
   ) : <View style={styles.settingRow}>{content}</View>;
 }
 
