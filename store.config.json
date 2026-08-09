@@ -1,0 +1,69 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 Levan Parastashvili",
+    "categories": [
+      "LIFESTYLE",
+      "PHOTO_AND_VIDEO"
+    ],
+    "info": {
+      "en-US": {
+        "title": "Buki: Kids Art Book",
+        "subtitle": "Save Every Little Masterpiece",
+        "description": "Turn piles of children’s drawings into private, beautiful keepsake books.\n\nBuki helps adults capture artwork, organize it by child and sketchpad, and preserve the memories around it—without making children create accounts.\n\nCAPTURE EVERY MASTERPIECE\n• Photograph a drawing or import it from Photos\n• Keep a clean artwork image and the original photo together\n• Add a title, artwork date, notes, tags, and favorites\n\nBUILD BEAUTIFUL SKETCHPADS\n• Browse art in spread, portrait, grid, album, and filmstrip layouts\n• Choose playful covers, page colors, themes, borders, and decorations\n• Search, filter, and organize the family library\n\nPRIVATE BY DESIGN\n• Artwork saves locally first and remains available offline\n• Children are profiles owned by an adult, not separate login accounts\n• There is no public gallery and Buki does not use children’s artwork for advertising\n• Adults control backup, restore, export, and deletion\n\nFREE AND PRO\nFree includes one child, one sketchpad, and up to 20 artworks. Buki Pro unlocks unlimited local child profiles, sketchpads, and artworks, plus premium organization, protected exports, and 2 GB of private cloud backup. Monthly, yearly, and lifetime options unlock the same Pro features; Apple shows the final localized price.\n\nKeep the art. Keep the story. Build a Buki together.",
+        "keywords": [
+          "drawings",
+          "children",
+          "keepsake",
+          "scrapbook",
+          "scan",
+          "organizer",
+          "memory",
+          "family",
+          "album",
+          "portfolio",
+          "school",
+          "crayon"
+        ],
+        "releaseNotes": "Buki Free and Pro are ready.\n\n• Adult accounts and child profiles\n• Monthly, yearly, and lifetime Pro access\n• Private 2 GB cloud backup and restore\n• Premium themes, borders, and decorations\n• Search, tags, favorites, filters, and bulk organization\n• PNG, JPG, share card, PDF, ZIP, and Buki archive exports\n• Stronger privacy controls and in-app account deletion",
+        "promoText": "Capture every drawing, organize it by child, and preserve it in beautiful sketchpads—with private Pro backup, premium styles, and protected exports.",
+        "privacyPolicyUrl": "https://buki.expo.app/privacy",
+        "supportUrl": "https://buki.expo.app/support",
+        "marketingUrl": "https://buki.expo.app/"
+      }
+    },
+    "advisory": {
+      "ageRatingOverride": "NONE",
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "contests": "NONE",
+      "gambling": false,
+      "gamblingSimulated": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "kidsAgeBand": null,
+      "koreaAgeRatingOverride": "NONE",
+      "lootBox": false,
+      "matureOrSuggestiveThemes": "NONE",
+      "medicalOrTreatmentInformation": "NONE",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "unrestrictedWebAccess": false,
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+      "advertising": false,
+      "ageAssurance": false,
+      "ageRatingOverrideV2": "NONE",
+      "developerAgeRatingInfoUrl": null,
+      "gunsOrOtherWeapons": "NONE",
+      "healthOrWellnessTopics": false,
+      "messagingAndChat": false,
+      "parentalControls": false,
+      "userGeneratedContent": false
+    },
+    "release": {
+      "automaticRelease": false,
+      "phasedRelease": true
+    }
+  }
+}
