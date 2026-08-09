@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   artworkTags,
   filterArtworkItems,
+  normalizeArtworkText,
+  selectedVisibleArtworkIds,
   type ArtworkListItem,
 } from "@/organization/artwork-organizer";
 import { useDrawings } from "@/store/drawings";
@@ -76,20 +78,24 @@ export function ArtLibrary() {
       }),
     [advanced, allItems, favoritesOnly, padFilter, query, tagFilter],
   );
-  const selectedIds = useMemo(() => [...selected], [selected]);
-  const selectedItems = useMemo(
-    () => allItems.filter((item) => selected.has(item.drawing.id)),
-    [allItems, selected],
+  const selectedIds = useMemo(
+    () => selectedVisibleArtworkIds(visibleItems, selected),
+    [selected, visibleItems],
   );
+  const selectedItems = useMemo(
+    () => visibleItems.filter((item) => selected.has(item.drawing.id)),
+    [selected, visibleItems],
+  );
+  const hasSelection = selectedIds.length > 0;
   const cardWidth = Math.floor((width - 16 * 2 - 12) / 2);
 
   useEffect(() => {
-    const valid = new Set(allItems.map((item) => item.drawing.id));
+    const valid = new Set(visibleItems.map((item) => item.drawing.id));
     setSelected((current) => {
       const next = new Set([...current].filter((id) => valid.has(id)));
       return next.size === current.size ? current : next;
     });
-  }, [allItems]);
+  }, [visibleItems]);
 
   useEffect(() => {
     if (advanced) return;
@@ -117,7 +123,7 @@ export function ArtLibrary() {
   };
 
   const openArtwork = (item: ArtworkListItem) => {
-    if (selected.size > 0) {
+    if (hasSelection) {
       toggleSelected(item.drawing.id);
       return;
     }
@@ -160,7 +166,7 @@ export function ArtLibrary() {
   const confirmBulkDelete = async () => {
     if (!(await confirmAdult("Deleting several artworks permanently removes their local image files."))) return;
     Alert.alert(
-      `Delete ${selected.size} artwork${selected.size === 1 ? "" : "s"}?`,
+      `Delete ${selectedIds.length} artwork${selectedIds.length === 1 ? "" : "s"}?`,
       "This cannot be undone on this device.",
       [
         { text: "Cancel", style: "cancel" },
@@ -186,10 +192,15 @@ export function ArtLibrary() {
             placeholder="Search titles, notes, tags, and sketchpads"
             placeholderTextColor="#9E9588"
             returnKeyType="search"
+            accessibilityLabel="Search artwork"
             style={styles.searchInput}
           />
           {query ? (
-            <Pressable onPress={() => setQuery("")} accessibilityLabel="Clear search">
+            <Pressable
+              onPress={() => setQuery("")}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
               <SymbolView name="xmark.circle.fill" size={17} tintColor={colors.mutedText} />
             </Pressable>
           ) : null}
@@ -197,6 +208,9 @@ export function ArtLibrary() {
       ) : (
         <Pressable
           onPress={() => requirePro("library_search")}
+          accessibilityRole="button"
+          accessibilityLabel="Search, filters, and bulk actions. Pro locked"
+          accessibilityHint="Opens Buki Pro options"
           style={({ pressed }) => [styles.searchBox, pressed && styles.pressed]}
         >
           <SymbolView name="magnifyingglass" size={17} tintColor={colors.mutedText} />
@@ -211,6 +225,7 @@ export function ArtLibrary() {
         <FilterChip
           label="All"
           selected={!favoritesOnly && !padFilter && !tagFilter}
+          locked={!advanced}
           onPress={() => {
             if (!requirePro("library_filters")) return;
             setFavoritesOnly(false);
@@ -221,6 +236,7 @@ export function ArtLibrary() {
         <FilterChip
           label="Favorites"
           selected={favoritesOnly}
+          locked={!advanced}
           onPress={() => {
             if (requirePro("library_favorites_filter")) setFavoritesOnly((value) => !value);
           }}
@@ -230,6 +246,7 @@ export function ArtLibrary() {
             key={pad.id}
             label={pad.name}
             selected={padFilter === pad.id}
+            locked={!advanced}
             onPress={() => {
               if (requirePro("library_sketchpad_filter")) {
                 setPadFilter((current) => (current === pad.id ? null : pad.id));
@@ -245,7 +262,8 @@ export function ArtLibrary() {
             <FilterChip
               key={tag}
               label={`#${tag}`}
-              selected={tagFilter?.toLocaleLowerCase() === tag.toLocaleLowerCase()}
+              selected={normalizeArtworkText(tagFilter ?? "") === normalizeArtworkText(tag)}
+              locked={!advanced}
               onPress={() => {
                 if (requirePro("library_tag_filter")) {
                   setTagFilter((current) => (current === tag ? null : tag));
@@ -260,8 +278,12 @@ export function ArtLibrary() {
         <Text style={styles.resultCount}>
           {visibleItems.length} artwork{visibleItems.length === 1 ? "" : "s"}
         </Text>
-        {selected.size ? (
-          <Pressable onPress={() => setSelected(new Set())}>
+        {hasSelection ? (
+          <Pressable
+            onPress={() => setSelected(new Set())}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel artwork selection"
+          >
             <Text style={styles.clearSelection}>Cancel selection</Text>
           </Pressable>
         ) : (
@@ -296,7 +318,7 @@ export function ArtLibrary() {
         columnWrapperStyle={styles.column}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: insets.bottom + (selected.size ? 118 : 42) },
+          { paddingBottom: insets.bottom + (hasSelection ? 118 : 42) },
         ]}
         ListHeaderComponent={header}
         ListEmptyComponent={
@@ -355,7 +377,7 @@ export function ArtLibrary() {
         }}
       />
 
-      {selected.size ? (
+      {hasSelection ? (
         <View style={[styles.bulkBar, { bottom: insets.bottom + 10 }]}>
           <BulkAction
             icon="heart.fill"
@@ -374,10 +396,24 @@ export function ArtLibrary() {
   );
 }
 
-function FilterChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+function FilterChip({
+  label,
+  selected,
+  locked,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  locked: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}${locked ? ". Pro locked" : ""}`}
+      accessibilityHint={locked ? "Opens Buki Pro options" : `Filters artwork by ${label}`}
+      accessibilityState={{ selected }}
       style={({ pressed }) => [styles.filterChip, selected && styles.filterChipSelected, pressed && styles.pressed]}
     >
       <Text style={[styles.filterChipText, selected && styles.filterChipTextSelected]}>{label}</Text>
@@ -397,7 +433,13 @@ function BulkAction({
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.bulkAction, pressed && styles.pressed]}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label} selected artwork`}
+      accessibilityHint={destructive ? "Permanently deletes selected artwork after confirmation" : undefined}
+      style={({ pressed }) => [styles.bulkAction, pressed && styles.pressed]}
+    >
       <SymbolView name={icon} size={17} tintColor={destructive ? "#C54A4A" : colors.titleTeal} />
       <Text style={[styles.bulkActionText, destructive && styles.bulkActionDestructive]}>{label}</Text>
     </Pressable>

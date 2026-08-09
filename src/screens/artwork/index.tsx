@@ -38,21 +38,21 @@ export function ArtworkDetails() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const id = firstParam(params.id);
-  const drawing = useDrawings((state) =>
-    id
-      ? Object.values(state.drawingsByPad)
-          .flat()
-          .find((item) => item.id === id)
-      : undefined,
-  );
+  const activeChildId = useProfiles((state) => state.activeChildId);
   const padId = useDrawings((state) =>
     id
-      ? Object.entries(state.drawingsByPad).find(([, drawings]) =>
-          drawings.some((item) => item.id === id),
-        )?.[0] ?? null
+      ? state.pads
+          .filter((item) => item.childId === activeChildId)
+          .find((item) => state.drawingsByPad[item.id]?.some((drawing) => drawing.id === id))
+          ?.id ?? null
       : null,
   );
-  const pad = useDrawings((state) => state.pads.find((item) => item.id === padId));
+  const drawing = useDrawings((state) =>
+    padId ? state.drawingsByPad[padId]?.find((item) => item.id === id) : undefined,
+  );
+  const pad = useDrawings((state) =>
+    state.pads.find((item) => item.id === padId && item.childId === activeChildId),
+  );
   const updateMetadata = useDrawings((state) => state.updateDrawingMetadata);
   const toggleFavorite = useDrawings((state) => state.toggleDrawingFavorite);
   const setDrawingTags = useDrawings((state) => state.setDrawingTags);
@@ -62,7 +62,7 @@ export function ArtworkDetails() {
   );
   const exportData = useMembership((state) => state.capabilities.exportData);
   const requestUpgrade = useMembership((state) => state.requestUpgrade);
-  const child = useProfiles((state) => state.children.find((item) => item.id === pad?.childId));
+  const child = useProfiles((state) => state.children.find((item) => item.id === activeChildId));
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [tagDraft, setTagDraft] = useState("");
@@ -222,6 +222,9 @@ export function ArtworkDetails() {
           <Pressable
             disabled={!changed}
             onPress={save}
+            accessibilityRole="button"
+            accessibilityLabel="Save artwork details"
+            accessibilityState={{ disabled: !changed }}
             style={({ pressed }) => [
               styles.primaryButton,
               !changed && styles.disabled,
@@ -248,6 +251,8 @@ export function ArtworkDetails() {
             onPress={() => toggleFavorite(drawing.id)}
             accessibilityRole="button"
             accessibilityLabel={drawing.favorite ? "Remove from favorites" : "Add to favorites"}
+            accessibilityHint={!advancedOrganization ? "Opens Buki Pro options" : undefined}
+            accessibilityState={{ selected: drawing.favorite === true }}
             style={({ pressed }) => [styles.favoriteButton, pressed && styles.pressed]}
           >
             <SymbolView
@@ -268,7 +273,8 @@ export function ArtworkDetails() {
                   key={tag}
                   onPress={() => setDrawingTags(drawing.id, tags.filter((item) => item !== tag))}
                   accessibilityRole="button"
-                  accessibilityLabel={`Remove tag ${tag}`}
+                  accessibilityLabel={`Remove tag ${tag}${!advancedOrganization ? ". Pro locked" : ""}`}
+                  accessibilityHint={!advancedOrganization ? "Opens Buki Pro options" : undefined}
                   style={styles.tag}
                 >
                   <Text style={styles.tagText}>{tag}</Text>
@@ -288,9 +294,16 @@ export function ArtworkDetails() {
               maxLength={24}
               returnKeyType="done"
               onSubmitEditing={addTag}
+              accessibilityLabel="New artwork tag"
               style={[styles.input, styles.tagInput]}
             />
-            <Pressable onPress={addTag} style={({ pressed }) => [styles.addTagButton, pressed && styles.pressed]}>
+            <Pressable
+              onPress={addTag}
+              accessibilityRole="button"
+              accessibilityLabel={`Add artwork tag${!advancedOrganization ? ". Pro locked" : ""}`}
+              accessibilityHint={!advancedOrganization ? "Opens Buki Pro options" : undefined}
+              style={({ pressed }) => [styles.addTagButton, pressed && styles.pressed]}
+            >
               <Text style={styles.addTagLabel}>Add</Text>
             </Pressable>
           </View>
@@ -298,6 +311,8 @@ export function ArtworkDetails() {
 
         <Pressable
           onPress={() => void confirmDelete()}
+          accessibilityRole="button"
+          accessibilityLabel="Delete artwork"
           style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
         >
           <Text style={styles.deleteLabel}>Delete artwork</Text>

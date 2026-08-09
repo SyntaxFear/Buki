@@ -111,6 +111,15 @@ export function activePadOf(s: { pads: Sketchpad[]; activePadId: string }): Sket
   return s.pads.find((p) => p.id === s.activePadId);
 }
 
+export function activeChildPadIdsOf(s: {
+  pads: Sketchpad[];
+  activePadId: string;
+}): ReadonlySet<string> {
+  const childId = s.pads.find((pad) => pad.id === s.activePadId)?.childId;
+  if (!childId) return new Set();
+  return new Set(s.pads.filter((pad) => pad.childId === childId).map((pad) => pad.id));
+}
+
 function persist(
   s: { activePadId: string; pads: Sketchpad[]; drawingsByPad: Record<string, Drawing[]> },
   onError?: (error: unknown) => void,
@@ -145,11 +154,16 @@ function advancedOrganizationAllowed(source: string): boolean {
 function updateDrawingById(
   drawingsByPad: Record<string, Drawing[]>,
   id: string,
+  allowedPadIds: ReadonlySet<string>,
   update: (drawing: Drawing) => Drawing,
 ): { drawingsByPad: Record<string, Drawing[]>; changed: boolean } {
   let changed = false;
   const nextByPad: Record<string, Drawing[]> = {};
   for (const [padId, drawings] of Object.entries(drawingsByPad)) {
+    if (!allowedPadIds.has(padId)) {
+      nextByPad[padId] = drawings;
+      continue;
+    }
     nextByPad[padId] = drawings.map((drawing) => {
       if (drawing.id !== id) return drawing;
       changed = true;
@@ -286,8 +300,9 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
 
   updateDrawingMetadata: (id, updates) => {
     const { drawingsByPad, activePadId, pads } = get();
+    const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
     const now = Date.now();
-    const result = updateDrawingById(drawingsByPad, id, (drawing) => ({
+    const result = updateDrawingById(drawingsByPad, id, allowedPadIds, (drawing) => ({
       ...drawing,
       title: updates.title.trim().slice(0, 100) || undefined,
       notes: updates.notes.trim().slice(0, 2_000) || undefined,
@@ -302,7 +317,8 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
   toggleDrawingFavorite: (id) => {
     if (!advancedOrganizationAllowed("artwork_favorite")) return false;
     const { drawingsByPad, activePadId, pads } = get();
-    const result = updateDrawingById(drawingsByPad, id, (drawing) => ({
+    const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
+    const result = updateDrawingById(drawingsByPad, id, allowedPadIds, (drawing) => ({
       ...drawing,
       favorite: !drawing.favorite,
       updatedAt: Date.now(),
@@ -317,7 +333,8 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     if (!advancedOrganizationAllowed("artwork_tags")) return false;
     const normalizedTags = normalizeArtworkTags(tags);
     const { drawingsByPad, activePadId, pads } = get();
-    const result = updateDrawingById(drawingsByPad, id, (drawing) => ({
+    const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
+    const result = updateDrawingById(drawingsByPad, id, allowedPadIds, (drawing) => ({
       ...drawing,
       tags: normalizedTags,
       updatedAt: Date.now(),
@@ -330,15 +347,18 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
 
   deleteDrawing: (id) => {
     const { drawingsByPad, activePadId, pads } = get();
+    const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
     const removed: Drawing[] = [];
     const nextByPad = Object.fromEntries(
       Object.entries(drawingsByPad).map(([padId, drawings]) => [
         padId,
-        drawings.filter((drawing) => {
-          if (drawing.id !== id) return true;
-          removed.push(drawing);
-          return false;
-        }),
+        !allowedPadIds.has(padId)
+          ? drawings
+          : drawings.filter((drawing) => {
+              if (drawing.id !== id) return true;
+              removed.push(drawing);
+              return false;
+            }),
       ]),
     );
     if (removed.length === 0) return false;
@@ -353,16 +373,19 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     const selected = new Set(ids);
     if (selected.size === 0) return false;
     const { drawingsByPad, activePadId, pads } = get();
+    const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
     let changed = false;
     const now = Date.now();
     const nextByPad = Object.fromEntries(
       Object.entries(drawingsByPad).map(([padId, drawings]) => [
         padId,
-        drawings.map((drawing) => {
-          if (!selected.has(drawing.id) || drawing.favorite === favorite) return drawing;
-          changed = true;
-          return { ...drawing, favorite, updatedAt: now };
-        }),
+        !allowedPadIds.has(padId)
+          ? drawings
+          : drawings.map((drawing) => {
+              if (!selected.has(drawing.id) || drawing.favorite === favorite) return drawing;
+              changed = true;
+              return { ...drawing, favorite, updatedAt: now };
+            }),
       ]),
     );
     if (!changed) return false;
@@ -377,18 +400,21 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     const selected = new Set(ids);
     if (!normalizedTag || selected.size === 0) return false;
     const { drawingsByPad, activePadId, pads } = get();
+    const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
     let changed = false;
     const now = Date.now();
     const nextByPad = Object.fromEntries(
       Object.entries(drawingsByPad).map(([padId, drawings]) => [
         padId,
-        drawings.map((drawing) => {
-          if (!selected.has(drawing.id)) return drawing;
-          const tags = normalizeArtworkTags([...(drawing.tags ?? []), normalizedTag]);
-          if (tags.length === (drawing.tags ?? []).length) return drawing;
-          changed = true;
-          return { ...drawing, tags, updatedAt: now };
-        }),
+        !allowedPadIds.has(padId)
+          ? drawings
+          : drawings.map((drawing) => {
+              if (!selected.has(drawing.id)) return drawing;
+              const tags = normalizeArtworkTags([...(drawing.tags ?? []), normalizedTag]);
+              if (tags.length === (drawing.tags ?? []).length) return drawing;
+              changed = true;
+              return { ...drawing, tags, updatedAt: now };
+            }),
       ]),
     );
     if (!changed) return false;
@@ -401,12 +427,13 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     if (!advancedOrganizationAllowed("library_bulk_move")) return false;
     const selected = new Set(ids);
     const { drawingsByPad, activePadId, pads } = get();
-    const targetPad = pads.find((pad) => pad.id === targetPadId);
+    const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
+    const targetPad = pads.find((pad) => pad.id === targetPadId && allowedPadIds.has(pad.id));
     if (!targetPad || selected.size === 0) return false;
     const moved: Drawing[] = [];
     const nextByPad = { ...drawingsByPad };
     for (const pad of pads) {
-      if (pad.id === targetPadId || pad.childId !== targetPad.childId) continue;
+      if (pad.id === targetPadId || !allowedPadIds.has(pad.id)) continue;
       const remaining: Drawing[] = [];
       for (const drawing of drawingsByPad[pad.id] ?? []) {
         if (selected.has(drawing.id)) moved.push({ ...drawing, updatedAt: Date.now() });
@@ -426,15 +453,18 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     const selected = new Set(ids);
     if (selected.size === 0) return false;
     const { drawingsByPad, activePadId, pads } = get();
+    const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
     const removed: Drawing[] = [];
     const nextByPad = Object.fromEntries(
       Object.entries(drawingsByPad).map(([padId, drawings]) => [
         padId,
-        drawings.filter((drawing) => {
-          if (!selected.has(drawing.id)) return true;
-          removed.push(drawing);
-          return false;
-        }),
+        !allowedPadIds.has(padId)
+          ? drawings
+          : drawings.filter((drawing) => {
+              if (!selected.has(drawing.id)) return true;
+              removed.push(drawing);
+              return false;
+            }),
       ]),
     );
     if (removed.length === 0) return false;

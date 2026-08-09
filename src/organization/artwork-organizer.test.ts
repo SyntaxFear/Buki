@@ -2,7 +2,9 @@ import type { ArtworkListItem } from "./artwork-organizer";
 import {
   artworkTags,
   filterArtworkItems,
+  normalizeArtworkText,
   normalizeArtworkTags,
+  selectedVisibleArtworkIds,
 } from "./artwork-organizer";
 
 const items: ArtworkListItem[] = [
@@ -54,6 +56,20 @@ describe("artwork organization", () => {
     expect(filterArtworkItems(items, { query: "weekend" }).map((item) => item.drawing.id)).toEqual([
       "art-2",
     ]);
+    expect(filterArtworkItems(items, { query: "blue rocket" }).map((item) => item.drawing.id)).toEqual([
+      "art-1",
+    ]);
+    expect(filterArtworkItems(items, { query: "SPACE" }).map((item) => item.drawing.id)).toEqual([
+      "art-1",
+    ]);
+  });
+
+  it("normalizes search text without depending on the device locale", () => {
+    expect(normalizeArtworkText("  School   Work  ")).toBe("school work");
+    expect(normalizeArtworkText("Ｉstanbul")).toBe("istanbul");
+    expect(filterArtworkItems(items, { query: "blue   rocket" }).map((item) => item.drawing.id)).toEqual([
+      "art-1",
+    ]);
   });
 
   it("combines favorite, sketchpad, and tag filters", () => {
@@ -67,5 +83,11 @@ describe("artwork organization", () => {
 
   it("collects unique tags in display order", () => {
     expect(artworkTags(items)).toEqual(["Nature", "School", "Space"]);
+  });
+
+  it("limits bulk actions to artwork still visible after filtering", () => {
+    expect(selectedVisibleArtworkIds([items[0]], new Set(["art-1", "art-2"]))).toEqual([
+      "art-1",
+    ]);
   });
 });
