@@ -13,14 +13,8 @@ import { getPublicAppConfig } from "@/config/env";
 type CustomerInfoHandler = (ownerId: string, customerInfo: CustomerInfo) => void;
 
 let activeOwnerId: string | null = null;
-let updateHandler: CustomerInfoHandler | null = null;
-let listenerInstalled = false;
+let installedListener: CustomerInfoUpdateListener | null = null;
 const REVENUECAT_LOGOUT_ATTEMPTS = 3;
-
-const customerInfoListener: CustomerInfoUpdateListener = (customerInfo) => {
-  if (!activeOwnerId || !updateHandler) return;
-  updateHandler(activeOwnerId, customerInfo);
-};
 
 function isAnonymousRevenueCatId(appUserId: string): boolean {
   return appUserId.startsWith("$RCAnonymousID:");
@@ -65,16 +59,33 @@ async function ensureConfigured(ownerId: string): Promise<CustomerInfo | null> {
   return Purchases.getCustomerInfo();
 }
 
+async function requireRevenueCatUser(ownerId: string): Promise<void> {
+  if (Platform.OS !== "ios" || activeOwnerId !== ownerId) {
+    throw new Error("Buki Pro is still connecting to this account. Please try again.");
+  }
+  const appUserId = await Purchases.getAppUserID();
+  if (appUserId !== ownerId) {
+    activeOwnerId = null;
+    throw new Error("Buki could not verify the Apple purchase account. Sign in again and retry.");
+  }
+}
+
 export async function connectRevenueCatUser(
   ownerId: string,
   handler: CustomerInfoHandler,
 ): Promise<CustomerInfo | null> {
   const customerInfo = await ensureConfigured(ownerId);
+  if (Platform.OS === "ios") {
+    const appUserId = await Purchases.getAppUserID();
+    if (appUserId !== ownerId) {
+      throw new Error("Buki could not verify the Apple purchase account.");
+    }
+  }
   activeOwnerId = ownerId;
-  updateHandler = handler;
-  if (Platform.OS === "ios" && !listenerInstalled) {
-    Purchases.addCustomerInfoUpdateListener(customerInfoListener);
-    listenerInstalled = true;
+  if (Platform.OS === "ios") {
+    if (installedListener) Purchases.removeCustomerInfoUpdateListener(installedListener);
+    installedListener = (updatedCustomerInfo) => handler(ownerId, updatedCustomerInfo);
+    Purchases.addCustomerInfoUpdateListener(installedListener);
   }
   return customerInfo;
 }
@@ -105,12 +116,21 @@ export async function isRevenueCatIntroEligible(
   }
 }
 
-export function purchaseRevenueCatPackage(aPackage: PurchasesPackage): Promise<MakePurchaseResult> {
-  return Purchases.purchasePackage(aPackage);
+export async function purchaseRevenueCatPackage(
+  aPackage: PurchasesPackage,
+  expectedOwnerId: string,
+): Promise<MakePurchaseResult> {
+  await requireRevenueCatUser(expectedOwnerId);
+  const result = await Purchases.purchasePackage(aPackage);
+  await requireRevenueCatUser(expectedOwnerId);
+  return result;
 }
 
-export function restoreRevenueCatPurchases(): Promise<CustomerInfo> {
-  return Purchases.restorePurchases();
+export async function restoreRevenueCatPurchases(expectedOwnerId: string): Promise<CustomerInfo> {
+  await requireRevenueCatUser(expectedOwnerId);
+  const customerInfo = await Purchases.restorePurchases();
+  await requireRevenueCatUser(expectedOwnerId);
+  return customerInfo;
 }
 
 export function isRevenueCatPurchaseCancelled(error: unknown): boolean {
@@ -124,7 +144,10 @@ export function isRevenueCatPurchaseCancelled(error: unknown): boolean {
 
 export async function disconnectRevenueCatUser(): Promise<void> {
   activeOwnerId = null;
-  updateHandler = null;
+  if (installedListener) {
+    Purchases.removeCustomerInfoUpdateListener(installedListener);
+    installedListener = null;
+  }
   if (Platform.OS !== "ios" || !(await Purchases.isConfigured())) return;
   const currentAppUserId = await Purchases.getAppUserID();
   if (!isAnonymousRevenueCatId(currentAppUserId)) await logOutRevenueCatUser();

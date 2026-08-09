@@ -97,9 +97,10 @@ export const useProfiles = create<ProfilesState>((set, get) => ({
     }),
 
   completeOnboarding: async (input) => {
+    const ownerId = get().ownerId;
     const adultName = input.adultName.trim();
     const childName = input.childName.trim();
-    if (!adultName || !childName) {
+    if (!ownerId || !adultName || !childName) {
       set({ error: "Add both your name and your child’s name." });
       return false;
     }
@@ -113,18 +114,23 @@ export const useProfiles = create<ProfilesState>((set, get) => ({
         childAvatarColor: input.childAvatarColor,
         defaultPadId: Crypto.randomUUID(),
       });
+      if (get().ownerId !== ownerId) return false;
+      const session = await getSupabaseClient().auth.getSession();
+      if (session.data.session?.user.id !== ownerId || get().ownerId !== ownerId) return false;
       const { error } = await getSupabaseClient().auth.updateUser({
         data: { full_name: adultName, avatar_url: input.adultAvatarUri },
       });
       if (error) console.warn("Could not update remote Buki profile metadata", error);
+      if (get().ownerId !== ownerId) return false;
       await useDrawings.getState().reloadForAccount();
+      if (get().ownerId !== ownerId) return false;
       await get().reloadForAccount();
-      return true;
+      return get().ownerId === ownerId;
     } catch (error) {
-      set({ error: message(error) });
+      if (get().ownerId === ownerId) set({ error: message(error) });
       return false;
     } finally {
-      set({ busy: false });
+      if (get().ownerId === ownerId) set({ busy: false });
     }
   },
 

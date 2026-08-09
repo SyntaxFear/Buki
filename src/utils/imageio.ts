@@ -7,10 +7,12 @@ import {
 } from "@shopify/react-native-skia";
 import { Asset } from "expo-asset";
 import { Directory, File, Paths } from "expo-file-system";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
 import { extractDrawing, type Box } from "@/utils/cutout";
 
 const MAX_DECODE_EDGE = 1000;
+const SAVED_PHOTO_EDGE = 2048;
 
 export interface ProcessedCutout {
   /** file:// URI of the saved transparent PNG */
@@ -97,44 +99,89 @@ export function pixelsToImage(pixels: Uint8Array, width: number, height: number)
   return image;
 }
 
+async function sanitizedImage(
+  sourceUri: string,
+  maxEdge: number,
+  format: SaveFormat,
+  compress: number,
+): Promise<File> {
+  const inspection = ImageManipulator.manipulate(sourceUri);
+  let inspected: Awaited<ReturnType<typeof inspection.renderAsync>> | null = null;
+  let resize: { width?: number; height?: number } | null = null;
+  try {
+    inspected = await inspection.renderAsync();
+    const width = inspected.width;
+    const height = inspected.height;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      throw new Error("Could not read image dimensions");
+    }
+    if (Math.max(width, height) > maxEdge) {
+      resize = width >= height ? { width: maxEdge } : { height: maxEdge };
+    }
+  } finally {
+    inspected?.release();
+    inspection.release();
+  }
+
+  const output = ImageManipulator.manipulate(sourceUri);
+  let rendered: Awaited<ReturnType<typeof output.renderAsync>> | null = null;
+  try {
+    if (resize) output.resize(resize);
+    rendered = await output.renderAsync();
+    const saved = await rendered.saveAsync({ format, compress });
+    return new File(saved.uri);
+  } finally {
+    rendered?.release();
+    output.release();
+  }
+}
+
 /**
  * Full pipeline: photo URI -> transparent PNG cutout on disk.
  * Returns null when no drawing was found in the photo.
  */
 export async function processPhotoToCutout(photoUri: string): Promise<ProcessedCutout | null> {
-  const image = decodeImage(readUriBytes(photoUri));
-  const { pixels, width, height } = imageToPixels(image);
-
-  const result = extractDrawing(pixels, width, height);
-  if (!result) return null;
-
-  const cutoutImage = pixelsToImage(result.pixels, result.width, result.height);
-  const png = cutoutImage.encodeToBytes(ImageFormat.PNG, 100);
-  if (!png) throw new Error("Could not encode cutout PNG");
-
-  const stamp = Date.now();
-  const file = new File(drawingsDir(), `drawing-${stamp}.png`);
-  file.write(png);
-
-  // Keep the original shot so the drawing can be viewed "as photographed".
-  // Never let a copy failure break the scan itself.
-  let savedPhotoUri: string | undefined;
+  const prepared = await sanitizedImage(photoUri, MAX_DECODE_EDGE, SaveFormat.PNG, 1);
   try {
-    const photoFile = new File(photosDir(), `photo-${stamp}.jpg`);
-    new File(photoUri).copy(photoFile);
-    savedPhotoUri = photoFile.uri;
-  } catch (e) {
-    console.warn("Could not preserve original photo", e);
-  }
+    const image = decodeImage(readUriBytes(prepared.uri));
+    const { pixels, width, height } = imageToPixels(image);
 
-  return {
-    uri: file.uri,
-    width: result.width,
-    height: result.height,
-    inkBox: result.inkBox,
-    paperBox: result.paperBox,
-    sourceWidth: width,
-    sourceHeight: height,
-    photoUri: savedPhotoUri,
-  };
+    const result = extractDrawing(pixels, width, height);
+    if (!result) return null;
+
+    const cutoutImage = pixelsToImage(result.pixels, result.width, result.height);
+    const png = cutoutImage.encodeToBytes(ImageFormat.PNG, 100);
+    if (!png) throw new Error("Could not encode cutout PNG");
+
+    const stamp = Date.now();
+    const file = new File(drawingsDir(), `drawing-${stamp}.png`);
+    file.write(png);
+
+    let savedPhotoUri: string | undefined;
+    try {
+      const sanitizedPhoto = await sanitizedImage(photoUri, SAVED_PHOTO_EDGE, SaveFormat.JPEG, 0.85);
+      try {
+        const photoFile = new File(photosDir(), `photo-${stamp}.jpg`);
+        sanitizedPhoto.copy(photoFile);
+        savedPhotoUri = photoFile.uri;
+      } finally {
+        try { if (sanitizedPhoto.exists) sanitizedPhoto.delete(); } catch {}
+      }
+    } catch (error) {
+      console.warn("Could not preserve original photo", error);
+    }
+
+    return {
+      uri: file.uri,
+      width: result.width,
+      height: result.height,
+      inkBox: result.inkBox,
+      paperBox: result.paperBox,
+      sourceWidth: width,
+      sourceHeight: height,
+      photoUri: savedPhotoUri,
+    };
+  } finally {
+    try { if (prepared.exists) prepared.delete(); } catch {}
+  }
 }

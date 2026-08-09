@@ -403,6 +403,7 @@ export const useAuth = create<AuthState>((set, get) => ({
     const user = get().user;
     if (!user) return;
     const profile = await loadAdultProfile(user.id);
+    if (get().user?.id !== user.id) return;
     set({ profile });
   },
 
@@ -416,15 +417,18 @@ export const useAuth = create<AuthState>((set, get) => ({
         data: { full_name: displayName, avatar_url: updates.avatarUri },
       });
       if (error) throw error;
+      if (get().user?.id !== user.id) return false;
       await editAdultProfile(user.id, { displayName, avatarUri: updates.avatarUri });
+      if (get().user?.id !== user.id) return false;
       const profile = await loadAdultProfile(user.id);
+      if (get().user?.id !== user.id) return false;
       set({ profile });
       return true;
     } catch (error) {
-      set({ error: errorMessage(error) });
+      if (get().user?.id === user.id) set({ error: errorMessage(error) });
       return false;
     } finally {
-      set({ busy: false });
+      if (get().user?.id === user.id) set({ busy: false });
     }
   },
 

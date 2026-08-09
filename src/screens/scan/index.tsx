@@ -37,6 +37,11 @@ import { useDrawings } from "@/store/drawings";
 import { colors } from "@/theme";
 import { Haptics, impactHaptic } from "@/utils/haptics";
 import { processPhotoToCutout, resolveAssetUri, type ProcessedCutout } from "@/utils/imageio";
+import {
+  MAX_SAFE_IMAGE_BYTES,
+  MAX_SAFE_IMAGE_EDGE,
+  MAX_SAFE_IMAGE_PIXELS,
+} from "@/utils/image-safety";
 import { SAMPLE_PHOTOS } from "@/utils/samples";
 
 type Phase = "aim" | "busy" | "glow";
@@ -97,7 +102,7 @@ export function Scan() {
         return;
       }
       impactHaptic(Haptics.ImpactFeedbackStyle.Light);
-      setPhotoUri(uri);
+      setPhotoUri(cutout.photoUri ?? uri);
       setResult(cutout);
       setPhase("glow");
     } catch (e) {
@@ -139,7 +144,18 @@ export function Scan() {
     }
     if (!requestArtworkCreation("artwork_limit")) return;
     const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 });
-    const uri = picked.assets?.[0]?.uri;
+    const asset = picked.assets?.[0];
+    if (
+      asset
+      && ((asset.fileSize ?? 0) > MAX_SAFE_IMAGE_BYTES
+        || asset.width > MAX_SAFE_IMAGE_EDGE
+        || asset.height > MAX_SAFE_IMAGE_EDGE
+        || asset.width * asset.height > MAX_SAFE_IMAGE_PIXELS)
+    ) {
+      showNotice("That photo is too large to import safely");
+      return;
+    }
+    const uri = asset?.uri;
     if (uri) process(uri);
   };
 

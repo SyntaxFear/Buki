@@ -23,6 +23,7 @@ import { useDrawings } from "@/store/drawings";
 import { currentCapabilities } from "@/store/membership";
 import { useProfiles } from "@/store/profiles";
 import { sha256Digest } from "@/utils/crypto";
+import { assertSafeImageClaim } from "@/utils/image-safety";
 import {
   BUKI_ARCHIVE_FORMAT,
   BUKI_ARCHIVE_LIMITS,
@@ -90,6 +91,11 @@ async function describeMedia(
   if (!uri) return { media: null, source: null };
   const file = new File(uri);
   if (!file.exists || file.size <= 0) return { media: null, source: null };
+  try {
+    assertSafeImageClaim(await file.bytes(), mimeType);
+  } catch {
+    return { media: null, source: null };
+  }
   const checksum = await sha256File(file);
   return {
     media: { path, checksum, byteSize: file.size, mimeType },
@@ -436,6 +442,7 @@ async function readAndVerifyManifest(extracted: ExtractedArchive): Promise<BukiA
     if ((await sha256File(file)) !== media.checksum) {
       throw new Error(`The checksum check failed for ${media.path}.`);
     }
+    assertSafeImageClaim(await file.bytes(), media.mimeType);
   }
   return manifest;
 }

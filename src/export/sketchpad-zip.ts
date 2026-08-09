@@ -1,5 +1,5 @@
-import { File, Paths } from "expo-file-system";
-import { strToU8, zipSync, type Zippable } from "fflate";
+import { File, FileMode, Paths } from "expo-file-system";
+import { strToU8, Zip, ZipPassThrough } from "fflate";
 
 import { artworkExportBaseName } from "./artwork-export";
 import { requireExportAccess } from "./export-access";
@@ -8,6 +8,41 @@ import type { Drawing, Sketchpad } from "@/store/migrate";
 
 export const SKETCHPAD_ZIP_FORMAT = "buki-sketchpad-export";
 export const SKETCHPAD_ZIP_VERSION = 1;
+const ZIP_CHUNK_SIZE = 1024 * 1024;
+
+interface ZipSourceEntry {
+  path: string;
+  source: File;
+}
+
+function addBytes(zip: Zip, path: string, bytes: Uint8Array, mtime: Date): void {
+  const entry = new ZipPassThrough(path);
+  entry.mtime = mtime;
+  zip.add(entry);
+  entry.push(bytes, true);
+}
+
+function addFile(zip: Zip, entry: ZipSourceEntry, mtime: Date): void {
+  const stream = new ZipPassThrough(entry.path);
+  stream.mtime = mtime;
+  zip.add(stream);
+  const input = entry.source.open(FileMode.ReadOnly);
+  try {
+    let remaining = entry.source.size;
+    if (remaining === 0) {
+      stream.push(new Uint8Array(), true);
+      return;
+    }
+    while (remaining > 0) {
+      const chunk = input.readBytes(Math.min(ZIP_CHUNK_SIZE, remaining));
+      if (chunk.length === 0) throw new Error(`Could not read ${entry.path}.`);
+      remaining -= chunk.length;
+      stream.push(chunk, remaining === 0);
+    }
+  } finally {
+    input.close();
+  }
+}
 
 export interface SketchpadZipArtwork {
   id: string;
@@ -189,19 +224,19 @@ export async function createSketchpadZip(input: {
   childName?: string;
 }): Promise<SketchpadZipResult> {
   requireExportAccess("sketchpad_zip_export");
-  const entries: Zippable = {};
+  const sources: ZipSourceEntry[] = [];
   const manifestMedia: Parameters<typeof buildSketchpadZipManifest>[0]["media"] = [];
 
   for (const item of mediaPlan(input.drawings)) {
     const image = new File(item.drawing.uri);
     const imageExists = image.exists;
-    if (imageExists) entries[item.imageFile] = await image.bytes();
+    if (imageExists) sources.push({ path: item.imageFile, source: image });
 
     let originalExists = false;
     if (item.drawing.photoUri && item.originalFile) {
       const original = new File(item.drawing.photoUri);
       originalExists = original.exists;
-      if (originalExists) entries[item.originalFile] = await original.bytes();
+      if (originalExists) sources.push({ path: item.originalFile, source: original });
     }
 
     manifestMedia.push({
@@ -218,21 +253,53 @@ export async function createSketchpadZip(input: {
     media: manifestMedia,
     childName: input.childName,
   });
-  entries["metadata.json"] = strToU8(JSON.stringify(manifest, null, 2));
-  entries["metadata.csv"] = strToU8(sketchpadMetadataCsv(manifest));
-  entries["README.txt"] = strToU8(
-    "Buki sketchpad export\n\nOpen metadata.json for complete structured details or metadata.csv for a spreadsheet-friendly list. Images and available original photos are stored in their matching folders.\n",
-  );
-  if (manifest.missingFiles.length) {
-    entries["missing-media.json"] = strToU8(JSON.stringify(manifest.missingFiles, null, 2));
-  }
-
-  const zip = zipSync(entries, { level: 0, mtime: new Date(manifest.exportedAt) });
   const filename = sketchpadZipFilename(input.pad);
   const destination = new File(Paths.cache, filename);
   try {
     requireExportAccess("sketchpad_zip_export_commit");
-    destination.write(zip);
+    destination.create({ overwrite: true, intermediates: true });
+    const output = destination.open(FileMode.Truncate);
+    const mtime = new Date(manifest.exportedAt);
+    let settled = false;
+    await new Promise<void>((resolve, reject) => {
+      const fail = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        try { output.close(); } catch {}
+        reject(error instanceof Error ? error : new Error("Could not create the sketchpad ZIP."));
+      };
+      const zip = new Zip((error, chunk, final) => {
+        if (error) return fail(error);
+        if (settled) return;
+        try {
+          output.writeBytes(chunk);
+          if (final) {
+            settled = true;
+            output.close();
+            resolve();
+          }
+        } catch (writeError) {
+          fail(writeError);
+        }
+      });
+      try {
+        addBytes(zip, "metadata.json", strToU8(JSON.stringify(manifest, null, 2)), mtime);
+        addBytes(zip, "metadata.csv", strToU8(sketchpadMetadataCsv(manifest)), mtime);
+        addBytes(
+          zip,
+          "README.txt",
+          strToU8("Buki sketchpad export\n\nOpen metadata.json for complete structured details or metadata.csv for a spreadsheet-friendly list. Images and available original photos are stored in their matching folders.\n"),
+          mtime,
+        );
+        if (manifest.missingFiles.length) {
+          addBytes(zip, "missing-media.json", strToU8(JSON.stringify(manifest.missingFiles, null, 2)), mtime);
+        }
+        for (const source of sources) addFile(zip, source, mtime);
+        zip.end();
+      } catch (error) {
+        fail(error);
+      }
+    });
     requireExportAccess("sketchpad_zip_export_complete");
     return {
       uri: destination.uri,

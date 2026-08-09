@@ -250,7 +250,7 @@ export async function loadLocalSyncSummary(
   );
   const values = new Map(preferences.map((entry) => [entry.key, entry.value]));
   return {
-    automaticBackup: values.get(preferenceKey("automatic_backup", ownerId)) !== "false",
+    automaticBackup: values.get(preferenceKey("automatic_backup", ownerId)) === "true",
     pendingCount: queue?.pending_count ?? 0,
     nextAttemptAt: queue?.next_attempt_at ?? null,
     lastSyncedAt: values.get(preferenceKey("last_sync_at", ownerId)) ?? null,

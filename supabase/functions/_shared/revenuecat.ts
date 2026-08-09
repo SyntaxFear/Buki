@@ -67,11 +67,13 @@ export function revenueCatPagePath(path: string): string {
   return `${url.pathname.slice(3)}${url.search}`;
 }
 
-async function revenueCatRequest(path: string): Promise<Response> {
+async function revenueCatRequest(path: string, init: RequestInit = {}): Promise<Response> {
   return fetch(`${REVENUECAT_API_BASE}${revenueCatPagePath(path)}`, {
+    ...init,
     headers: {
       Authorization: `Bearer ${requiredSecret("REVENUECAT_SECRET_API_KEY")}`,
       Accept: "application/json",
+      ...init.headers,
     },
   });
 }
@@ -207,6 +209,20 @@ export async function verifyRevenueCatPro(
     expiresAt: expiresAt?.toISOString() ?? null,
     checkedAt: checkedAt.toISOString(),
   };
+}
+
+export async function deleteRevenueCatCustomer(customerId: string): Promise<void> {
+  const projectId = requiredSecret("REVENUECAT_PROJECT_ID");
+  const upstream = await revenueCatRequest(
+    `/projects/${encodeURIComponent(projectId)}/customers/${encodeURIComponent(customerId)}`,
+    { method: "DELETE" },
+  );
+  if (upstream.status === 404) {
+    await upstream.body?.cancel();
+    return;
+  }
+  if (!upstream.ok) return revenueCatError(upstream, "customer deletion");
+  await upstream.body?.cancel();
 }
 
 export async function persistRevenueCatVerification(

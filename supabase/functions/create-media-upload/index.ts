@@ -13,8 +13,6 @@ import { CREATE_ONLY_SIGNED_UPLOAD_OPTIONS } from "../_shared/signed-upload.ts";
 const MIME_EXTENSION: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
-  "image/heic": "heic",
-  "image/webp": "webp",
 };
 
 type ReservationRow = {

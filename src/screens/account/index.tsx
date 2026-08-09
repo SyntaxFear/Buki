@@ -222,6 +222,17 @@ export function AccountCenter() {
     requestUpgrade(feature, source);
   };
 
+  const changeAutomaticBackup = async (enabled: boolean) => {
+    if (!enabled) {
+      await setAutomaticBackup(false);
+      return;
+    }
+    if (!(await confirmAdult(
+      "Turning on cloud backup uploads this account’s child profiles, artwork details, and images to Buki’s private cloud storage.",
+    ))) return;
+    await setAutomaticBackup(true);
+  };
+
   const beginCreateChild = () => {
     if (
       !canCreateContent(
@@ -595,7 +606,7 @@ export function AccountCenter() {
                 value={automaticBackup && capabilities.cloudBackup && cloudUploadsEnabled}
                 accessibilityLabel="Automatic backup"
                 onValueChange={(value) => {
-                  if (capabilities.cloudBackup) void setAutomaticBackup(value);
+                  if (capabilities.cloudBackup) void changeAutomaticBackup(value);
                   else void introducePro("cloudBackup", "account_backup_toggle");
                 }}
               />

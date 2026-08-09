@@ -147,6 +147,7 @@ describe("membership account switching", () => {
 
   it("does not report a verification-failed purchase as applied", async () => {
     useMembership.setState({ ownerId: "adult-a" });
+    useMembership.setState({ purchaseIdentityReady: true });
 
     await expect(
       useMembership.getState().acceptCustomerInfo(customerInfo("FAILED"), "adult-a"),

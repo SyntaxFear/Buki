@@ -157,7 +157,11 @@ function installListeners(ownerId: string): void {
 
   membershipUnsubscribe = useMembership.subscribe((state, previous) => {
     if (useCloudSync.getState().ownerId !== ownerId) return;
-    if (state.capabilities.cloudBackup && !previous.capabilities.cloudBackup) {
+    if (
+      state.capabilities.cloudBackup
+      && !previous.capabilities.cloudBackup
+      && useCloudSync.getState().automaticBackup
+    ) {
       scheduleSync();
     } else if (!state.capabilities.cloudBackup && previous.capabilities.cloudBackup) {
       useCloudSync.setState({ status: "paused" });
@@ -180,7 +184,7 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
   hydrated: false,
   ownerId: null,
   deviceId: null,
-  automaticBackup: true,
+  automaticBackup: false,
   status: "idle",
   pendingCount: 0,
   nextAttemptAt: null,
@@ -195,7 +199,7 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
       hydrated: false,
       ownerId,
       deviceId: null,
-      automaticBackup: true,
+      automaticBackup: false,
       status: "idle",
       pendingCount: 0,
       nextAttemptAt: null,
@@ -237,7 +241,7 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
       hydrated: true,
       ownerId: null,
       deviceId: null,
-      automaticBackup: true,
+      automaticBackup: false,
       status: "idle",
       pendingCount: 0,
       nextAttemptAt: null,

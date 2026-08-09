@@ -247,7 +247,7 @@ export function ProPaywallHost() {
     setPurchasing(true);
     setError(null);
     try {
-      const result = await purchaseRevenueCatPackage(selectedPlan.aPackage);
+      const result = await purchaseRevenueCatPackage(selectedPlan.aPackage, accountId);
       const applied = await acceptCustomerInfo(result.customerInfo, accountId);
       if (!applied) {
         throw new Error(

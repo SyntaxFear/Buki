@@ -17,6 +17,7 @@ jest.mock("expo-print", () => ({
 
 jest.mock("expo-file-system", () => ({
   Paths: { cache: "cache" },
+  FileMode: { ReadOnly: "read", Truncate: "truncate" },
   File: class MockFile {
     readonly uri: string;
 
@@ -31,6 +32,32 @@ jest.mock("expo-file-system", () => ({
 
     get exists() {
       return !mockDeletes.includes(this.uri);
+    }
+
+    get size() {
+      return 3;
+    }
+
+    create() {
+      mockWrites.push(this.uri);
+    }
+
+    open(mode: string) {
+      if (mode === "read") {
+        let read = false;
+        return {
+          readBytes: () => {
+            if (read) return new Uint8Array();
+            read = true;
+            return new Uint8Array([1, 2, 3]);
+          },
+          close: jest.fn(),
+        };
+      }
+      return {
+        writeBytes: () => mockWrites.push(this.uri),
+        close: jest.fn(),
+      };
     }
 
     async base64() {
@@ -263,6 +290,7 @@ describe("export service authorization", () => {
       "sketchpad_zip_export_commit",
       "sketchpad_zip_export_complete",
     ]);
-    expect(mockWrites).toEqual([expect.stringContaining(".zip")]);
+    expect(mockWrites.length).toBeGreaterThan(0);
+    expect(mockWrites.every((uri) => uri.includes(".zip"))).toBe(true);
   });
 });

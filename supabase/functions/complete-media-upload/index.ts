@@ -9,6 +9,7 @@ import {
   requestObject,
 } from "../_shared/buki.ts";
 import { copyUploadToFinalPath } from "../_shared/signed-upload.ts";
+import { assertSafeUploadedImage } from "../_shared/image-safety.ts";
 
 type ReservationRow = {
   id: string;
@@ -37,6 +38,8 @@ function hex(buffer: ArrayBuffer): string {
 
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json(405, { error: "method_not_allowed" });
+  let claimedOwner: string | null = null;
+  let claimedReservationId: string | null = null;
   try {
     const { user, admin } = await authenticatedClients(request);
     const body = await requestObject(request);
@@ -46,17 +49,17 @@ Deno.serve(async (request) => {
       throw new HttpError(400, "invalid_reservationId");
     }
 
-    const reservationResult = await admin
-      .from("media_upload_reservations")
-      .select("*")
-      .eq("id", reservationId)
-      .eq("owner_id", user.id)
-      .maybeSingle();
-    if (reservationResult.error) throw new Error("reservation_lookup_failed");
-    const reservation = reservationResult.data as ReservationRow | null;
-    if (!reservation || reservation.status !== "reserved") {
+    const reservationResult = await admin.rpc("claim_media_upload_verification", {
+      target_owner: user.id,
+      target_reservation_id: reservationId,
+    });
+    if (reservationResult.error) throw new Error("reservation_claim_failed");
+    const reservation = (reservationResult.data as ReservationRow[] | null)?.[0] ?? null;
+    if (!reservation) {
       throw new HttpError(409, "upload_reservation_inactive");
     }
+    claimedOwner = user.id;
+    claimedReservationId = reservation.id;
     if (Date.parse(reservation.expires_at) <= Date.now()) {
       throw new HttpError(409, "upload_reservation_expired");
     }
@@ -89,6 +92,15 @@ Deno.serve(async (request) => {
         target_reservation_id: reservation.id,
       });
       throw new HttpError(422, "uploaded_checksum_mismatch");
+    }
+    try {
+      assertSafeUploadedImage(new Uint8Array(bytes), reservation.mime_type);
+    } catch {
+      await admin.rpc("release_media_upload_reservation", {
+        target_owner: user.id,
+        target_reservation_id: reservation.id,
+      });
+      throw new HttpError(422, "uploaded_image_invalid");
     }
 
     await copyUploadToFinalPath(bucket, reservation.storage_path, finalStoragePath);
@@ -123,6 +135,15 @@ Deno.serve(async (request) => {
       bytesLimit: result.bytes_limit,
     });
   } catch (error) {
+    if (claimedOwner && claimedReservationId) {
+      try {
+        const { admin } = await authenticatedClients(request);
+        await admin.rpc("release_media_upload_verification", {
+          target_owner: claimedOwner,
+          target_reservation_id: claimedReservationId,
+        });
+      } catch {}
+    }
     return handleError(error, "complete_media_upload");
   }
 });

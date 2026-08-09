@@ -10,6 +10,8 @@ import { deleteLocalFile } from "./file-cleanup";
 
 const LANDSCAPE = { width: 842, height: 595 } as const;
 const PORTRAIT = { width: 595, height: 842 } as const;
+const MAX_PDF_ARTWORKS = 250;
+const MAX_PDF_SOURCE_BYTES = 40 * 1024 * 1024;
 
 export interface EmbeddedPdfArtwork {
   drawing: Drawing;
@@ -210,6 +212,13 @@ export async function createSketchpadPdf(input: {
   childName?: string;
 }): Promise<SketchpadPdfResult> {
   requireExportAccess("sketchpad_pdf_export");
+  const sourceBytes = input.drawings.reduce((total, drawing) => {
+    const file = new File(drawing.uri);
+    return total + (file.exists ? file.size : 0);
+  }, 0);
+  if (input.drawings.length > MAX_PDF_ARTWORKS || sourceBytes > MAX_PDF_SOURCE_BYTES) {
+    throw new Error("This sketchpad is too large for one PDF. Export it as a ZIP instead.");
+  }
   let missingCount = 0;
   const artworks: EmbeddedPdfArtwork[] = [];
   for (const drawing of input.drawings) {

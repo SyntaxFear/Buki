@@ -200,8 +200,11 @@ interface MockFileSystem {
 }
 
 const mockFileSystem = jest.requireMock("expo-file-system") as MockFileSystem;
-const artworkBytes = strToU8("transparent-artwork-bytes");
-const ARTWORK_CHECKSUM = "0ccc89861303e5459723caa50915145f1f394388e0201bfea8e326cf26b0c366";
+const artworkBytes = Uint8Array.from([
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13,
+  73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1,
+]);
+const ARTWORK_CHECKSUM = "a930c2bb4e61c0682068f71c4ef427eefbb07098ecea9390e445e7af4b66a384";
 
 function baseManifest(mediaBytes: Uint8Array = artworkBytes): BukiArchiveManifest {
   return {

@@ -238,6 +238,17 @@ Deno.serve(async (request) => {
     const entitlementRefresh = await processEntitlementRefreshes(admin);
     const storageSweeps = await processStorageSweeps(admin);
     const staleUploads = await processStaleUploadReservations(admin);
+    const analyticsCutoff = new Date(Date.now() - (90 * 24 * 60 * 60 * 1000)).toISOString();
+    const analyticsCleanup = await admin
+      .from("analytics_events")
+      .delete({ count: "exact" })
+      .lt("received_at", analyticsCutoff);
+    if (analyticsCleanup.error) throw new Error("analytics_retention_cleanup_failed");
+    const analyticsRateLimitCleanup = await admin
+      .from("analytics_rate_limits")
+      .delete({ count: "exact" })
+      .lt("updated_at", new Date(Date.now() - (2 * 24 * 60 * 60 * 1000)).toISOString());
+    if (analyticsRateLimitCleanup.error) throw new Error("analytics_rate_limit_cleanup_failed");
     const claimed = await admin.rpc("claim_due_cloud_retention", {
       batch_limit: 25,
     });
@@ -297,6 +308,8 @@ Deno.serve(async (request) => {
       staleUploads,
       retention: { claimed: owners.length, deleted, renewed, failed },
       storageSweeps,
+      analyticsDeleted: analyticsCleanup.count ?? 0,
+      analyticsRateLimitsDeleted: analyticsRateLimitCleanup.count ?? 0,
     });
   } catch (error) {
     return handleError(error, "retention_cleanup");

@@ -39,6 +39,7 @@ interface MembershipState {
   hydrated: boolean;
   loading: boolean;
   ownerId: string | null;
+  purchaseIdentityReady: boolean;
   tier: AccessTier;
   entitlement: EntitlementSnapshot;
   capabilities: Capabilities;
@@ -157,6 +158,7 @@ export const useMembership = create<MembershipState>((set, get) => ({
   hydrated: false,
   loading: false,
   ownerId: null,
+  purchaseIdentityReady: false,
   tier: "free",
   entitlement: EMPTY_ENTITLEMENT,
   capabilities: FREE_CAPABILITIES,
@@ -175,6 +177,7 @@ export const useMembership = create<MembershipState>((set, get) => ({
     clearExpiryTimer();
     set({
       ownerId,
+      purchaseIdentityReady: false,
       hydrated: false,
       loading: true,
       tier: "free",
@@ -214,6 +217,7 @@ export const useMembership = create<MembershipState>((set, get) => ({
       try {
         const customerInfo = await connectRevenueCatUser(ownerId, receiveCustomerInfo);
         if (get().ownerId !== ownerId) return;
+        set({ purchaseIdentityReady: true });
         if (customerInfo) {
           await applyCustomerInfo(ownerId, customerInfo);
         } else {
@@ -252,11 +256,11 @@ export const useMembership = create<MembershipState>((set, get) => ({
 
   restorePurchases: async (source = "account_center") => {
     const ownerId = get().ownerId;
-    if (!ownerId) return "failed";
+    if (!ownerId || !get().purchaseIdentityReady) return "failed";
     void trackAnalyticsEvent(ownerId, { name: "restore_attempted", source });
     set({ loading: true, error: null });
     try {
-      const customerInfo = await restoreRevenueCatPurchases();
+      const customerInfo = await restoreRevenueCatPurchases(ownerId);
       if (get().ownerId !== ownerId) return "failed";
       await applyCustomerInfo(ownerId, customerInfo);
       if (get().ownerId !== ownerId) return "failed";
@@ -285,6 +289,7 @@ export const useMembership = create<MembershipState>((set, get) => ({
       hydrated: true,
       loading: false,
       ownerId: null,
+      purchaseIdentityReady: false,
       tier: "free",
       entitlement: EMPTY_ENTITLEMENT,
       capabilities: FREE_CAPABILITIES,
@@ -337,6 +342,7 @@ export const useMembership = create<MembershipState>((set, get) => ({
       hydrated: true,
       loading: false,
       ownerId: null,
+      purchaseIdentityReady: false,
       tier: "free",
       entitlement: EMPTY_ENTITLEMENT,
       capabilities: FREE_CAPABILITIES,

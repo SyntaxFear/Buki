@@ -1,5 +1,6 @@
 let mockAuthUserId: string | null = null;
 let mockMembershipOwnerId: string | null = null;
+let mockPurchaseIdentityReady = false;
 
 jest.mock("@/store/auth", () => ({
   useAuth: {
@@ -9,7 +10,10 @@ jest.mock("@/store/auth", () => ({
 
 jest.mock("@/store/membership", () => ({
   useMembership: {
-    getState: () => ({ ownerId: mockMembershipOwnerId }),
+    getState: () => ({
+      ownerId: mockMembershipOwnerId,
+      purchaseIdentityReady: mockPurchaseIdentityReady,
+    }),
   },
 }));
 
@@ -22,18 +26,21 @@ describe("RevenueCat purchase account prerequisite", () => {
   beforeEach(() => {
     mockAuthUserId = null;
     mockMembershipOwnerId = null;
+    mockPurchaseIdentityReady = false;
   });
 
   it("requires both authentication and the matching RevenueCat owner", () => {
-    expect(matchingPurchaseAccountId(null, null)).toBeNull();
-    expect(matchingPurchaseAccountId("adult-a", null)).toBeNull();
-    expect(matchingPurchaseAccountId("adult-a", "adult-b")).toBeNull();
-    expect(matchingPurchaseAccountId("adult-a", "adult-a")).toBe("adult-a");
+    expect(matchingPurchaseAccountId(null, null, false)).toBeNull();
+    expect(matchingPurchaseAccountId("adult-a", null, true)).toBeNull();
+    expect(matchingPurchaseAccountId("adult-a", "adult-b", true)).toBeNull();
+    expect(matchingPurchaseAccountId("adult-a", "adult-a", false)).toBeNull();
+    expect(matchingPurchaseAccountId("adult-a", "adult-a", true)).toBe("adult-a");
   });
 
   it("reads fresh store state at the moment of the purchase action", () => {
     mockAuthUserId = "adult-a";
     mockMembershipOwnerId = "adult-a";
+    mockPurchaseIdentityReady = true;
     expect(currentPurchaseAccountId()).toBe("adult-a");
 
     mockAuthUserId = null;

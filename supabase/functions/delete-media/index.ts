@@ -48,6 +48,9 @@ Deno.serve(async (request) => {
     if (!prepared) throw new Error("media_delete_prepare_missing");
 
     if (prepared.delete_object && prepared.storage_path) {
+      if (!prepared.storage_path.startsWith(`${user.id}/`)) {
+        throw new Error("media_storage_path_invalid");
+      }
       const removed = await admin.storage.from("buki-media").remove([prepared.storage_path]);
       if (removed.error) throw new Error("media_object_delete_failed");
     }

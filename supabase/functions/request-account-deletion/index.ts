@@ -5,6 +5,7 @@ import {
   queueOwnerStorageSweep,
   removeOwnerStorageObjects,
 } from "../_shared/cloud-data.ts";
+import { deleteRevenueCatCustomer } from "../_shared/revenuecat.ts";
 
 Deno.serve(async (request) => {
   if (request.method !== "POST") {
@@ -32,6 +33,7 @@ Deno.serve(async (request) => {
         })
         .eq("owner_id", user.id);
       if (held.error) throw new Error("account_deletion_privacy_hold_failed");
+      await deleteRevenueCatCustomer(user.id);
       await queueOwnerStorageSweep(admin, user.id, "account_deletion");
       const removedObjects = await removeOwnerStorageObjects(admin, user.id);
       const deleted = await admin.auth.admin.deleteUser(user.id, false);

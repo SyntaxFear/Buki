@@ -9,13 +9,17 @@ export const PURCHASE_ACCOUNT_CHANGED =
 export function matchingPurchaseAccountId(
   authUserId: string | null | undefined,
   membershipOwnerId: string | null | undefined,
+  purchaseIdentityReady: boolean,
 ): string | null {
-  return authUserId && authUserId === membershipOwnerId ? authUserId : null;
+  return purchaseIdentityReady && authUserId && authUserId === membershipOwnerId
+    ? authUserId
+    : null;
 }
 
 export function currentPurchaseAccountId(): string | null {
   return matchingPurchaseAccountId(
     useAuth.getState().user?.id,
     useMembership.getState().ownerId,
+    useMembership.getState().purchaseIdentityReady,
   );
 }
