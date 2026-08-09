@@ -7,6 +7,7 @@ import type { Drawing, StoreData } from "@/store/migrate";
 import { activeLocalOwnerId } from "./account-repository";
 import {
   assertLibrarySnapshotWithinCapabilities,
+  CrossAccountLibraryConflictError,
   saveLibrary,
 } from "./library-repository";
 
@@ -124,6 +125,29 @@ describe("library repository capability boundary", () => {
 
     expect(tx.runAsync).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["sketchpad", 0, "shared-pad"],
+    ["artwork", 1, "art-0"],
+    ["media file", 2, "art-0:cutout"],
+    ["child profile", 3, "child-a"],
+  ] as const)(
+    "rejects a cross-account %s identifier before writing",
+    async (entity, conflictCall, id) => {
+      activeLocalOwnerIdMock.mockResolvedValue("owner-b");
+      const { db, tx } = database();
+      for (let index = 0; index < conflictCall; index += 1) {
+        tx.getFirstAsync.mockResolvedValueOnce(null);
+      }
+      tx.getFirstAsync.mockResolvedValueOnce({ id });
+
+      await expect(saveLibrary(db as never, library(1, "shared-pad"), {
+        getCapabilities: () => resolveCapabilities("pro"),
+      })).rejects.toEqual(new CrossAccountLibraryConflictError(entity, id));
+
+      expect(tx.runAsync).not.toHaveBeenCalled();
+    },
+  );
 
   it("blocks a direct Free snapshot containing a second sketchpad", () => {
     const data = library(0);

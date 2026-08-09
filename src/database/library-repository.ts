@@ -79,6 +79,15 @@ export interface LibrarySaveOptions {
   expectedOwnerId?: string;
 }
 
+export class CrossAccountLibraryConflictError extends Error {
+  readonly code = "cross_account_id_collision";
+
+  constructor(entity: string, id: string) {
+    super(`The ${entity} identifier ${id} belongs to another Buki account on this device.`);
+    this.name = "CrossAccountLibraryConflictError";
+  }
+}
+
 interface ExistingLibraryIds {
   sketchpads: ReadonlySet<string>;
   artworks: ReadonlySet<string>;
@@ -168,6 +177,59 @@ function fileSize(uri: string): number | null {
   } catch {
     return null;
   }
+}
+
+async function assertNoCrossAccountIds(
+  db: SQLiteDatabase,
+  ownerId: string | null,
+  table: "child_profiles" | "sketchpads" | "artworks" | "media_files",
+  entity: string,
+  ids: readonly string[],
+): Promise<void> {
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+  for (let offset = 0; offset < uniqueIds.length; offset += 400) {
+    const chunk = uniqueIds.slice(offset, offset + 400);
+    const placeholders = chunk.map(() => "?").join(",");
+    const ownerMismatch = ownerId === null
+      ? "owner_id IS NOT NULL"
+      : "(owner_id IS NULL OR owner_id <> ?)";
+    const conflict = await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM ${table}
+       WHERE id IN (${placeholders}) AND ${ownerMismatch}
+       LIMIT 1`,
+      ...chunk,
+      ...(ownerId === null ? [] : [ownerId]),
+    );
+    if (conflict) throw new CrossAccountLibraryConflictError(entity, conflict.id);
+  }
+}
+
+async function assertLibraryAccountIsolation(
+  db: SQLiteDatabase,
+  ownerId: string | null,
+  data: StoreData,
+): Promise<void> {
+  const artwork = data.pads.flatMap((pad) => data.drawingsByPad[pad.id] ?? []);
+  await assertNoCrossAccountIds(db, ownerId, "sketchpads", "sketchpad", data.pads.map((pad) => pad.id));
+  await assertNoCrossAccountIds(db, ownerId, "artworks", "artwork", artwork.map((drawing) => drawing.id));
+  await assertNoCrossAccountIds(
+    db,
+    ownerId,
+    "media_files",
+    "media file",
+    artwork.flatMap((drawing) => [
+      `${drawing.id}:cutout`,
+      `${drawing.id}:preview`,
+      ...(drawing.photoUri ? [`${drawing.id}:original`] : []),
+    ]),
+  );
+  await assertNoCrossAccountIds(
+    db,
+    ownerId,
+    "child_profiles",
+    "child profile",
+    data.pads.map((pad) => pad.childId || DEFAULT_CHILD_ID),
+  );
 }
 
 export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
@@ -264,6 +326,7 @@ export async function saveLibrary(
     throw new Error("The active Buki account changed before the library write.");
   }
   await db.withExclusiveTransactionAsync(async (tx) => {
+    await assertLibraryAccountIsolation(tx, ownerId, data);
     const existingPads = await tx.getAllAsync<{
       id: string;
       design: string;
