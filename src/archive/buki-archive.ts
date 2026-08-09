@@ -24,6 +24,7 @@ import { currentCapabilities } from "@/store/membership";
 import { useProfiles } from "@/store/profiles";
 import {
   BUKI_ARCHIVE_FORMAT,
+  BUKI_ARCHIVE_LIMITS,
   BUKI_ARCHIVE_MANIFEST_PATH,
   BUKI_ARCHIVE_VERSION,
   archiveMedia,
@@ -35,9 +36,10 @@ import {
 import { emptyPadSignature, planBukiArchiveImport } from "./import-plan";
 
 const ARCHIVE_CHUNK_SIZE = 1024 * 1024;
-const MAX_MANIFEST_BYTES = 20 * 1024 * 1024;
-const MAX_ARCHIVE_ENTRIES = 2_000_005;
-const MAX_EXTRACTED_BYTES = 16 * 1024 * 1024 * 1024;
+const MAX_ARCHIVE_ENTRIES = (BUKI_ARCHIVE_LIMITS.maxArtworks * 2) + 2;
+const MIN_EXTRACTED_BUDGET = 64 * 1024 * 1024;
+const EXTRACTION_OVERHEAD = 16 * 1024 * 1024;
+const DISK_SPACE_RESERVE = 128 * 1024 * 1024;
 
 interface ArchiveSourceEntry {
   path: string;
@@ -292,16 +294,41 @@ function deleteDirectoryQuietly(directory: Directory): void {
   } catch {}
 }
 
+function archiveEntryByteLimit(path: string): number {
+  if (path === BUKI_ARCHIVE_MANIFEST_PATH) return BUKI_ARCHIVE_LIMITS.maxManifestBytes;
+  if (path === "README.txt") return BUKI_ARCHIVE_LIMITS.maxReadmeBytes;
+  return BUKI_ARCHIVE_LIMITS.maxMediaBytes;
+}
+
+export function archiveExtractionBudget(sourceBytes: number, availableDiskSpace?: number): number {
+  if (!Number.isSafeInteger(sourceBytes) || sourceBytes <= 0) {
+    throw new Error("The selected archive is empty or has an invalid size.");
+  }
+  if (sourceBytes > BUKI_ARCHIVE_LIMITS.maxExpandedBytes) {
+    throw new Error("The selected archive is too large for one Buki import.");
+  }
+  const maximumExpanded = Math.min(
+    BUKI_ARCHIVE_LIMITS.maxExpandedBytes,
+    Math.max(MIN_EXTRACTED_BUDGET, (sourceBytes * 2) + EXTRACTION_OVERHEAD),
+  );
+  if (
+    typeof availableDiskSpace === "number"
+    && Number.isFinite(availableDiskSpace)
+    && availableDiskSpace >= 0
+    && availableDiskSpace < maximumExpanded + DISK_SPACE_RESERVE
+  ) {
+    throw new Error("This device does not have enough free space to safely import the archive.");
+  }
+  return maximumExpanded;
+}
+
 function extractArchive(source: File): ExtractedArchive {
   if (!source.exists) throw new Error("The selected Buki archive is unavailable.");
+  const maximumExpanded = archiveExtractionBudget(source.size, Paths.availableDiskSpace);
   const directory = new Directory(Paths.cache, `buki-import-${Crypto.randomUUID()}`);
   directory.create({ intermediates: true });
   const entries = new Set<string>();
   const handles = new Set<ReturnType<File["open"]>>();
-  const maximumExpanded = Math.min(
-    MAX_EXTRACTED_BYTES,
-    Math.max(512 * 1024 * 1024, source.size * 20),
-  );
   let expandedBytes = 0;
   let extractionError: Error | null = null;
 
@@ -327,6 +354,8 @@ function extractArchive(source: File): ExtractedArchive {
         return;
       }
       entries.add(entry.name);
+      const maximumEntryBytes = archiveEntryByteLimit(entry.name);
+      let entryBytes = 0;
       const destination = extractedFile(directory, entry.name);
       destination.create({ overwrite: true, intermediates: true });
       const output = destination.open(FileMode.Truncate);
@@ -334,8 +363,11 @@ function extractArchive(source: File): ExtractedArchive {
       entry.ondata = (error, chunk, final) => {
         if (error && !extractionError) extractionError = error;
         if (!extractionError) {
+          entryBytes += chunk.length;
           expandedBytes += chunk.length;
-          if (expandedBytes > maximumExpanded) {
+          if (entryBytes > maximumEntryBytes) {
+            extractionError = new Error(`The archive entry ${entry.name} is too large.`);
+          } else if (expandedBytes > maximumExpanded) {
             extractionError = new Error("The archive expands beyond the safe import size for this device.");
           } else {
             try {
@@ -381,7 +413,7 @@ function extractArchive(source: File): ExtractedArchive {
 
 async function readAndVerifyManifest(extracted: ExtractedArchive): Promise<BukiArchiveManifest> {
   const manifestFile = extractedFile(extracted.directory, BUKI_ARCHIVE_MANIFEST_PATH);
-  if (!manifestFile.exists || manifestFile.size > MAX_MANIFEST_BYTES) {
+  if (!manifestFile.exists || manifestFile.size > BUKI_ARCHIVE_LIMITS.maxManifestBytes) {
     throw new Error("The selected file does not contain a valid Buki manifest.");
   }
   let raw: unknown;

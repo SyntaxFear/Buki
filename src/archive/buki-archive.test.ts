@@ -190,8 +190,8 @@ jest.mock("@/store/profiles", () => ({
   useProfiles: { getState: () => ({ reloadForAccount: mockReloadProfiles }) },
 }));
 
-import { createBukiArchive, importBukiArchive } from "./buki-archive";
-import type { BukiArchiveManifest } from "./format";
+import { archiveExtractionBudget, createBukiArchive, importBukiArchive } from "./buki-archive";
+import { BUKI_ARCHIVE_LIMITS, type BukiArchiveManifest } from "./format";
 
 interface MockFileSystem {
   __files: Map<string, Uint8Array>;
@@ -452,5 +452,16 @@ describe("Buki archive ZIP integration", () => {
       "The archive contains an unexpected file: media/artwork-999999/cutout.png.",
     );
     expect(mockImportBukiLibraryArchive).not.toHaveBeenCalled();
+  });
+
+  it("uses a bounded extraction budget and requires free disk headroom", () => {
+    expect(archiveExtractionBudget(1_024, 1024 * 1024 * 1024)).toBe(64 * 1024 * 1024);
+    expect(() => archiveExtractionBudget(
+      BUKI_ARCHIVE_LIMITS.maxExpandedBytes + 1,
+      Number.MAX_SAFE_INTEGER,
+    )).toThrow("too large");
+    expect(() => archiveExtractionBudget(1_024, 128 * 1024 * 1024)).toThrow(
+      "enough free space",
+    );
   });
 });

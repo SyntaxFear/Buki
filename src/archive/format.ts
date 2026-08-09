@@ -12,6 +12,15 @@ import { PAD_STYLES, type PadStyle } from "@/store/migrate";
 export const BUKI_ARCHIVE_FORMAT = "buki-library-archive";
 export const BUKI_ARCHIVE_VERSION = 1;
 export const BUKI_ARCHIVE_MANIFEST_PATH = "manifest.json";
+export const BUKI_ARCHIVE_LIMITS = {
+  maxChildren: 100,
+  maxSketchpads: 2_000,
+  maxArtworks: 10_000,
+  maxMediaBytes: 30 * 1024 * 1024,
+  maxManifestBytes: 8 * 1024 * 1024,
+  maxReadmeBytes: 64 * 1024,
+  maxExpandedBytes: (2 * 1024 * 1024 * 1024) + (64 * 1024 * 1024),
+} as const;
 
 const idSchema = z.string().min(1).max(200).refine(
   (value) => value === value.trim(),
@@ -29,7 +38,7 @@ const mediaPathSchema = z.string().regex(/^media\/[a-z0-9-]+\/(cutout|original)\
 const mediaSchema = z.strictObject({
   path: mediaPathSchema,
   checksum: z.string().regex(/^[a-f0-9]{64}$/),
-  byteSize: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  byteSize: z.number().int().positive().max(BUKI_ARCHIVE_LIMITS.maxMediaBytes),
   mimeType: z.enum(["image/png", "image/jpeg", "image/heic", "image/webp"]),
 });
 
@@ -84,9 +93,9 @@ const manifestSchema = z.strictObject({
   version: z.literal(BUKI_ARCHIVE_VERSION),
   exportedAt: exportedAtSchema,
   appVersion: z.string().trim().min(1).max(50),
-  children: z.array(childSchema).max(1_000),
-  sketchpads: z.array(sketchpadSchema).max(100_000),
-  artworks: z.array(artworkSchema).max(1_000_000),
+  children: z.array(childSchema).max(BUKI_ARCHIVE_LIMITS.maxChildren),
+  sketchpads: z.array(sketchpadSchema).max(BUKI_ARCHIVE_LIMITS.maxSketchpads),
+  artworks: z.array(artworkSchema).max(BUKI_ARCHIVE_LIMITS.maxArtworks),
 });
 
 export type BukiArchiveMedia = z.infer<typeof mediaSchema>;
@@ -154,6 +163,13 @@ export function parseBukiArchiveManifest(value: unknown): BukiArchiveManifest {
     [artwork.cutout?.path, artwork.original?.path].filter((path): path is string => Boolean(path)),
   );
   ensureUnique(paths, "media path");
+  let totalMediaBytes = 0;
+  for (const media of archiveMedia(manifest)) {
+    totalMediaBytes += media.byteSize;
+    if (totalMediaBytes > BUKI_ARCHIVE_LIMITS.maxExpandedBytes) {
+      throw new Error("The Buki archive declares too much media for one import.");
+    }
+  }
   return manifest;
 }
 

@@ -1,5 +1,6 @@
 import {
   BUKI_ARCHIVE_FORMAT,
+  BUKI_ARCHIVE_LIMITS,
   BUKI_ARCHIVE_VERSION,
   archiveMedia,
   isSafeArchiveEntryPath,
@@ -114,6 +115,20 @@ describe("Buki archive format", () => {
         },
       }],
     })).toThrow("inconsistent original-photo metadata");
+  });
+
+  it("rejects media files that exceed the device-safe per-file limit", () => {
+    const artwork = manifest.artworks[0];
+    expect(() => parseBukiArchiveManifest({
+      ...manifest,
+      artworks: [{
+        ...artwork,
+        cutout: {
+          ...artwork.cutout!,
+          byteSize: BUKI_ARCHIVE_LIMITS.maxMediaBytes + 1,
+        },
+      }],
+    })).toThrow("Invalid Buki archive manifest");
   });
 
   it("accepts only the documented archive entry paths", () => {
