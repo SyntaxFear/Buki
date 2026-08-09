@@ -34,7 +34,11 @@ import {
   PageBorder,
 } from "@/components/pad-ornaments";
 import { getPadDesign, PAD_GEOMETRY, type PadDesignId } from "@/pad-designs";
-import type { PadBorderId, PadDecorationId } from "@/pad-visuals";
+import {
+  SPREAD_SNAPSHOT_DECORATION_PLACEMENT,
+  type PadBorderId,
+  type PadDecorationId,
+} from "@/pad-visuals";
 import type { Drawing } from "@/store/drawings";
 import { colors, padDarkColor } from "@/theme";
 import { useImageCache } from "@/utils/image-cache";
@@ -185,6 +189,35 @@ export function Scrapbook({
     }),
     [border, decoration, palette.stamp, palette.stampColor, palette.tabs],
   );
+  // Settled decorations span the spread once. During a turn, partition that
+  // same pattern between the left and right page faces instead of duplicating it.
+  const spreadSnapshotVisuals = useMemo(
+    () => ({
+      turningFront: {
+        ...snapshotVisuals,
+        decorationPlacement: SPREAD_SNAPSHOT_DECORATION_PLACEMENT.turningFront,
+      },
+      turningBack: {
+        ...snapshotVisuals,
+        decorationPlacement: SPREAD_SNAPSHOT_DECORATION_PLACEMENT.turningBack,
+      },
+      baseLeft: {
+        ...snapshotVisuals,
+        decorationPlacement: SPREAD_SNAPSHOT_DECORATION_PLACEMENT.baseLeft,
+      },
+      baseRight: {
+        ...snapshotVisuals,
+        decorationPlacement: SPREAD_SNAPSHOT_DECORATION_PLACEMENT.baseRight,
+      },
+    }),
+    [snapshotVisuals],
+  );
+  const {
+    turningFront: turningFrontVisuals,
+    turningBack: turningBackVisuals,
+    baseLeft: baseLeftVisuals,
+    baseRight: baseRightVisuals,
+  } = spreadSnapshotVisuals;
 
   const frontSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
@@ -192,9 +225,18 @@ export function Scrapbook({
     return buildFaceSnapshot(rightPage.width, rightPage.height, items, {
       pageColor: paper,
       dotColor: palette.gridDot,
-      visuals: snapshotVisuals,
+      visuals: turningFrontVisuals,
     });
-  }, [flip, frontFace, frontImage, paper, palette.gridDot, rightPage, rightSlotLocal, snapshotVisuals]);
+  }, [
+    flip,
+    frontFace,
+    frontImage,
+    paper,
+    palette.gridDot,
+    rightPage,
+    rightSlotLocal,
+    turningFrontVisuals,
+  ]);
 
   const backSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
@@ -202,9 +244,18 @@ export function Scrapbook({
     return buildFaceSnapshot(rightPage.width, rightPage.height, items, {
       pageColor: paper,
       dotColor: palette.gridDot,
-      visuals: snapshotVisuals,
+      visuals: turningBackVisuals,
     });
-  }, [flip, backFace, backImage, paper, palette.gridDot, rightPage, leftSlotLocal, snapshotVisuals]);
+  }, [
+    flip,
+    backFace,
+    backImage,
+    paper,
+    palette.gridDot,
+    rightPage,
+    leftSlotLocal,
+    turningBackVisuals,
+  ]);
 
   const baseLeftSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
@@ -213,9 +264,18 @@ export function Scrapbook({
     return buildFaceSnapshot(leftPage.width, leftPage.height, items, {
       pageColor: paper,
       dotColor: palette.gridDot,
-      visuals: snapshotVisuals,
+      visuals: baseLeftVisuals,
     });
-  }, [baseLeft, flip, leftPage, leftSlotLocal, lookup, paper, palette.gridDot, snapshotVisuals]);
+  }, [
+    baseLeft,
+    flip,
+    leftPage,
+    leftSlotLocal,
+    lookup,
+    paper,
+    palette.gridDot,
+    baseLeftVisuals,
+  ]);
 
   const baseRightSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
@@ -224,9 +284,18 @@ export function Scrapbook({
     return buildFaceSnapshot(rightPage.width, rightPage.height, items, {
       pageColor: paper,
       dotColor: palette.gridDot,
-      visuals: snapshotVisuals,
+      visuals: baseRightVisuals,
     });
-  }, [baseRight, flip, lookup, paper, palette.gridDot, rightPage, rightSlotLocal, snapshotVisuals]);
+  }, [
+    baseRight,
+    flip,
+    lookup,
+    paper,
+    palette.gridDot,
+    rightPage,
+    rightSlotLocal,
+    baseRightVisuals,
+  ]);
 
   useEffect(() => {
     if (!flip) return;

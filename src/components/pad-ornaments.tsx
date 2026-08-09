@@ -12,7 +12,12 @@ import {
 import type { ReactNode } from "react";
 
 import { PAD_GEOMETRY, type PadStamp, type PadTabGlyph } from "@/pad-designs";
-import type { PadBorderId, PadDecorationId } from "@/pad-visuals";
+import {
+  decorationSidesForPlacement,
+  type PadBorderId,
+  type PadDecorationId,
+  type PadDecorationPlacement,
+} from "@/pad-visuals";
 
 export function PageBorder({
   id,
@@ -212,6 +217,8 @@ export interface SnapshotPageVisuals {
   accent: string;
   secondary: string;
   stamp: PadStamp;
+  /** Split a spread-wide decoration between page snapshots so the spine stays clean. */
+  decorationPlacement?: PadDecorationPlacement;
 }
 
 /** Draws the same page styling into an offscreen page-turn snapshot. */
@@ -221,9 +228,12 @@ export function drawSnapshotPageVisuals(
   height: number,
   visuals: SnapshotPageVisuals,
 ): void {
+  const placement = visuals.decorationPlacement ?? "both";
   drawSnapshotBorder(canvas, visuals.border, width, height, visuals.accent);
   if (visuals.decoration === "none") {
-    drawSnapshotStamp(canvas, 29, height - 29, visuals.stamp, visuals.accent);
+    if (placement !== "right") {
+      drawSnapshotStamp(canvas, 29, height - 29, visuals.stamp, visuals.accent);
+    }
     return;
   }
   drawSnapshotDecorations(
@@ -233,6 +243,7 @@ export function drawSnapshotPageVisuals(
     height,
     visuals.accent,
     visuals.secondary,
+    placement,
   );
 }
 
@@ -349,51 +360,66 @@ function drawSnapshotDecorations(
   height: number,
   accent: string,
   secondary: string,
+  placement: PadDecorationPlacement,
 ) {
   const left = 20;
   const right = width - 20;
   const top = 20;
   const bottom = height - 20;
+  const { left: showLeft, right: showRight } = decorationSidesForPlacement(placement);
   if (id === "confetti-pop") {
-    const dots: Array<[number, number, string, number]> = [
-      [left, top, accent, 4.2],
-      [left + 11, top + 7, secondary, 3.2],
-      [right, top + 4, secondary, 4.2],
-      [right - 12, top - 3, accent, 3.2],
-      [right, bottom, accent, 4.2],
-      [left + 5, bottom, secondary, 3.2],
-    ];
+    const dots: Array<[number, number, string, number]> = [];
+    if (showLeft) {
+      dots.push(
+        [left, top, accent, 4.2],
+        [left + 11, top + 7, secondary, 3.2],
+        [left + 5, bottom, secondary, 3.2],
+      );
+    }
+    if (showRight) {
+      dots.push(
+        [right, top + 4, secondary, 4.2],
+        [right - 12, top - 3, accent, 3.2],
+        [right, bottom, accent, 4.2],
+      );
+    }
     for (const [cx, cy, color, radius] of dots) {
       canvas.drawCircle(cx, cy, radius, snapshotPaint(color, PaintStyle.Fill, 1, 0.72));
     }
     return;
   }
   if (id === "sparkle-trail") {
-    drawSnapshotStamp(canvas, left, bottom, "spark", accent);
-    drawSnapshotStamp(canvas, right, top, "spark", secondary);
-    canvas.drawCircle(right - 19, top + 17, 3, snapshotPaint(accent, PaintStyle.Fill, 1, 0.58));
+    if (showLeft) drawSnapshotStamp(canvas, left, bottom, "spark", accent);
+    if (showRight) {
+      drawSnapshotStamp(canvas, right, top, "spark", secondary);
+      canvas.drawCircle(right - 19, top + 17, 3, snapshotPaint(accent, PaintStyle.Fill, 1, 0.58));
+    }
     return;
   }
   if (id === "heart-parade") {
-    drawSnapshotStamp(canvas, left, bottom, "heart", accent);
-    drawSnapshotStamp(canvas, right, top, "heart", secondary);
+    if (showLeft) drawSnapshotStamp(canvas, left, bottom, "heart", accent);
+    if (showRight) drawSnapshotStamp(canvas, right, top, "heart", secondary);
     return;
   }
   if (id === "flower-garden") {
-    drawSnapshotStamp(canvas, left, bottom, "flower", accent);
-    drawSnapshotStamp(canvas, right, top, "flower", secondary);
+    if (showLeft) drawSnapshotStamp(canvas, left, bottom, "flower", accent);
+    if (showRight) drawSnapshotStamp(canvas, right, top, "flower", secondary);
     return;
   }
   if (id === "starry-sky") {
-    drawSnapshotStamp(canvas, right, top, "spark", accent);
-    canvas.drawCircle(right - 24, top + 8, 5, snapshotPaint(secondary, PaintStyle.Fill, 1, 0.55));
-    canvas.drawCircle(right - 32, top + 1, 2, snapshotPaint(accent, PaintStyle.Fill, 1, 0.65));
-    drawSnapshotStamp(canvas, left, bottom, "spark", secondary);
+    if (showRight) {
+      drawSnapshotStamp(canvas, right, top, "spark", accent);
+      canvas.drawCircle(right - 24, top + 8, 5, snapshotPaint(secondary, PaintStyle.Fill, 1, 0.55));
+      canvas.drawCircle(right - 32, top + 1, 2, snapshotPaint(accent, PaintStyle.Fill, 1, 0.65));
+    }
+    if (showLeft) drawSnapshotStamp(canvas, left, bottom, "spark", secondary);
     return;
   }
-  drawSnapshotStamp(canvas, left, bottom, "heart", accent);
-  drawSnapshotStamp(canvas, right, top, "spark", secondary);
-  drawSnapshotStamp(canvas, right - 18, bottom, "flower", accent);
+  if (showLeft) drawSnapshotStamp(canvas, left, bottom, "heart", accent);
+  if (showRight) {
+    drawSnapshotStamp(canvas, right, top, "spark", secondary);
+    drawSnapshotStamp(canvas, right - 18, bottom, "flower", accent);
+  }
 }
 
 function drawSnapshotStamp(

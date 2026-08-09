@@ -2,6 +2,8 @@ import { PAD_DESIGNS } from "./pad-designs";
 import {
   PAD_BORDERS,
   PAD_DECORATIONS,
+  SPREAD_SNAPSHOT_DECORATION_PLACEMENT,
+  decorationSidesForPlacement,
   hasPremiumPadVisual,
   isPadBorderId,
   isPadDecorationId,
@@ -37,7 +39,30 @@ describe("premium sketchpad visuals", () => {
       "Sticker Stars",
       "Museum Frame",
     ]);
-    expect(PAD_DECORATIONS.some((decoration) => decoration.premium)).toBe(true);
+    expect(
+      PAD_DECORATIONS.filter((decoration) => decoration.premium).map(
+        (decoration) => decoration.name,
+      ),
+    ).toEqual([
+      "Confetti Pop",
+      "Sparkle Trail",
+      "Heart Parade",
+      "Flower Garden",
+      "Starry Sky",
+      "Sticker Party",
+    ]);
+  });
+
+  it("partitions spread decorations between page-turn snapshots", () => {
+    expect(SPREAD_SNAPSHOT_DECORATION_PLACEMENT).toEqual({
+      turningFront: "right",
+      turningBack: "left",
+      baseLeft: "left",
+      baseRight: "right",
+    });
+    expect(decorationSidesForPlacement("both")).toEqual({ left: true, right: true });
+    expect(decorationSidesForPlacement("left")).toEqual({ left: true, right: false });
+    expect(decorationSidesForPlacement("right")).toEqual({ left: false, right: true });
   });
 
   it("repairs unknown persisted visual identifiers", () => {

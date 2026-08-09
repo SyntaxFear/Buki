@@ -26,7 +26,12 @@ import { useFonts } from "expo-font";
 
 import { useDrawings, type PadStyle, type Sketchpad } from "@/store/drawings";
 import { useProfiles } from "@/store/profiles";
-import { getPadDesign, PAD_DESIGNS, type PadDesignId } from "@/pad-designs";
+import {
+  getPadDesign,
+  PAD_DESIGNS,
+  type PadDesignId,
+  type PadStamp,
+} from "@/pad-designs";
 import {
   PAD_BORDERS,
   PAD_DECORATIONS,
@@ -542,10 +547,11 @@ function VisualOptionGrid<T extends string>({
             ]}
           >
             <View style={[styles.visualSwatch, { backgroundColor: option.previewColor }]}>
-              {kind === "decoration" && option.id !== "none" ? (
+              {kind === "decoration" ? (
                 <MiniDecorationPreview
                   id={option.id as PadDecorationId}
-                  accent={colors.surface}
+                  stamp="paw"
+                  accent={option.id === "none" ? colors.ink : colors.surface}
                   secondary="rgba(255,255,255,0.68)"
                 />
               ) : option.id !== "none" ? (
@@ -705,6 +711,7 @@ function MiniCover({
           ) : null}
           <MiniDecorationPreview
             id={decoration}
+            stamp={palette.stamp}
             accent={palette.stampColor}
             secondary={palette.tabs[1].color}
           />
@@ -716,14 +723,34 @@ function MiniCover({
 
 function MiniDecorationPreview({
   id,
+  stamp = "paw",
   accent,
   secondary,
 }: {
   id: PadDecorationId;
+  stamp?: PadStamp;
   accent: string;
   secondary: string;
 }) {
-  if (id === "none") return null;
+  if (id === "none") {
+    if (stamp === "paw") {
+      return (
+        <View pointerEvents="none" style={styles.miniDecorationLayer}>
+          <View style={[styles.miniPawPad, { backgroundColor: accent }]} />
+          <View style={[styles.miniPawToeOne, { backgroundColor: accent }]} />
+          <View style={[styles.miniPawToeTwo, { backgroundColor: accent }]} />
+          <View style={[styles.miniPawToeThree, { backgroundColor: accent }]} />
+          <View style={[styles.miniPawToeFour, { backgroundColor: accent }]} />
+        </View>
+      );
+    }
+    const glyph = stamp === "flower" ? "✿" : stamp === "heart" ? "♥" : "✦";
+    return (
+      <View pointerEvents="none" style={styles.miniDecorationLayer}>
+        <Text style={[styles.miniThemeMark, { color: accent }]}>{glyph}</Text>
+      </View>
+    );
+  }
   if (id === "confetti-pop") {
     return (
       <View pointerEvents="none" style={styles.miniDecorationLayer}>
@@ -1291,6 +1318,55 @@ const styles = StyleSheet.create({
   miniMarkTopLeft: { left: 2, top: 1 },
   miniMarkTopRight: { right: 2, top: 1 },
   miniMarkBottomLeft: { left: 2, bottom: 1 },
+  miniThemeMark: {
+    position: "absolute",
+    left: 2,
+    bottom: 0,
+    fontSize: 8,
+    lineHeight: 9,
+    fontWeight: "900",
+  },
+  miniPawPad: {
+    position: "absolute",
+    left: 3,
+    bottom: 2,
+    width: 7,
+    height: 5,
+    borderRadius: 4,
+    transform: [{ rotate: "-14deg" }],
+  },
+  miniPawToeOne: {
+    position: "absolute",
+    left: 2,
+    bottom: 8,
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+  },
+  miniPawToeTwo: {
+    position: "absolute",
+    left: 6,
+    bottom: 10,
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+  },
+  miniPawToeThree: {
+    position: "absolute",
+    left: 10,
+    bottom: 9,
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+  },
+  miniPawToeFour: {
+    position: "absolute",
+    left: 13,
+    bottom: 6,
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+  },
   miniPlanet: {
     position: "absolute",
     right: 9,

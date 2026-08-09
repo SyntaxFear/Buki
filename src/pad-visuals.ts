@@ -20,6 +20,25 @@ export type PadDecorationId =
   | "starry-sky"
   | "sticker-party";
 
+export type PadDecorationPlacement = "both" | "left" | "right";
+
+export const SPREAD_SNAPSHOT_DECORATION_PLACEMENT = {
+  turningFront: "right",
+  turningBack: "left",
+  baseLeft: "left",
+  baseRight: "right",
+} as const satisfies Record<string, PadDecorationPlacement>;
+
+export function decorationSidesForPlacement(placement: PadDecorationPlacement): {
+  left: boolean;
+  right: boolean;
+} {
+  return {
+    left: placement !== "right",
+    right: placement !== "left",
+  };
+}
+
 export interface PadVisualOption<T extends string> {
   id: T;
   name: string;
