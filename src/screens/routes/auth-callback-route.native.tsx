@@ -1,36 +1,54 @@
 import * as Linking from "expo-linking";
-import { router } from "expo-router";
-import { useEffect, useRef } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { oauthCallbackUrlFromRouteParams } from "@/auth/oauth";
 import { useAuth } from "@/store/auth";
 import { colors } from "@/theme";
 
 export default function AuthCallbackRoute() {
   const url = Linking.useURL();
+  const params = useLocalSearchParams();
   const completeAuthCallback = useAuth((state) => state.completeAuthCallback);
   const busy = useAuth((state) => state.busy);
   const error = useAuth((state) => state.error);
   const handledUrl = useRef<string | null>(null);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const routeCallbackUrl = oauthCallbackUrlFromRouteParams(params);
+  const callbackUrl = routeCallbackUrl ?? url;
 
   useEffect(() => {
-    if (!url || handledUrl.current === url) return;
-    handledUrl.current = url;
-    void completeAuthCallback(url).then((completed) => {
-      if (completed) router.replace("/");
+    if (!callbackUrl) {
+      setRouteError("Authentication did not return a usable session.");
+      return;
+    }
+    if (handledUrl.current === callbackUrl) return;
+    handledUrl.current = callbackUrl;
+    setRouteError(null);
+    void completeAuthCallback(callbackUrl).then((completed) => {
+      if (completed) {
+        router.replace("/");
+      } else {
+        setRouteError(
+          "This sign-in link could not be completed. Request a new link and try again.",
+        );
+      }
     });
-  }, [completeAuthCallback, url]);
+  }, [callbackUrl, completeAuthCallback]);
+
+  const visibleError = error ?? routeError;
 
   return (
     <View style={styles.screen}>
-      {busy || !error ? <ActivityIndicator color={colors.titleTeal} size="large" /> : null}
+      {busy || !visibleError ? <ActivityIndicator color={colors.titleTeal} size="large" /> : null}
       <Text accessibilityRole="header" style={styles.title}>
-        {error ? "Sign-in link could not be completed" : "Finishing sign in"}
+        {visibleError ? "Sign-in link could not be completed" : "Finishing sign in"}
       </Text>
-      <Text selectable accessibilityRole={error ? "alert" : undefined} style={styles.copy}>
-        {error ?? "Buki is securely connecting this device to your adult account."}
+      <Text selectable accessibilityRole={visibleError ? "alert" : undefined} style={styles.copy}>
+        {visibleError ?? "Buki is securely connecting this device to your adult account."}
       </Text>
-      {error ? (
+      {visibleError ? (
         <Pressable accessibilityRole="button" onPress={() => router.replace("/")} style={styles.button}>
           <Text style={styles.buttonLabel}>Back to sign in</Text>
         </Pressable>

@@ -7,6 +7,34 @@ const CALLBACK_PROTOCOL = "buki:";
 const CALLBACK_HOST = "auth";
 const CALLBACK_PATH = "/callback";
 const UNSAFE_CREDENTIAL_KEYS = ["access_token", "refresh_token", "token_hash", "type"] as const;
+const ROUTE_CALLBACK_KEYS = [
+  "code",
+  "error",
+  "error_code",
+  "error_description",
+  ...UNSAFE_CREDENTIAL_KEYS,
+] as const;
+
+export type OAuthCallbackRouteParams = Record<string, string | string[] | undefined>;
+
+export function oauthCallbackUrlFromRouteParams(
+  params: OAuthCallbackRouteParams,
+): string | null {
+  const query = new URLSearchParams();
+  let hasCallbackValue = false;
+
+  for (const key of ROUTE_CALLBACK_KEYS) {
+    const value = params[key];
+    const values = Array.isArray(value) ? value : [value];
+    for (const candidate of values) {
+      if (typeof candidate !== "string") continue;
+      query.append(key, candidate);
+      hasCallbackValue = true;
+    }
+  }
+
+  return hasCallbackValue ? `buki://auth/callback?${query.toString()}` : null;
+}
 
 export function parseOAuthCallback(url: string): OAuthCallback {
   const parsed = new URL(url);
@@ -33,6 +61,7 @@ export function parseOAuthCallback(url: string): OAuthCallback {
     error:
       parsed.searchParams.get("error_description")
       ?? parsed.searchParams.get("error")
+      ?? parsed.searchParams.get("error_code")
       ?? fragment.get("error_description")
       ?? fragment.get("error"),
   };
