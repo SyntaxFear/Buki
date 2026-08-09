@@ -3,6 +3,7 @@ const mockPrintToFileAsync = jest.fn();
 const mockCopies: Array<{ source: string; destination: string }> = [];
 const mockWrites: string[] = [];
 const mockDeletes: string[] = [];
+const mockReleaseSource = jest.fn();
 
 jest.mock("./export-access", () => ({
   requireExportAccess: (source: string) => mockRequireExportAccess(source),
@@ -88,6 +89,7 @@ describe("export service authorization", () => {
     mockCopies.length = 0;
     mockWrites.length = 0;
     mockDeletes.length = 0;
+    mockReleaseSource.mockReset();
   });
 
   it("rechecks individual image access after the copy", async () => {
@@ -98,6 +100,17 @@ describe("export service authorization", () => {
       "artwork_png_export_commit",
     ]);
     expect(mockCopies).toHaveLength(1);
+  });
+
+  it("releases a temporary image source after a successful copy", async () => {
+    await expect(copyArtworkExport(
+      "file:///capture.jpg",
+      drawing,
+      "jpg",
+      { releaseSource: mockReleaseSource },
+    )).resolves.toContain(".jpg");
+
+    expect(mockReleaseSource).toHaveBeenCalledTimes(1);
   });
 
   it("removes an image export rejected at commit time", async () => {
@@ -111,6 +124,40 @@ describe("export service authorization", () => {
       new ProFeatureRequiredError("exportData"),
     );
     expect(mockDeletes).toEqual([expect.stringContaining(".png")]);
+  });
+
+  it("releases a temporary image source when commit access is rejected", async () => {
+    mockRequireExportAccess
+      .mockImplementationOnce(() => undefined)
+      .mockImplementationOnce(() => {
+        throw new ProFeatureRequiredError("exportData");
+      });
+
+    await expect(copyArtworkExport(
+      "file:///capture.jpg",
+      drawing,
+      "jpg",
+      { releaseSource: mockReleaseSource },
+    )).rejects.toEqual(new ProFeatureRequiredError("exportData"));
+
+    expect(mockReleaseSource).toHaveBeenCalledTimes(1);
+    expect(mockDeletes).toEqual([expect.stringContaining(".jpg")]);
+  });
+
+  it("releases a temporary image source when access expires before copying", async () => {
+    mockRequireExportAccess.mockImplementationOnce(() => {
+      throw new ProFeatureRequiredError("exportData");
+    });
+
+    await expect(copyArtworkExport(
+      "file:///capture.jpg",
+      drawing,
+      "jpg",
+      { releaseSource: mockReleaseSource },
+    )).rejects.toEqual(new ProFeatureRequiredError("exportData"));
+
+    expect(mockCopies).toHaveLength(0);
+    expect(mockReleaseSource).toHaveBeenCalledTimes(1);
   });
 
   it("rechecks PDF access before and after publishing the result", async () => {
@@ -128,6 +175,44 @@ describe("export service authorization", () => {
       source: "file:///printed.pdf",
       destination: expect.stringContaining(".pdf"),
     });
+    expect(mockDeletes).toEqual(["file:///printed.pdf"]);
+  });
+
+  it("removes both PDF files when commit access is rejected", async () => {
+    mockRequireExportAccess
+      .mockImplementationOnce(() => undefined)
+      .mockImplementationOnce(() => {
+        throw new ProFeatureRequiredError("exportData");
+      });
+
+    await expect(createSketchpadPdf({ pad, drawings: [drawing] })).rejects.toEqual(
+      new ProFeatureRequiredError("exportData"),
+    );
+
+    expect(mockCopies).toHaveLength(0);
+    expect(mockDeletes).toEqual([
+      expect.stringContaining(".pdf"),
+      "file:///printed.pdf",
+    ]);
+  });
+
+  it("removes both PDF files when access expires after copying", async () => {
+    mockRequireExportAccess
+      .mockImplementationOnce(() => undefined)
+      .mockImplementationOnce(() => undefined)
+      .mockImplementationOnce(() => {
+        throw new ProFeatureRequiredError("exportData");
+      });
+
+    await expect(createSketchpadPdf({ pad, drawings: [drawing] })).rejects.toEqual(
+      new ProFeatureRequiredError("exportData"),
+    );
+
+    expect(mockCopies).toHaveLength(1);
+    expect(mockDeletes).toEqual([
+      expect.stringContaining(".pdf"),
+      "file:///printed.pdf",
+    ]);
   });
 
   it("rechecks ZIP access before and after writing the result", async () => {

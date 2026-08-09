@@ -5,6 +5,10 @@ import { requireExportAccess } from "./export-access";
 
 export type ArtworkImageExport = "png" | "jpg" | "card";
 
+interface ArtworkExportCopyOptions {
+  releaseSource?: () => void;
+}
+
 export function artworkExportBaseName(drawing: Pick<Drawing, "id" | "title" | "addedAt">): string {
   const title = drawing.title
     ?.normalize("NFKD")
@@ -31,17 +35,20 @@ export async function copyArtworkExport(
   sourceUri: string,
   drawing: Pick<Drawing, "id" | "title" | "addedAt">,
   format: ArtworkImageExport,
+  options: ArtworkExportCopyOptions = {},
 ): Promise<string> {
-  requireExportAccess(`artwork_${format}_export`);
   const source = new File(sourceUri);
-  if (!source.exists) throw new Error("The artwork image is missing from this device.");
   const destination = new File(Paths.cache, artworkExportFilename(drawing, format));
   try {
+    requireExportAccess(`artwork_${format}_export`);
+    if (!source.exists) throw new Error("The artwork image is missing from this device.");
     await source.copy(destination, { overwrite: true });
     requireExportAccess(`artwork_${format}_export_commit`);
     return destination.uri;
   } catch (error) {
     try { if (destination.exists) destination.delete(); } catch {}
     throw error;
+  } finally {
+    try { options.releaseSource?.(); } catch {}
   }
 }

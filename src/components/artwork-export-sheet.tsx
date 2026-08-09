@@ -12,7 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
-import ViewShot, { captureRef, type ViewShotRef } from "react-native-view-shot";
+import ViewShot, { captureRef, releaseCapture, type ViewShotRef } from "react-native-view-shot";
 
 import {
   artworkExportFilename,
@@ -82,7 +82,9 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
       height: Math.round(width / ratio),
       useRenderInContext: true,
     });
-    return copyArtworkExport(uri, drawing, format);
+    return copyArtworkExport(uri, drawing, format, {
+      releaseSource: () => releaseCapture(uri),
+    });
   };
 
   const share = async () => {

@@ -234,9 +234,10 @@ export async function createSketchpadPdf(input: {
   });
   const filename = sketchpadPdfFilename(input.pad);
   const destination = new File(Paths.cache, filename);
+  const printedFile = new File(printed.uri);
   try {
     requireExportAccess("sketchpad_pdf_export_commit");
-    await new File(printed.uri).copy(destination, { overwrite: true });
+    await printedFile.copy(destination, { overwrite: true });
     requireExportAccess("sketchpad_pdf_export_complete");
     return {
       uri: destination.uri,
@@ -247,5 +248,9 @@ export async function createSketchpadPdf(input: {
   } catch (error) {
     try { if (destination.exists) destination.delete(); } catch {}
     throw error;
+  } finally {
+    try {
+      if (printedFile.uri !== destination.uri && printedFile.exists) printedFile.delete();
+    } catch {}
   }
 }
