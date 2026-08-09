@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createBukiArchive, importBukiArchive } from "@/archive/buki-archive";
 import { createSketchpadPdf } from "@/export/sketchpad-pdf";
 import { createSketchpadZip } from "@/export/sketchpad-zip";
+import { deleteLocalFile } from "@/export/file-cleanup";
 import { useDrawings } from "@/store/drawings";
 import { useMembership } from "@/store/membership";
 import { confirmAdult } from "@/store/parental-gate";
@@ -90,6 +91,7 @@ export function ExportsScreen() {
     if (!(await confirmAdult(`Exporting ${selectedPad.name} opens Apple’s system share sheet.`))) return;
 
     setBusy(kind);
+    let exportUri: string | null = null;
     try {
       if (!(await Sharing.isAvailableAsync())) {
         Alert.alert("Sharing unavailable", "This device cannot open Apple’s share sheet right now.");
@@ -98,6 +100,7 @@ export function ExportsScreen() {
       const result = kind === "pdf"
         ? await createSketchpadPdf({ pad: selectedPad, drawings, childName })
         : await createSketchpadZip({ pad: selectedPad, drawings, childName });
+      exportUri = result.uri;
       if (!(await confirmIncompleteExport(result.missingCount))) return;
       await Sharing.shareAsync(result.uri, {
         mimeType: kind === "pdf" ? "application/pdf" : "application/zip",
@@ -117,6 +120,7 @@ export function ExportsScreen() {
         error instanceof Error ? error.message : "Please try again.",
       );
     } finally {
+      if (exportUri) await deleteLocalFile(exportUri);
       setBusy(null);
     }
   };
@@ -128,12 +132,14 @@ export function ExportsScreen() {
     }
     if (!(await confirmAdult("Creating a full Buki archive opens Apple’s system share sheet."))) return;
     setBusy("archive");
+    let exportUri: string | null = null;
     try {
       if (!(await Sharing.isAvailableAsync())) {
         Alert.alert("Sharing unavailable", "This device cannot open Apple’s share sheet right now.");
         return;
       }
       const result = await createBukiArchive();
+      exportUri = result.uri;
       if (!(await confirmIncompleteExport(result.missingMedia))) return;
       await Sharing.shareAsync(result.uri, {
         mimeType: "application/vnd.buki.archive",
@@ -150,6 +156,7 @@ export function ExportsScreen() {
     } catch (error) {
       Alert.alert("Could not create Buki archive", error instanceof Error ? error.message : "Please try again.");
     } finally {
+      if (exportUri) await deleteLocalFile(exportUri);
       setBusy(null);
     }
   };
@@ -160,6 +167,7 @@ export function ExportsScreen() {
       return;
     }
     if (!(await confirmAdult("Importing a Buki archive adds child profiles, sketchpads, and artwork to this account."))) return;
+    let selectedUri: string | null = null;
     try {
       const selection = await DocumentPicker.getDocumentAsync({
         type: "*/*",
@@ -167,8 +175,9 @@ export function ExportsScreen() {
         multiple: false,
       });
       if (selection.canceled) return;
+      selectedUri = selection.assets[0].uri;
       setBusy("import");
-      const result = await importBukiArchive(selection.assets[0].uri);
+      const result = await importBukiArchive(selectedUri);
       const added = result.childrenAdded + result.sketchpadsAdded + result.artworksAdded;
       Alert.alert(
         added > 0 ? "Buki archive imported" : "Nothing new to import",
@@ -181,6 +190,7 @@ export function ExportsScreen() {
     } catch (error) {
       Alert.alert("Could not import Buki archive", error instanceof Error ? error.message : "Please choose a valid .buki file.");
     } finally {
+      if (selectedUri) await deleteLocalFile(selectedUri);
       setBusy(null);
     }
   };

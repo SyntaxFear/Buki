@@ -20,6 +20,7 @@ import {
   type ArtworkImageExport,
 } from "@/export/artwork-export";
 import { requireExportAccess } from "@/export/export-access";
+import { deleteLocalFile } from "@/export/file-cleanup";
 import type { Drawing } from "@/store/drawings";
 import { confirmAdult } from "@/store/parental-gate";
 import { colors } from "@/theme";
@@ -90,13 +91,14 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
   const share = async () => {
     if (!(await confirmAdult("Sharing artwork opens Apple’s system share sheet."))) return;
     setBusy("share");
+    let preparedUri: string | null = null;
     try {
       if (!(await Sharing.isAvailableAsync())) {
         Alert.alert("Sharing unavailable", "This device cannot open the share sheet right now.");
         return;
       }
-      const uri = await prepareFile();
-      await Sharing.shareAsync(uri, {
+      preparedUri = await prepareFile();
+      await Sharing.shareAsync(preparedUri, {
         mimeType: format === "jpg" ? "image/jpeg" : "image/png",
         UTI: format === "jpg" ? "public.jpeg" : "public.png",
         dialogTitle: artworkExportFilename(drawing, format),
@@ -111,6 +113,7 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
     } catch (error) {
       Alert.alert("Could not export artwork", error instanceof Error ? error.message : "Please try again.");
     } finally {
+      if (preparedUri) await deleteLocalFile(preparedUri);
       setBusy(null);
     }
   };
@@ -118,6 +121,7 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
   const save = async () => {
     if (!(await confirmAdult("Saving artwork adds an image to the adult device’s Photos library."))) return;
     setBusy("save");
+    let preparedUri: string | null = null;
     try {
       const permission = await MediaLibrary.requestPermissionsAsync(true);
       if (!permission.granted) {
@@ -127,8 +131,8 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
         );
         return;
       }
-      const uri = await prepareFile();
-      await MediaLibrary.Asset.create(uri);
+      preparedUri = await prepareFile();
+      await MediaLibrary.Asset.create(preparedUri);
       void trackAnalyticsEvent(ownerId, {
         name: "export_used",
         source: "save_to_photos",
@@ -140,6 +144,7 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
     } catch (error) {
       Alert.alert("Could not save artwork", error instanceof Error ? error.message : "Please try again.");
     } finally {
+      if (preparedUri) await deleteLocalFile(preparedUri);
       setBusy(null);
     }
   };

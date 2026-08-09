@@ -37,16 +37,17 @@ export async function copyArtworkExport(
   format: ArtworkImageExport,
   options: ArtworkExportCopyOptions = {},
 ): Promise<string> {
-  const source = new File(sourceUri);
-  const destination = new File(Paths.cache, artworkExportFilename(drawing, format));
+  let destination: File | null = null;
   try {
     requireExportAccess(`artwork_${format}_export`);
+    const source = new File(sourceUri);
     if (!source.exists) throw new Error("The artwork image is missing from this device.");
+    destination = new File(Paths.cache, artworkExportFilename(drawing, format));
     await source.copy(destination, { overwrite: true });
     requireExportAccess(`artwork_${format}_export_commit`);
     return destination.uri;
   } catch (error) {
-    try { if (destination.exists) destination.delete(); } catch {}
+    try { if (destination?.exists) destination.delete(); } catch {}
     throw error;
   } finally {
     try { options.releaseSource?.(); } catch {}

@@ -6,6 +6,7 @@ import type { Drawing, PadStyle, Sketchpad } from "@/store/migrate";
 import { unitCapacity } from "@/utils/book-layout";
 import { requireExportAccess } from "./export-access";
 import { escapeHtml, exportSlug, isoDate } from "./export-utils";
+import { deleteLocalFile } from "./file-cleanup";
 
 const LANDSCAPE = { width: 842, height: 595 } as const;
 const PORTRAIT = { width: 595, height: 842 } as const;
@@ -232,10 +233,11 @@ export async function createSketchpadPdf(input: {
     height: document.height,
     margins: { top: 0, right: 0, bottom: 0, left: 0 },
   });
-  const filename = sketchpadPdfFilename(input.pad);
-  const destination = new File(Paths.cache, filename);
-  const printedFile = new File(printed.uri);
+  let destination: File | null = null;
   try {
+    const filename = sketchpadPdfFilename(input.pad);
+    destination = new File(Paths.cache, filename);
+    const printedFile = new File(printed.uri);
     requireExportAccess("sketchpad_pdf_export_commit");
     await printedFile.copy(destination, { overwrite: true });
     requireExportAccess("sketchpad_pdf_export_complete");
@@ -246,11 +248,9 @@ export async function createSketchpadPdf(input: {
       missingCount,
     };
   } catch (error) {
-    try { if (destination.exists) destination.delete(); } catch {}
+    if (destination) await deleteLocalFile(destination.uri);
     throw error;
   } finally {
-    try {
-      if (printedFile.uri !== destination.uri && printedFile.exists) printedFile.delete();
-    } catch {}
+    if (!destination || printed.uri !== destination.uri) await deleteLocalFile(printed.uri);
   }
 }

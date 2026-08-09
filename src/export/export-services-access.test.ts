@@ -3,6 +3,8 @@ const mockPrintToFileAsync = jest.fn();
 const mockCopies: Array<{ source: string; destination: string }> = [];
 const mockWrites: string[] = [];
 const mockDeletes: string[] = [];
+const mockLegacyDeletes: string[] = [];
+const mockFileConstructorErrors = new Set<string>();
 const mockReleaseSource = jest.fn();
 
 jest.mock("./export-access", () => ({
@@ -22,6 +24,9 @@ jest.mock("expo-file-system", () => ({
       this.uri = parts.length === 1
         ? String(parts[0])
         : `cache://${String(parts[1])}`;
+      if (mockFileConstructorErrors.has(this.uri)) {
+        throw new Error(`Could not construct ${this.uri}`);
+      }
     }
 
     get exists() {
@@ -47,6 +52,12 @@ jest.mock("expo-file-system", () => ({
     delete() {
       mockDeletes.push(this.uri);
     }
+  },
+}));
+
+jest.mock("expo-file-system/legacy", () => ({
+  deleteAsync: async (uri: string) => {
+    mockLegacyDeletes.push(uri);
   },
 }));
 
@@ -89,6 +100,8 @@ describe("export service authorization", () => {
     mockCopies.length = 0;
     mockWrites.length = 0;
     mockDeletes.length = 0;
+    mockLegacyDeletes.length = 0;
+    mockFileConstructorErrors.clear();
     mockReleaseSource.mockReset();
   });
 
@@ -160,6 +173,18 @@ describe("export service authorization", () => {
     expect(mockReleaseSource).toHaveBeenCalledTimes(1);
   });
 
+  it("releases a temporary image source when filename metadata is invalid", async () => {
+    await expect(copyArtworkExport(
+      "file:///capture.jpg",
+      { ...drawing, addedAt: Number.NaN },
+      "jpg",
+      { releaseSource: mockReleaseSource },
+    )).rejects.toThrow("Invalid time value");
+
+    expect(mockCopies).toHaveLength(0);
+    expect(mockReleaseSource).toHaveBeenCalledTimes(1);
+  });
+
   it("rechecks PDF access before and after publishing the result", async () => {
     await expect(createSketchpadPdf({ pad, drawings: [drawing] })).resolves.toMatchObject({
       pageCount: 2,
@@ -213,6 +238,18 @@ describe("export service authorization", () => {
       expect.stringContaining(".pdf"),
       "file:///printed.pdf",
     ]);
+  });
+
+  it("falls back to legacy deletion when the printed File wrapper cannot be constructed", async () => {
+    mockFileConstructorErrors.add("file:///printed.pdf");
+
+    await expect(createSketchpadPdf({ pad, drawings: [drawing] })).rejects.toThrow(
+      "Could not construct file:///printed.pdf",
+    );
+
+    expect(mockCopies).toHaveLength(0);
+    expect(mockDeletes).toEqual([expect.stringContaining(".pdf")]);
+    expect(mockLegacyDeletes).toEqual(["file:///printed.pdf"]);
   });
 
   it("rechecks ZIP access before and after writing the result", async () => {

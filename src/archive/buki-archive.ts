@@ -512,14 +512,14 @@ export async function importBukiArchive(uri: string): Promise<BukiArchiveImportR
           const cutoutMedia = artwork.source.cutout;
           if (!cutoutMedia) continue;
           const cutout = importedDestination(drawingsDirectory, artwork.id, extensionFromMedia(cutoutMedia));
-          await extractedFile(extracted.directory, cutoutMedia.path).copy(cutout);
           createdFiles.push(cutout);
+          await extractedFile(extracted.directory, cutoutMedia.path).copy(cutout);
 
           let photoUri: string | undefined;
           if (artwork.source.original) {
             const original = importedDestination(photosDirectory, artwork.id, extensionFromMedia(artwork.source.original));
-            await extractedFile(extracted.directory, artwork.source.original.path).copy(original);
             createdFiles.push(original);
+            await extractedFile(extracted.directory, artwork.source.original.path).copy(original);
             photoUri = original.uri;
           }
 

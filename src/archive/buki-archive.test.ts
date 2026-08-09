@@ -7,6 +7,7 @@ const mockLoadLibrarySnapshot = jest.fn();
 const mockRequireExportAccess = jest.fn();
 const mockReloadDrawings = jest.fn();
 const mockReloadProfiles = jest.fn();
+let mockCopyFailureDestinationPrefix: string | null = null;
 
 jest.mock("expo-application", () => ({
   nativeApplicationVersion: "1.0.1",
@@ -93,6 +94,12 @@ jest.mock("expo-file-system", () => {
         throw new Error(`File already exists: ${destination.uri}`);
       }
       destination.write(await this.bytes());
+      if (
+        mockCopyFailureDestinationPrefix
+        && destination.uri.startsWith(mockCopyFailureDestinationPrefix)
+      ) {
+        throw new Error(`Injected copy failure for ${destination.uri}`);
+      }
     }
 
     open(mode: string) {
@@ -282,6 +289,7 @@ describe("Buki archive ZIP integration", () => {
     mockRequireExportAccess.mockReset();
     mockReloadDrawings.mockReset().mockResolvedValue(undefined);
     mockReloadProfiles.mockReset().mockResolvedValue(undefined);
+    mockCopyFailureDestinationPrefix = null;
   });
 
   it("creates a real versioned archive with matching media checksums", async () => {
@@ -419,6 +427,20 @@ describe("Buki archive ZIP integration", () => {
         expect.stringContaining("buki-import-"),
       ]),
     );
+  });
+
+  it("removes a partially created imported file when its copy throws", async () => {
+    mockFileSystem.__files.set("mem://copy-failure.buki", archiveBytes());
+    mockCopyFailureDestinationPrefix = "mem://document/drawings/import-";
+
+    await expect(importBukiArchive("mem://copy-failure.buki")).rejects.toThrow(
+      "Injected copy failure",
+    );
+
+    expect([...mockFileSystem.__files.keys()]).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/^mem:\/\/document\/drawings\/import-/)]),
+    );
+    expect(mockImportBukiLibraryArchive).not.toHaveBeenCalled();
   });
 
   it("rejects unexpected archive entries before persistence", async () => {
