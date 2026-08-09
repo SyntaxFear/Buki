@@ -40,7 +40,6 @@ export function OnboardingScreen() {
   const profile = useAuth((state) => state.profile);
   const otpEmail = useAuth((state) => state.otpEmail);
   const sendEmailOtp = useAuth((state) => state.sendEmailOtp);
-  const verifyEmailOtp = useAuth((state) => state.verifyEmailOtp);
   const resetEmailOtp = useAuth((state) => state.resetEmailOtp);
   const signInWithApple = useAuth((state) => state.signInWithApple);
   const signInWithGoogle = useAuth((state) => state.signInWithGoogle);
@@ -52,7 +51,6 @@ export function OnboardingScreen() {
   const completeOnboarding = useProfiles((state) => state.completeOnboarding);
 
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
   const [showEmail, setShowEmail] = useState(false);
   const [adultName, setAdultName] = useState("");
   const [adultAvatar, setAdultAvatar] = useState<(typeof ADULT_AVATARS)[number]>("🌻");
@@ -209,10 +207,10 @@ export function OnboardingScreen() {
               <Pressable
                 onPress={() => setShowEmail(true)}
                 accessibilityRole="button"
-                accessibilityLabel="Continue with email code"
+                accessibilityLabel="Continue with email sign-in link"
                 style={styles.emailReveal}
               >
-                <Text style={styles.emailRevealLabel}>Continue with email code</Text>
+                <Text style={styles.emailRevealLabel}>Continue with email link</Text>
               </Pressable>
             ) : (
               <View style={styles.emailForm}>
@@ -230,26 +228,17 @@ export function OnboardingScreen() {
                 />
                 {otpEmail ? (
                   <>
-                    <TextInput
-                      value={otp}
-                      onChangeText={setOtp}
-                      placeholder="6-digit code"
-                      placeholderTextColor={colors.mutedText}
-                      keyboardType="number-pad"
-                      textContentType="oneTimeCode"
-                      maxLength={8}
-                      style={styles.input}
-                      accessibilityLabel="Email verification code"
-                    />
+                    <Text style={styles.cardCopy} accessibilityRole="alert">
+                      We sent a one-time sign-in link to {otpEmail}. Open it on this iPhone to continue.
+                    </Text>
                     <PrimaryButton
-                      title="Verify code"
+                      title="Send link again"
                       busy={busy}
-                      onPress={() => void verifyEmailOtp(otpEmail, otp)}
+                      onPress={() => void sendEmailOtp(otpEmail)}
                     />
                     <Pressable
                       onPress={() => {
                         resetEmailOtp();
-                        setOtp("");
                       }}
                       disabled={busy}
                       accessibilityRole="button"
@@ -261,7 +250,7 @@ export function OnboardingScreen() {
                   </>
                 ) : (
                   <PrimaryButton
-                    title="Email me a code"
+                    title="Email me a sign-in link"
                     busy={busy}
                     onPress={() => void sendEmailOtp(email)}
                   />
