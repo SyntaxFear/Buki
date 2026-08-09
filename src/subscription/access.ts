@@ -48,7 +48,13 @@ export class ProFeatureRequiredError extends Error {
   readonly code = "PRO_FEATURE_REQUIRED";
 
   constructor(readonly feature: Exclude<ProFeature, ContentResource>) {
-    super(`Buki Pro is required to use ${feature === "premiumVisuals" ? "premium visuals" : feature}.`);
+    const label = {
+      cloudBackup: "cloud backup",
+      exportData: "data exports",
+      advancedOrganization: "advanced organization",
+      premiumVisuals: "premium visuals",
+    }[feature];
+    super(`Buki Pro is required to use ${label}.`);
     this.name = "ProFeatureRequiredError";
   }
 }

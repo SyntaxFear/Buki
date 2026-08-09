@@ -4,6 +4,7 @@ import * as Print from "expo-print";
 import { getPadDesign } from "@/pad-designs";
 import type { Drawing, PadStyle, Sketchpad } from "@/store/migrate";
 import { unitCapacity } from "@/utils/book-layout";
+import { requireExportAccess } from "./export-access";
 import { escapeHtml, exportSlug, isoDate } from "./export-utils";
 
 const LANDSCAPE = { width: 842, height: 595 } as const;
@@ -205,6 +206,7 @@ export async function createSketchpadPdf(input: {
   drawings: Drawing[];
   childName?: string;
 }): Promise<SketchpadPdfResult> {
+  requireExportAccess("sketchpad_pdf_export");
   let missingCount = 0;
   const artworks: EmbeddedPdfArtwork[] = [];
   for (const drawing of input.drawings) {
@@ -230,11 +232,18 @@ export async function createSketchpadPdf(input: {
   });
   const filename = sketchpadPdfFilename(input.pad);
   const destination = new File(Paths.cache, filename);
-  await new File(printed.uri).copy(destination, { overwrite: true });
-  return {
-    uri: destination.uri,
-    filename,
-    pageCount: printed.numberOfPages || document.pageCount,
-    missingCount,
-  };
+  try {
+    requireExportAccess("sketchpad_pdf_export_commit");
+    await new File(printed.uri).copy(destination, { overwrite: true });
+    requireExportAccess("sketchpad_pdf_export_complete");
+    return {
+      uri: destination.uri,
+      filename,
+      pageCount: printed.numberOfPages || document.pageCount,
+      missingCount,
+    };
+  } catch (error) {
+    try { if (destination.exists) destination.delete(); } catch {}
+    throw error;
+  }
 }

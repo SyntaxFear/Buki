@@ -17,9 +17,10 @@ import {
   type ImportedArchiveLibrary,
 } from "@/database";
 import type { LocalChildProfile } from "@/database/profile-repository";
+import { requireExportAccess } from "@/export/export-access";
 import type { Drawing, Sketchpad } from "@/store/migrate";
 import { useDrawings } from "@/store/drawings";
-import { currentCapabilities, useMembership } from "@/store/membership";
+import { currentCapabilities } from "@/store/membership";
 import { useProfiles } from "@/store/profiles";
 import {
   BUKI_ARCHIVE_FORMAT,
@@ -60,12 +61,6 @@ export interface BukiArchiveImportResult {
   missingSkipped: number;
 }
 
-function requireArchiveAccess(source: string): void {
-  if (currentCapabilities().exportData) return;
-  useMembership.getState().requestUpgrade("exportData", source);
-  throw new Error("Buki Pro is required to use library archives.");
-}
-
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -77,7 +72,7 @@ async function sha256File(file: File): Promise<string> {
 }
 
 function photoFormat(uri: string): { extension: string; mimeType: BukiArchiveMedia["mimeType"] } {
-  const clean = uri.split(/[?#]/)[0].toLocaleLowerCase();
+  const clean = uri.split(/[?#]/)[0].toLowerCase();
   if (clean.endsWith(".png")) return { extension: "png", mimeType: "image/png" };
   if (clean.endsWith(".heic") || clean.endsWith(".heif")) return { extension: "heic", mimeType: "image/heic" };
   if (clean.endsWith(".webp")) return { extension: "webp", mimeType: "image/webp" };
@@ -191,7 +186,7 @@ function archiveFilename(timestamp: number): string {
 }
 
 export async function createBukiArchive(): Promise<BukiArchiveExportResult> {
-  requireArchiveAccess("archive_export");
+  requireExportAccess("archive_export");
   await flushLibraryWrites();
   const [profiles, library] = await Promise.all([loadBukiProfiles(), loadLibrarySnapshot()]);
   if (!profiles.ownerId) throw new Error("Sign in before creating a Buki archive.");
@@ -264,15 +259,22 @@ export async function createBukiArchive(): Promise<BukiArchiveExportResult> {
   });
   const filename = archiveFilename(exportedAt);
   const destination = new File(Paths.cache, filename);
-  await writeArchiveZip(destination, manifest, mediaEntries);
-  return {
-    uri: destination.uri,
-    filename,
-    children: manifest.children.length,
-    sketchpads: manifest.sketchpads.length,
-    artworks: manifest.artworks.length,
-    missingMedia,
-  };
+  try {
+    requireExportAccess("archive_export_commit");
+    await writeArchiveZip(destination, manifest, mediaEntries);
+    requireExportAccess("archive_export_complete");
+    return {
+      uri: destination.uri,
+      filename,
+      children: manifest.children.length,
+      sketchpads: manifest.sketchpads.length,
+      artworks: manifest.artworks.length,
+      missingMedia,
+    };
+  } catch (error) {
+    try { if (destination.exists) destination.delete(); } catch {}
+    throw error;
+  }
 }
 
 interface ExtractedArchive {
@@ -443,7 +445,7 @@ function extensionFromMedia(media: BukiArchiveMedia): string {
 }
 
 export async function importBukiArchive(uri: string): Promise<BukiArchiveImportResult> {
-  requireArchiveAccess("archive_import");
+  requireExportAccess("archive_import");
   await flushLibraryWrites();
   const extracted = extractArchive(new File(uri));
   const createdFiles: File[] = [];
@@ -546,7 +548,7 @@ export async function importBukiArchive(uri: string): Promise<BukiArchiveImportR
     await importBukiLibraryArchive(imported, {
       getCapabilities: currentCapabilities,
       assertWriteAllowed: () => {
-        requireArchiveAccess("archive_import_commit");
+        requireExportAccess("archive_import_commit");
       },
     });
     committed = true;

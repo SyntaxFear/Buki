@@ -4,6 +4,7 @@ import type {
   BukiArchiveManifest,
   BukiArchiveSketchpad,
 } from "./format";
+import { normalizeArtworkText } from "@/organization/artwork-organizer";
 
 export interface PlannedArchiveArtwork {
   id: string;
@@ -38,21 +39,21 @@ export interface ExistingArchiveLibrary {
 }
 
 export function emptyPadSignature(childCreatedAt: number, pad: Pick<BukiArchiveSketchpad, "name" | "style" | "createdAt">): string {
-  return [childCreatedAt, pad.name.trim().toLocaleLowerCase(), pad.style, pad.createdAt].join("|");
+  return [childCreatedAt, normalizeArtworkText(pad.name), pad.style, pad.createdAt].join("|");
 }
 
 function uniqueImportedChildName(name: string, usedNames: Set<string>): string {
   const base = name.trim() || "Imported Child";
-  if (!usedNames.has(base.toLocaleLowerCase())) {
-    usedNames.add(base.toLocaleLowerCase());
+  if (!usedNames.has(normalizeArtworkText(base))) {
+    usedNames.add(normalizeArtworkText(base));
     return base;
   }
   let index = 1;
   while (true) {
     const suffix = index === 1 ? " (Imported)" : ` (Imported ${index})`;
     const candidate = `${base.slice(0, Math.max(1, 80 - suffix.length))}${suffix}`;
-    if (!usedNames.has(candidate.toLocaleLowerCase())) {
-      usedNames.add(candidate.toLocaleLowerCase());
+    if (!usedNames.has(normalizeArtworkText(candidate))) {
+      usedNames.add(normalizeArtworkText(candidate));
       return candidate;
     }
     index += 1;
@@ -64,7 +65,7 @@ export function planBukiArchiveImport(
   existing: ExistingArchiveLibrary,
   makeId: () => string,
 ): ArchiveImportPlan {
-  const usedNames = new Set(existing.childNames.map((name) => name.trim().toLocaleLowerCase()));
+  const usedNames = new Set(existing.childNames.map(normalizeArtworkText));
   const emptyPads = new Set(existing.emptyPadSignatures);
   const seenChecksums = new Set(existing.artworkChecksums);
   const artworksByPad = new Map<string, BukiArchiveArtwork[]>();

@@ -1,6 +1,7 @@
 import { File, Paths } from "expo-file-system";
 
 import type { Drawing } from "@/store/migrate";
+import { requireExportAccess } from "./export-access";
 
 export type ArtworkImageExport = "png" | "jpg" | "card";
 
@@ -8,7 +9,7 @@ export function artworkExportBaseName(drawing: Pick<Drawing, "id" | "title" | "a
   const title = drawing.title
     ?.normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase()
+    .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
@@ -31,9 +32,16 @@ export async function copyArtworkExport(
   drawing: Pick<Drawing, "id" | "title" | "addedAt">,
   format: ArtworkImageExport,
 ): Promise<string> {
+  requireExportAccess(`artwork_${format}_export`);
   const source = new File(sourceUri);
   if (!source.exists) throw new Error("The artwork image is missing from this device.");
   const destination = new File(Paths.cache, artworkExportFilename(drawing, format));
-  await source.copy(destination, { overwrite: true });
-  return destination.uri;
+  try {
+    await source.copy(destination, { overwrite: true });
+    requireExportAccess(`artwork_${format}_export_commit`);
+    return destination.uri;
+  } catch (error) {
+    try { if (destination.exists) destination.delete(); } catch {}
+    throw error;
+  }
 }

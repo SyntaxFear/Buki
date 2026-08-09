@@ -1,3 +1,5 @@
+jest.mock("./export-access", () => ({ requireExportAccess: jest.fn() }));
+
 import type { Drawing, Sketchpad } from "@/store/migrate";
 import {
   buildSketchpadZipManifest,

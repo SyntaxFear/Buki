@@ -2,6 +2,7 @@ import { File, Paths } from "expo-file-system";
 import { strToU8, zipSync, type Zippable } from "fflate";
 
 import { artworkExportBaseName } from "./artwork-export";
+import { requireExportAccess } from "./export-access";
 import { escapeCsv, exportSlug } from "./export-utils";
 import type { Drawing, Sketchpad } from "@/store/migrate";
 
@@ -187,6 +188,7 @@ export async function createSketchpadZip(input: {
   drawings: Drawing[];
   childName?: string;
 }): Promise<SketchpadZipResult> {
+  requireExportAccess("sketchpad_zip_export");
   const entries: Zippable = {};
   const manifestMedia: Parameters<typeof buildSketchpadZipManifest>[0]["media"] = [];
 
@@ -228,11 +230,18 @@ export async function createSketchpadZip(input: {
   const zip = zipSync(entries, { level: 0, mtime: new Date(manifest.exportedAt) });
   const filename = sketchpadZipFilename(input.pad);
   const destination = new File(Paths.cache, filename);
-  destination.write(zip);
-  return {
-    uri: destination.uri,
-    filename,
-    artworkCount: input.drawings.length,
-    missingCount: manifest.missingFiles.length,
-  };
+  try {
+    requireExportAccess("sketchpad_zip_export_commit");
+    destination.write(zip);
+    requireExportAccess("sketchpad_zip_export_complete");
+    return {
+      uri: destination.uri,
+      filename,
+      artworkCount: input.drawings.length,
+      missingCount: manifest.missingFiles.length,
+    };
+  } catch (error) {
+    try { if (destination.exists) destination.delete(); } catch {}
+    throw error;
+  }
 }

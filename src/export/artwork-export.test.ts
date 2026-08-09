@@ -1,3 +1,5 @@
+jest.mock("./export-access", () => ({ requireExportAccess: jest.fn() }));
+
 import { artworkExportBaseName, artworkExportFilename } from "./artwork-export";
 
 const drawing = { id: "drawing:abc/123", title: "  My Bright Sun!  ", addedAt: 1_700_000_000_000 };
@@ -16,5 +18,14 @@ describe("artwork export names", () => {
     expect(
       artworkExportFilename({ id: "drawing:abc/123", addedAt: 1_700_000_000_000 }, "png"),
     ).toBe("buki-drawing-abc-123-2023-11-14.png");
+  });
+
+  it("normalizes Unicode filenames without locale-specific casing", () => {
+    expect(
+      artworkExportFilename(
+        { id: "drawing-1", title: "  Ｉstanbul   ART  ", addedAt: 1_700_000_000_000 },
+        "png",
+      ),
+    ).toBe("buki-istanbul-art-2023-11-14.png");
   });
 });

@@ -31,6 +31,31 @@ describe("Buki archive import plan", () => {
     expect(plan.children[0].pads[0].artworks[0].source.id).toBe("art-b");
   });
 
+  it("normalizes child and empty-pad names deterministically", () => {
+    let next = 0;
+    const normalized = {
+      ...base,
+      children: [{ ...base.children[0], name: "  Ａva   Marie  " }],
+      sketchpads: [{ ...base.sketchpads[0], name: "  My   Book  " }],
+      artworks: [],
+    };
+    const signature = emptyPadSignature(
+      normalized.children[0].createdAt,
+      { ...normalized.sketchpads[0], name: "My Book" },
+    );
+    const plan = planBukiArchiveImport(
+      normalized,
+      {
+        childNames: ["ava marie"],
+        emptyPadSignatures: [signature],
+        artworkChecksums: [],
+      },
+      () => `new-${++next}`,
+    );
+
+    expect(plan.children).toEqual([]);
+  });
+
   it("does not create empty structures when every artwork is already present", () => {
     const plan = planBukiArchiveImport(
       base,

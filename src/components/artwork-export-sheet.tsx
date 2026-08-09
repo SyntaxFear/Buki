@@ -19,6 +19,7 @@ import {
   copyArtworkExport,
   type ArtworkImageExport,
 } from "@/export/artwork-export";
+import { requireExportAccess } from "@/export/export-access";
 import type { Drawing } from "@/store/drawings";
 import { confirmAdult } from "@/store/parental-gate";
 import { colors } from "@/theme";
@@ -66,6 +67,7 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
   }, [format]);
 
   const prepareFile = async (): Promise<string> => {
+    requireExportAccess(`artwork_${format}_prepare`);
     if (format === "png") return copyArtworkExport(drawing.uri, drawing, "png");
     if (!previewReady || !previewRef.current) {
       throw new Error("The export preview is still loading.");
