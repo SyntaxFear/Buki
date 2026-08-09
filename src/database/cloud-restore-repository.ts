@@ -3,11 +3,124 @@ import type { SQLiteDatabase } from "expo-sqlite";
 
 import type { CloudRestoreResult, RemoteCloudSnapshot } from "@/sync/cloud-types";
 import { activePadPreferenceKey } from "./account-repository";
+import { enqueueLocalSyncOperation } from "./sync-repository";
 import { artworkTagEntityId } from "./sync-serialization";
+
+interface QueuedRelationRow {
+  operation: string;
+  entity_id: string;
+  payload: string | null;
+  updated_at: number;
+}
+
+interface QueuedTagRemapResult {
+  removedKeys: string[];
+  queuedOperations: Array<{ key: string; operation: string }>;
+}
 
 function timestamp(value: string): number {
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : Date.now();
+}
+
+function parseArtworkTagEntityId(
+  entityId: string,
+): { artworkId: string; tagId: string } | null {
+  const separator = entityId.indexOf("|");
+  if (
+    separator <= 0 ||
+    separator !== entityId.lastIndexOf("|") ||
+    separator === entityId.length - 1
+  ) {
+    return null;
+  }
+  try {
+    const artworkId = decodeURIComponent(entityId.slice(0, separator));
+    const tagId = decodeURIComponent(entityId.slice(separator + 1));
+    return artworkId && tagId ? { artworkId, tagId } : null;
+  } catch {
+    return null;
+  }
+}
+
+function queuePayload(value: string | null): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function remapQueuedTagReferences(
+  db: SQLiteDatabase,
+  ownerId: string,
+  localTagId: string,
+  remoteTagId: string,
+): Promise<QueuedTagRemapResult> {
+  if (localTagId === remoteTagId) return { removedKeys: [], queuedOperations: [] };
+  const queuedRelations = await db.getAllAsync<QueuedRelationRow>(
+    `SELECT operation, entity_id, payload, updated_at
+     FROM sync_queue
+     WHERE owner_id = ? AND entity_type = 'artwork_tag'`,
+    ownerId,
+  );
+  const canonicalRows = new Map(
+    queuedRelations.map((row) => [row.entity_id, row]),
+  );
+  const removedKeys = [`tag:${localTagId}`];
+  const queuedOperations: Array<{ key: string; operation: string }> = [];
+
+  await db.runAsync(
+    "DELETE FROM sync_queue WHERE owner_id = ? AND entity_type = 'tag' AND entity_id = ?",
+    ownerId,
+    localTagId,
+  );
+
+  for (const row of queuedRelations) {
+    const relation = parseArtworkTagEntityId(row.entity_id);
+    if (!relation || relation.tagId !== localTagId) continue;
+    const canonicalEntityId = artworkTagEntityId(relation.artworkId, remoteTagId);
+    const canonical = canonicalRows.get(canonicalEntityId);
+    removedKeys.push(`artwork_tag:${row.entity_id}`);
+    await db.runAsync(
+      `DELETE FROM sync_queue
+       WHERE owner_id = ? AND entity_type = 'artwork_tag' AND entity_id = ?`,
+      ownerId,
+      row.entity_id,
+    );
+    if (canonical && canonical.updated_at >= row.updated_at) continue;
+    if (row.operation !== "upsert" && row.operation !== "delete") continue;
+
+    const now = Date.now();
+    const currentPayload = queuePayload(row.payload);
+    const payload = {
+      ...currentPayload,
+      owner_id: ownerId,
+      artwork_id: relation.artworkId,
+      tag_id: remoteTagId,
+      ...(row.operation === "upsert"
+        ? { created_at: currentPayload.created_at ?? new Date(now).toISOString() }
+        : { deleted_at: currentPayload.deleted_at ?? new Date(now).toISOString() }),
+    };
+    await enqueueLocalSyncOperation(db, {
+      ownerId,
+      operation: row.operation,
+      entityType: "artwork_tag",
+      entityId: canonicalEntityId,
+      payload,
+      now,
+    });
+    queuedOperations.push({
+      key: `artwork_tag:${canonicalEntityId}`,
+      operation: row.operation,
+    });
+  }
+
+  return { removedKeys, queuedOperations };
 }
 
 async function localMediaUris(db: SQLiteDatabase, ownerId: string): Promise<Set<string>> {
@@ -374,6 +487,16 @@ export async function applyRemoteCloudSnapshot(
           )
         : [];
       if (conflictingTag) {
+        const remappedQueue = await remapQueuedTagReferences(
+          tx,
+          ownerId,
+          conflictingTag.id,
+          tag.id,
+        );
+        for (const key of remappedQueue.removedKeys) queuedOperation.delete(key);
+        for (const queued of remappedQueue.queuedOperations) {
+          queuedOperation.set(queued.key, queued.operation);
+        }
         await tx.runAsync("DELETE FROM tags WHERE owner_id = ? AND id = ?", ownerId, conflictingTag.id);
       }
       await tx.runAsync(
