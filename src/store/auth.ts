@@ -3,7 +3,7 @@ import { makeRedirectUri } from "expo-auth-session";
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import { create } from "zustand";
-import type { EmailOtpType, Session, User } from "@supabase/supabase-js";
+import type { Session, User } from "@supabase/supabase-js";
 
 import {
   activateBukiAccount,
@@ -210,22 +210,6 @@ async function completeOAuth(url: string): Promise<Session | null> {
   if (callback.error) throw new Error(callback.error);
   if (callback.code) {
     const { data, error } = await client.auth.exchangeCodeForSession(callback.code);
-    if (error) throw error;
-    return data.session;
-  }
-  if (callback.tokenHash && callback.type) {
-    const { data, error } = await client.auth.verifyOtp({
-      token_hash: callback.tokenHash,
-      type: callback.type as EmailOtpType,
-    });
-    if (error) throw error;
-    return data.session;
-  }
-  if (callback.accessToken && callback.refreshToken) {
-    const { data, error } = await client.auth.setSession({
-      access_token: callback.accessToken,
-      refresh_token: callback.refreshToken,
-    });
     if (error) throw error;
     return data.session;
   }
