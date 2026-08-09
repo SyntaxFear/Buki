@@ -70,32 +70,69 @@ function errorMessage(error: unknown): string {
 }
 
 async function resetAccountState(hydrateSignedOut: boolean): Promise<unknown> {
-  disconnectAnalytics();
-  useCloudSync.getState().disconnectUser();
-  let membershipError: unknown = null;
+  let cleanupError: unknown = null;
+  const recordCleanupError = (error: unknown) => {
+    cleanupError ??= error;
+  };
+
+  try {
+    disconnectAnalytics();
+  } catch (error) {
+    recordCleanupError(error);
+  }
+  try {
+    useCloudSync.getState().disconnectUser();
+  } catch (error) {
+    recordCleanupError(error);
+  }
   try {
     await useMembership.getState().disconnectUser();
   } catch (error) {
-    membershipError = error;
+    recordCleanupError(error);
+  }
+  try {
     useMembership.getState().resetMembership();
+  } catch (error) {
+    recordCleanupError(error);
   }
-  await clearBukiAccount();
-  useDrawings.getState().resetForAccountSwitch();
-  useProfiles.getState().resetForAccountSwitch();
-  usePreferences.getState().resetForAccountSwitch();
-  if (hydrateSignedOut) {
-    await Promise.all([
-      useDrawings.getState().hydrate(),
-      useProfiles.getState().hydrate(),
-      usePreferences.getState().hydrate(),
-    ]);
+
+  let accountCleared = false;
+  try {
+    await clearBukiAccount();
+    accountCleared = true;
+  } catch (error) {
+    recordCleanupError(error);
   }
-  return membershipError;
+
+  for (const reset of [
+    () => useDrawings.getState().resetForAccountSwitch(),
+    () => useProfiles.getState().resetForAccountSwitch(),
+    () => usePreferences.getState().resetForAccountSwitch(),
+  ]) {
+    try {
+      reset();
+    } catch (error) {
+      recordCleanupError(error);
+    }
+  }
+
+  if (hydrateSignedOut && accountCleared) {
+    try {
+      await Promise.all([
+        useDrawings.getState().hydrate(),
+        useProfiles.getState().hydrate(),
+        usePreferences.getState().hydrate(),
+      ]);
+    } catch (error) {
+      recordCleanupError(error);
+    }
+  }
+  return cleanupError;
 }
 
 async function applySessionNow(session: Session | null): Promise<void> {
   if (!session?.user) {
-    const membershipError = await resetAccountState(true);
+    const cleanupError = await resetAccountState(true);
     useAuth.setState({
       hydrated: true,
       status: "signedOut",
@@ -104,9 +141,9 @@ async function applySessionNow(session: Session | null): Promise<void> {
       profile: null,
       otpEmail: null,
     });
-    if (membershipError) {
+    if (cleanupError) {
       throw new Error(
-        "Buki signed out locally, but could not clear the previous purchase identity. Try again before signing in to another account.",
+        "Buki signed out locally, but could not fully clear the previous account or purchase identity. Close and reopen Buki before signing in to another account.",
       );
     }
     return;
@@ -229,11 +266,19 @@ export const useAuth = create<AuthState>((set, get) => ({
           initializationSucceeded = true;
         } catch (error) {
           initializationSucceeded = false;
-          useMembership.getState().resetMembership();
+          lastAppliedUserId = null;
+          const cleanupError = await resetAccountState(true);
           set({
             hydrated: true,
+            busy: false,
             status: "signedOut",
-            error: errorMessage(error),
+            session: null,
+            user: null,
+            profile: null,
+            otpEmail: null,
+            error: cleanupError
+              ? `${errorMessage(error)} Buki also could not fully clear the previous local account state.`
+              : errorMessage(error),
           });
         }
       })();

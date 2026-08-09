@@ -30,6 +30,7 @@ import { usePreferences } from "@/store/preferences";
 import { useProfiles, type ChildProfile } from "@/store/profiles";
 import { useCloudSync } from "@/store/sync";
 import { canCreateContent, type ProFeature } from "@/subscription/access";
+import { inactiveMembershipCopy } from "@/subscription/membership-copy";
 import {
   currentPurchaseAccountId,
   PURCHASE_ACCOUNT_CHANGED,
@@ -39,6 +40,20 @@ import { colors } from "@/theme";
 
 const ADULT_AVATARS = ["🌻", "🦊", "🐻", "🌈", "⭐️"] as const;
 const CHILD_COLORS = ["#FFD65A", "#70D0BD", "#86B8EA", "#FFA7B9", "#A98BE6"] as const;
+const ADULT_AVATAR_LABELS: Record<(typeof ADULT_AVATARS)[number], string> = {
+  "🌻": "Sunflower",
+  "🦊": "Fox",
+  "🐻": "Bear",
+  "🌈": "Rainbow",
+  "⭐️": "Star",
+};
+const CHILD_COLOR_LABELS: Record<(typeof CHILD_COLORS)[number], string> = {
+  "#FFD65A": "Yellow",
+  "#70D0BD": "Teal",
+  "#86B8EA": "Blue",
+  "#FFA7B9": "Pink",
+  "#A98BE6": "Purple",
+};
 
 type ChildDraft = {
   id: string | null;
@@ -157,6 +172,7 @@ export function AccountCenter() {
     );
   }, [user?.identities]);
   const renewalDate = formatDate(entitlement.expiresAt);
+  const inactiveMembership = inactiveMembershipCopy(entitlement);
   const retentionDeleteDate = formatDate(cloudDeleteAfter);
   const avatar = adultAvatar(profile?.avatarUri, profile?.displayName ?? "Parent");
   const cloudProgress = Math.min(1, usage.cloudBytes / Math.max(1, usage.cloudLimit));
@@ -468,6 +484,7 @@ export function AccountCenter() {
               <Pressable
                 onPress={() => void setActiveChild(child.id)}
                 accessibilityRole="radio"
+                accessibilityLabel={`${child.name}${child.id === activeChildId ? ", current child" : ", make current child"}`}
                 accessibilityState={{ selected: child.id === activeChildId }}
                 style={[styles.childIdentity, child.id === activeChildId && styles.childIdentityActive]}
               >
@@ -483,10 +500,10 @@ export function AccountCenter() {
                 </View>
               </Pressable>
               <View style={styles.compactActions}>
-                <MiniAction label="↑" disabled={index === 0} onPress={() => void moveChild(child.id, -1)} />
-                <MiniAction label="↓" disabled={index === children.length - 1} onPress={() => void moveChild(child.id, 1)} />
-                <MiniAction label="Edit" onPress={() => beginEditChild(child)} />
-                <MiniAction label="Remove" destructive disabled={children.length === 1} onPress={() => void confirmDeleteChild(child)} />
+                <MiniAction label="↑" accessibilityLabel={`Move ${child.name} up`} disabled={index === 0} onPress={() => void moveChild(child.id, -1)} />
+                <MiniAction label="↓" accessibilityLabel={`Move ${child.name} down`} disabled={index === children.length - 1} onPress={() => void moveChild(child.id, 1)} />
+                <MiniAction label="Edit" accessibilityLabel={`Edit ${child.name}`} onPress={() => beginEditChild(child)} />
+                <MiniAction label="Remove" accessibilityLabel={`Remove ${child.name}`} destructive disabled={children.length === 1} onPress={() => void confirmDeleteChild(child)} />
               </View>
             </View>
           ))}
@@ -503,7 +520,7 @@ export function AccountCenter() {
                     ? "Checking App Store access…"
                     : tier === "pro"
                     ? `${entitlement.product ? entitlement.product.charAt(0).toUpperCase() + entitlement.product.slice(1) : "Pro"} access`
-                    : "1 child · 1 sketchpad · 20 artworks"}
+                    : inactiveMembership.detail}
                 </Text>
               </View>
               <View style={[styles.badge, tier === "pro" && styles.proBadge]}>
@@ -520,6 +537,9 @@ export function AccountCenter() {
               </Text>
             ) : (
               <>
+                {inactiveMembership.history ? (
+                  <Text style={styles.membershipFootnote}>{inactiveMembership.history}</Text>
+                ) : null}
                 <ActionButton title="Discover Buki Pro" prominent onPress={() => void introducePro("cloudBackup", "account_membership")} />
                 {cloudRetentionReadOnly ? (
                   <Text style={styles.membershipFootnote}>
@@ -772,8 +792,8 @@ function ActionButton({ title, onPress, prominent, destructive, busy, disabled }
   );
 }
 
-function MiniAction({ label, onPress, disabled, destructive }: { label: string; onPress: () => void; disabled?: boolean; destructive?: boolean }) {
-  return <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.miniAction, disabled && styles.disabled, pressed && styles.pressed]}><Text style={[styles.miniActionLabel, destructive && styles.dangerText]}>{label}</Text></Pressable>;
+function MiniAction({ label, accessibilityLabel, onPress, disabled, destructive }: { label: string; accessibilityLabel?: string; onPress: () => void; disabled?: boolean; destructive?: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.miniAction, disabled && styles.disabled, pressed && styles.pressed]}><Text style={[styles.miniActionLabel, destructive && styles.dangerText]}>{label}</Text></Pressable>;
 }
 
 function DangerButton({ title, onPress, busy }: { title: string; onPress: () => void; busy?: boolean }) {
@@ -791,8 +811,8 @@ function AdultEditor({ visible, busy, profileName, profileAvatar, onCancel, onSa
   useEffect(() => { if (visible) { setName(profileName); setAvatar(current); } }, [current, profileName, visible]);
   return (
     <EditorShell visible={visible} title="Edit adult profile" busy={busy} canSave={Boolean(name.trim())} onCancel={onCancel} onSave={() => onSave(name, `emoji:${avatar}`)}>
-      <TextInput value={name} onChangeText={setName} placeholder="Display name" autoCapitalize="words" style={styles.editorInput} />
-      <View style={styles.avatarChoices}>{ADULT_AVATARS.map((item) => <Pressable key={item} onPress={() => setAvatar(item)} style={[styles.avatarChoice, avatar === item && styles.avatarChoiceSelected]}><Text style={styles.avatarChoiceText}>{item}</Text></Pressable>)}</View>
+      <TextInput accessibilityLabel="Adult display name" value={name} onChangeText={setName} placeholder="Display name" autoCapitalize="words" style={styles.editorInput} />
+      <View accessibilityRole="radiogroup" style={styles.avatarChoices}>{ADULT_AVATARS.map((item) => <Pressable key={item} accessibilityRole="radio" accessibilityLabel={`${ADULT_AVATAR_LABELS[item]} adult avatar`} accessibilityState={{ selected: avatar === item }} onPress={() => setAvatar(item)} style={[styles.avatarChoice, avatar === item && styles.avatarChoiceSelected]}><Text style={styles.avatarChoiceText}>{item}</Text></Pressable>)}</View>
     </EditorShell>
   );
 }
@@ -803,13 +823,13 @@ function ChildEditor({ draft, busy, onCancel, onSave }: { draft: ChildDraft | nu
   if (!value) return null;
   return (
     <EditorShell visible title={value.id ? "Edit child profile" : "Add child profile"} busy={busy} canSave={Boolean(value.name.trim())} onCancel={onCancel} onSave={() => onSave(value)}>
-      <TextInput value={value.name} onChangeText={(name) => setValue({ ...value, name })} placeholder="Nickname or first name" autoCapitalize="words" style={styles.editorInput} />
+      <TextInput accessibilityLabel="Child nickname or first name" value={value.name} onChangeText={(name) => setValue({ ...value, name })} placeholder="Nickname or first name" autoCapitalize="words" style={styles.editorInput} />
       <Text style={styles.editorLabel}>Profile color</Text>
-      <View style={styles.avatarChoices}>{CHILD_COLORS.map((color) => <Pressable key={color} onPress={() => setValue({ ...value, avatarColor: color })} style={[styles.colorChoice, { backgroundColor: color }, value.avatarColor === color && styles.colorChoiceSelected]} />)}</View>
+      <View accessibilityRole="radiogroup" style={styles.avatarChoices}>{CHILD_COLORS.map((color) => <Pressable key={color} accessibilityRole="radio" accessibilityLabel={`${CHILD_COLOR_LABELS[color]} profile color`} accessibilityState={{ selected: value.avatarColor === color }} onPress={() => setValue({ ...value, avatarColor: color })} style={[styles.colorChoice, { backgroundColor: color }, value.avatarColor === color && styles.colorChoiceSelected]} />)}</View>
       <Text style={styles.editorLabel}>Birth month and year (optional)</Text>
       <View style={styles.birthRow}>
-        <TextInput value={value.birthMonth} onChangeText={(birthMonth) => setValue({ ...value, birthMonth })} placeholder="Month" keyboardType="number-pad" maxLength={2} style={[styles.editorInput, styles.birthInput]} />
-        <TextInput value={value.birthYear} onChangeText={(birthYear) => setValue({ ...value, birthYear })} placeholder="Year" keyboardType="number-pad" maxLength={4} style={[styles.editorInput, styles.birthInput]} />
+        <TextInput accessibilityLabel="Birth month" value={value.birthMonth} onChangeText={(birthMonth) => setValue({ ...value, birthMonth })} placeholder="Month" keyboardType="number-pad" maxLength={2} style={[styles.editorInput, styles.birthInput]} />
+        <TextInput accessibilityLabel="Birth year" value={value.birthYear} onChangeText={(birthYear) => setValue({ ...value, birthYear })} placeholder="Year" keyboardType="number-pad" maxLength={4} style={[styles.editorInput, styles.birthInput]} />
       </View>
     </EditorShell>
   );

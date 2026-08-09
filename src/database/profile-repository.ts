@@ -133,15 +133,20 @@ export async function completeLocalOnboarding(
       );
     }
 
-    await tx.runAsync(
-      `UPDATE sketchpads SET child_id = ?, updated_at = ? WHERE owner_id = ?`,
-      childId,
-      now,
-      ownerId,
-    );
+    if (!firstChild) {
+      await tx.runAsync(
+        `UPDATE sketchpads SET child_id = ?, updated_at = ? WHERE owner_id = ?`,
+        childId,
+        now,
+        ownerId,
+      );
+    }
     const firstPad = await tx.getFirstAsync<{ id: string }>(
-      "SELECT id FROM sketchpads WHERE owner_id = ? AND deleted_at IS NULL ORDER BY sort_order, created_at LIMIT 1",
+      `SELECT id FROM sketchpads
+       WHERE owner_id = ? AND child_id = ? AND deleted_at IS NULL
+       ORDER BY sort_order, created_at LIMIT 1`,
       ownerId,
+      childId,
     );
     const activePadId = firstPad?.id ?? input.defaultPadId;
     if (!firstPad) {

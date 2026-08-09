@@ -185,6 +185,68 @@ describe("authentication state boundaries", () => {
     expect(useAuth.getState()).toMatchObject({ status: "signedIn", session: next });
   });
 
+  it("fails closed and clears account-scoped state when session initialization fails", async () => {
+    const previous = session("adult-a", "token-a");
+    useAuth.setState({
+      hydrated: false,
+      status: "signedIn",
+      session: previous,
+      user: previous.user,
+      profile: {
+        id: previous.user.id,
+        displayName: "Adult A",
+        email: previous.user.email ?? null,
+        avatarUri: null,
+      },
+      otpEmail: "adult-a@example.com",
+    });
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: new Error("offline") });
+
+    await useAuth.getState().initialize();
+
+    expect(mockSyncState.disconnectUser).toHaveBeenCalledTimes(1);
+    expect(mockMembershipState.disconnectUser).toHaveBeenCalledTimes(1);
+    expect(mockMembershipState.resetMembership).toHaveBeenCalledTimes(1);
+    expect(mockDatabase.clearBukiAccount).toHaveBeenCalledTimes(1);
+    expect(mockDrawingsState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
+    expect(mockProfilesState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
+    expect(mockPreferencesState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
+    expect(mockDrawingsState.hydrate).toHaveBeenCalledTimes(1);
+    expect(mockProfilesState.hydrate).toHaveBeenCalledTimes(1);
+    expect(mockPreferencesState.hydrate).toHaveBeenCalledTimes(1);
+    expect(useAuth.getState()).toMatchObject({
+      hydrated: true,
+      busy: false,
+      status: "signedOut",
+      session: null,
+      user: null,
+      profile: null,
+      otpEmail: null,
+      error: "offline",
+    });
+  });
+
+  it("does not rehydrate a previous account if clearing its local owner fails", async () => {
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: new Error("offline") });
+    mockDatabase.clearBukiAccount.mockRejectedValue(new Error("database unavailable"));
+
+    await useAuth.getState().initialize();
+
+    expect(mockDrawingsState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
+    expect(mockProfilesState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
+    expect(mockPreferencesState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
+    expect(mockDrawingsState.hydrate).not.toHaveBeenCalled();
+    expect(mockProfilesState.hydrate).not.toHaveBeenCalled();
+    expect(mockPreferencesState.hydrate).not.toHaveBeenCalled();
+    expect(useAuth.getState()).toMatchObject({
+      status: "signedOut",
+      session: null,
+      user: null,
+      profile: null,
+    });
+    expect(useAuth.getState().error).toContain("could not fully clear");
+  });
+
   it("retries listener registration when the first registration throws", async () => {
     mockAuthListener
       .mockImplementationOnce(() => {
