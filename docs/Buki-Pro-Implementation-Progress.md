@@ -1,6 +1,6 @@
 # Buki Pro implementation and iOS release progress
 
-Last updated: **2026-08-09 15:57 +04 (Asia/Tbilisi)**
+Last updated: **2026-08-09 16:39 +04 (Asia/Tbilisi)**
 
 Release scope: **iOS only**. Android is deferred.
 
@@ -22,7 +22,7 @@ Status legend:
 |---|---|
 | Repository | `SyntaxFear/Buki` |
 | Delivery branch | `main`, pushed directly as previously approved |
-| Implementation baseline before this tracker update | `f980e24ff963dc3aa3598ec678551498c829ea29` |
+| Current verified implementation head | `cb1b188` |
 | Main worktree before this tracker | Clean and equal to `origin/main` |
 | App name | Buki |
 | Expo slug | `Bloombook` |
@@ -215,16 +215,16 @@ The yearly plan saves approximately 44% versus paying monthly. Store-localized p
 | Six Pro themes | ✅ | ✅ | ✅ preview/save gate | ⏳ Pro-save lifecycle |
 | Eight Pro borders and decorations | ✅ | ✅ | ✅ preview/save gate | ⏳ Pro-save lifecycle |
 | Artwork metadata | ✅ | ✅ | ✅ title/date/notes | ⏳ |
-| Tags, favorites, search, filters, bulk actions | ✅ | ✅ | 🟡 Free gates verified; active-Pro operations pending | ⏳ |
-| PNG/JPG and share-card export | ✅ | ✅ | 🟡 Free lock verified; generated files pending | ⏳ |
+| Tags, favorites, search, filters, bulk actions | ✅ | ✅ | 🟡 Active-Pro search/filter verified; tags, favorites, and bulk actions pending | ⏳ |
+| PNG/JPG and share-card export | ✅ | ✅ | 🟡 Active-Pro share card generated; PNG/JPG pending | ⏳ |
 | Sketchpad PDF export | ✅ | ✅ | 🟡 Free lock verified; generated file pending | ⏳ |
 | ZIP export | ✅ | ✅ | 🟡 Free lock verified; generated file pending | ⏳ |
 | `.buki` archive export/import | ✅ | ✅ | ⏳ | ⏳ corruption/duplicate matrix |
 | Supabase schema and RLS | ✅ | ✅ source-level coverage | 🟡 live function access verified | ⏳ cross-account proof |
-| Persistent local sync queue | ✅ | ✅ | 🟡 Pro access obtained; upload proof interrupted | ⏳ |
-| Deduplicated media uploads | ✅ | ✅ | ⏳ | ⏳ |
+| Persistent local sync queue | ✅ | ✅ | ✅ two-artwork upload completed and repeat sync drained | ⏳ |
+| Deduplicated media uploads | ✅ | ✅ | ✅ repeat sync preserved 634.1 KB usage | ⏳ dashboard row/object proof |
 | Signed upload reservation/replay protection | ✅ | ✅ | ⏳ | ⏳ security agent |
-| Cloud restore and 2 GB quota handling | ✅ | ✅ | ⏳ | ⏳ |
+| Cloud restore and 2 GB quota handling | ✅ | ✅ | ✅ two artworks and six media files restored after native-download fix | ⏳ clean-device and quota boundary |
 | Ninety-day retention and scheduled cleanup | ✅ | ✅ lifecycle tests | ⏳ real timeline simulation | ⏳ |
 | Cloud/account deletion | ✅ | ✅ where applicable | ✅ warning flow; deletion canceled | ⏳ destructive test account run |
 | Privacy-safe analytics | ✅ | ✅ | ⏳ event evidence | ⏳ |
@@ -290,12 +290,16 @@ The following was verified on an iPhone 17 Pro Max simulator running iOS 26.5 wi
 | RevenueCat server key lacked entitlement-read permission | Replaced the permission set with four required read-only scopes | Live configuration fix |
 | Signed upload token could be replayed | Upload reservations hardened | `c52b6f8` |
 | Auth callback/account boundary risks | Native sign-in and callback validation hardened | `ffd91ef`, `f134a13` |
+| Persisted local media paths broke after an iOS app-container relocation | Rebased safe `Documents` file URIs to the current app container during database startup | `46bd903` |
+| Expo Crypto rejected raw `ArrayBuffer` input during native media hashing | Centralized SHA-256 hashing through copied `Uint8Array` input | `f9e5816` |
+| Account Center action rows were not exposed as accessible buttons | Added explicit button roles, labels, and hints | `bbfcd0e` |
+| React Native Supabase download blobs did not expose `arrayBuffer()` | Restores now use short-lived signed URLs and Expo FileSystem native downloads before checksum verification | `cb1b188` |
 
 ## 8. Current test and quality baseline
 
-Verified on **2026-08-09** from `main` at implementation baseline `f980e24`:
+Verified on **2026-08-09** from `main` at `cb1b188`:
 
-- ✅ Jest: **49 suites, 274 tests passed**.
+- ✅ Jest: **51 suites, 279 tests passed**.
 - ✅ TypeScript: `npx tsc --noEmit` passed.
 - ✅ Expo Doctor: **20/20 checks passed**.
 - ✅ Expo lint: **0 errors and 0 warnings** with a committed, scoped Expo SDK 57 configuration.
@@ -333,25 +337,26 @@ Known quality work still open:
 
 ### 9.3 Disposable runtime worktree
 
-- Path: `/Users/bitcoin/.codex/tmp/Buki-iOS-Runtime-c52b6f8`
+- Path: `/Users/bitcoin/.codex/tmp/Buki-Phase2-c47bee1`
 - Purpose: native simulator diagnostics and smoke testing.
-- Contains uncommitted diagnostic logging and copied fixes.
+- Contains generated native files, copied environment configuration, and the validated Phase 2 commits on a detached head.
 - Must never be committed or used as the release source.
 - Main repository remains the source of truth.
 
 ### 9.4 Current interruption point
 
-The last run proved active Pro and authoritative cloud access. It was interrupted immediately before proving that the two local artworks upload, deduplicate, appear in private Supabase storage/metadata, and restore correctly.
+The two local artworks now upload, repeat-sync without increasing 634.1 KB cloud usage, and restore with all six media files. Safari is authenticated to a Supabase organization that does not contain the Buki project, so direct dashboard proof of exact table rows and storage objects requires the Buki-owning Supabase account to be signed into Safari. The remaining active-Pro organization/export matrix is still in progress.
 
 ## 10. Remaining work in priority order
 
 1. ⛔ **Finish the active Pro cloud smoke test**
-   - Confirm Automatic Backup state.
-   - Trigger Sync Now.
-   - Verify queue drains.
-   - Verify two artwork records, previews/originals, checksums, and usage accounting in Supabase.
-   - Verify a repeated sync does not duplicate files.
-   - Verify cloud restore on a clean device/account-scoped local state.
+   - ✅ Confirm Automatic Backup state.
+   - ✅ Trigger Sync Now and verify the queue drains.
+   - ✅ Verify usage accounting reaches 634.1 KB.
+   - ✅ Verify a repeated sync does not increase usage or duplicate logical media.
+   - ✅ Verify two artworks and all six media files restore on the current device.
+   - ⏳ Verify exact artwork/media/checksum rows and private storage objects in the Supabase dashboard after Safari is signed into the Buki-owning account.
+   - ⏳ Verify restore on a separate clean simulator/account-scoped local state.
 
 2. ⛔ **Complete Pro feature smoke tests while the temporary grant is active**
    - Add/edit tags.
@@ -585,6 +590,15 @@ Release is allowed only when all applicable items are checked:
 - Migrated all six deprecated mutable Skia path-builder call sites to `Skia.PathBuilder`.
 - Re-ran 49 Jest suites/274 tests, TypeScript, Expo Doctor 20/20, and the iOS Metro export successfully at `f980e24`.
 - Confirmed the FormSheet/ScrollView warning still requires Simulator reproduction and was not changed speculatively.
+- Rebased persisted local `Documents` media URIs after app-container relocation; live artwork decoding recovered.
+- Fixed Expo Crypto native hashing to always receive copied typed bytes.
+- Uploaded two artworks with six media records; cloud usage reached 634.1 KB and remained unchanged after repeat sync.
+- Fixed Account Center action accessibility so Sync, Restore, organization, and export rows are operable by assistive technology and automation.
+- Replaced unsupported React Native Blob `arrayBuffer()` restore handling with signed native FileSystem downloads.
+- Live restore completed with `2 artworks restored` and no failed media after the download fix.
+- Verified active-Pro library search reduced two artworks to the matching `Sailing Day` result and generated the share-card export preview.
+- Re-ran 51 Jest suites/279 tests, TypeScript, Expo lint, and Expo Doctor 20/20 successfully at `cb1b188`.
+- Safari currently exposes only the `samosi-production` Supabase project; Buki dashboard inspection is waiting for the Buki-owning Supabase login in Safari.
 
 ### Update procedure for every future session
 
