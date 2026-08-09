@@ -138,7 +138,8 @@ export function buildSketchpadPdfDocument({
   .cover-kicker { margin: 0 0 10px; color: ${design.coverDark}; font-size: 14px; font-weight: 800; letter-spacing: 2.2px; text-transform: uppercase; }
   .cover h1 { margin: 0; font-size: 46px; line-height: 1.05; }
   .cover-owner { margin: 14px 0 0; color: #75685a; font-size: 21px; }
-  .cover-meta { margin: 26px 0 0; color: #75685a; font-size: 14px; }
+  .cover-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 12px; margin: 26px 0 0; color: #75685a; font-size: 14px; }
+  .cover-meta span { white-space: nowrap; }
   .cover-mark { position: absolute; right: 34px; bottom: 24px; font-size: 34px; color: ${design.ring}; }
   .content-sheet { padding: 28px 34px 24px; background: ${pad.pageColor || design.paper}; }
   .page-header, .page-footer { display: flex; justify-content: space-between; align-items: center; color: #75685a; font-size: 12px; font-weight: 700; letter-spacing: .5px; }
@@ -156,11 +157,12 @@ export function buildSketchpadPdfDocument({
   .missing-image { width: 78%; padding: 18px; text-align: center; color: #8a6f62; background: #fff3ec; border: 2px dashed #e5b7a2; border-radius: 14px; }
   .missing-image strong, .missing-image span { display: block; }
   .missing-image span { margin-top: 5px; font-size: 11px; }
-  .art-caption { flex: none; display: grid; gap: 2px; padding-top: 6px; text-align: center; }
+  .art-caption { flex: none; display: grid; gap: 2px; padding: 6px 18px 0; text-align: center; }
   .art-caption strong { font-size: 15px; line-height: 1.1; }
-  .art-caption span { color: #75685a; font-size: 10px; }
+  .art-caption span { overflow: hidden; color: #75685a; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
   .art-notes { max-height: 28px; overflow: hidden; color: #665d54; font-size: 10px; line-height: 1.3; }
   .style-grid .slot, .style-strip .slot { padding: 8px; border-radius: 13px; }
+  .style-grid .art-caption, .style-strip .art-caption { padding-inline: 14px; }
   .style-grid .art-caption strong, .style-strip .art-caption strong { font-size: 12px; }
   .style-grid .art-notes, .style-strip .art-notes { display: none; }
   .border-gallery-mat { border: 9px double #b7d7d2; }
@@ -177,7 +179,7 @@ export function buildSketchpadPdfDocument({
   .border-sticker-stars::after { right: 4px; bottom: 1px; }
   .border-museum-frame { border: 10px double #c89b4b; box-shadow: inset 0 0 0 2px #6f4f20; }
   .decor { position: absolute; z-index: 4; color: ${design.stampColor}; font-size: 18px; line-height: 1; }
-  .decor-a { left: 7px; top: 7px; } .decor-b { right: 8px; top: 9px; } .decor-c { right: 9px; bottom: 7px; }
+  .decor-a { left: 7px; top: 7px; } .decor-b { right: 8px; top: 9px; } .decor-c { right: 9px; bottom: 44px; }
 </style>
 </head>
 <body>
@@ -186,7 +188,7 @@ export function buildSketchpadPdfDocument({
       <p class=\"cover-kicker\">Buki Sketchpad</p>
       <h1>${escapeHtml(pad.name)}</h1>
       <p class=\"cover-owner\">${owner}</p>
-      <p class=\"cover-meta\">${artworks.length} artwork${artworks.length === 1 ? "" : "s"} · ${LAYOUT_LABELS[pad.style]} · Exported ${generated}</p>
+      <p class=\"cover-meta\"><span>${artworks.length} artwork${artworks.length === 1 ? "" : "s"}</span><span>${LAYOUT_LABELS[pad.style]}</span><span>Exported ${generated}</span></p>
     </div>
     <div class=\"cover-mark\">${design.stamp === "heart" ? "♥" : design.stamp === "flower" ? "✿" : design.stamp === "paw" ? "●" : "✦"}</div>
   </section>

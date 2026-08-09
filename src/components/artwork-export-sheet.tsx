@@ -152,7 +152,12 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
             <Text style={styles.eyebrow}>BUKI PRO EXPORT</Text>
             <Text style={styles.title}>Export artwork</Text>
           </View>
-          <Pressable onPress={onClose} style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}>
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close artwork export"
+            style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
+          >
             <Text style={styles.doneLabel}>Done</Text>
           </Pressable>
         </View>
@@ -164,6 +169,8 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
                 key={item}
                 onPress={() => setFormat(item)}
                 accessibilityRole="radio"
+                accessibilityLabel={`${FORMAT_LABELS[item].title}, ${FORMAT_LABELS[item].detail}`}
+                accessibilityHint="Selects this artwork export format"
                 accessibilityState={{ selected: format === item }}
                 style={({ pressed }) => [
                   styles.formatCard,
@@ -237,6 +244,10 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
             <Pressable
               disabled={Boolean(busy) || captureDisabled}
               onPress={() => void share()}
+              accessibilityRole="button"
+              accessibilityLabel={`Share ${FORMAT_LABELS[format].title} artwork export`}
+              accessibilityHint="Opens Apple’s system share sheet after adult confirmation"
+              accessibilityState={{ disabled: Boolean(busy) || captureDisabled, busy: busy === "share" }}
               style={({ pressed }) => [styles.primaryButton, (busy || captureDisabled) && styles.disabled, pressed && styles.pressed]}
             >
               {busy === "share" ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryLabel}>Share</Text>}
@@ -244,6 +255,10 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
             <Pressable
               disabled={Boolean(busy) || captureDisabled}
               onPress={() => void save()}
+              accessibilityRole="button"
+              accessibilityLabel={`Save ${FORMAT_LABELS[format].title} artwork export to Photos`}
+              accessibilityHint="Adds the exported image to the adult device’s Photos library after confirmation"
+              accessibilityState={{ disabled: Boolean(busy) || captureDisabled, busy: busy === "save" }}
               style={({ pressed }) => [styles.secondaryButton, (busy || captureDisabled) && styles.disabled, pressed && styles.pressed]}
             >
               {busy === "save" ? <ActivityIndicator color={colors.titleTeal} /> : <Text style={styles.secondaryLabel}>Save to Photos</Text>}

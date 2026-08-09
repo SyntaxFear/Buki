@@ -223,6 +223,8 @@ export function ExportsScreen() {
                 key={pad.id}
                 onPress={() => setSelectedPadId(pad.id)}
                 accessibilityRole="radio"
+                accessibilityLabel={`${pad.name}, ${STYLE_LABELS[pad.style]}, ${count} artwork${count === 1 ? "" : "s"}`}
+                accessibilityHint="Selects this sketchpad for PDF or ZIP export"
                 accessibilityState={{ selected }}
                 style={({ pressed }) => [
                   styles.padCard,
@@ -247,6 +249,9 @@ export function ExportsScreen() {
             <Text style={styles.lockedDetail}>Your local artwork stays available. Upgrade to create files you can save or share.</Text>
             <Pressable
               onPress={() => requestUpgrade("exportData", "export_center")}
+              accessibilityRole="button"
+              accessibilityLabel="See Buki Pro plans"
+              accessibilityHint="Opens the Buki Pro purchase options"
               style={({ pressed }) => [styles.proButton, pressed && styles.pressed]}
             >
               <Text style={styles.proButtonLabel}>See Buki Pro</Text>
@@ -326,6 +331,9 @@ function ExportCard({
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
+      accessibilityLabel={`${title}. ${actionLabel}`}
+      accessibilityHint={detail}
+      accessibilityState={{ disabled, busy }}
       style={({ pressed }) => [styles.exportCard, disabled && styles.disabled, pressed && styles.pressed]}
     >
       <View style={styles.fileBadge}><Text style={styles.fileBadgeText}>{badge}</Text></View>
