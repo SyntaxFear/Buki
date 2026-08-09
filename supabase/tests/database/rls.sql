@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(69);
+select plan(81);
 
 select has_table('public', 'adult_profiles', 'adult_profiles exists');
 select has_table('public', 'child_profiles', 'child_profiles exists');
@@ -16,6 +16,12 @@ select has_column(
   'media_upload_reservations',
   'reserved_bytes',
   'pending uploads track their full temporary quota charge'
+);
+select has_column(
+  'public',
+  'media_upload_reservations',
+  'create_only_token',
+  'upload reservations record whether their signed token rejects overwrite replay'
 );
 select has_table('public', 'cloud_retention', 'cloud_retention exists');
 select has_table('public', 'storage_deletion_sweeps', 'delayed storage deletion sweeps exist');
@@ -203,14 +209,14 @@ select lives_ok(
 select is(
   (select reserved_bytes from public.media_upload_reservations
    where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369' and media_id = 'quota-media'),
-  31457280::bigint,
-  'the reservation charges the full 30 MiB signed-upload allowance'
+  62914560::bigint,
+  'the reservation charges for both a 30 MiB source and finalized copy'
 );
 select is(
   (select bytes_reserved from public.storage_usage
    where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
-  31457280::bigint,
-  'temporary quota accounting includes the full possible object size'
+  62914560::bigint,
+  'temporary quota accounting includes both possible objects'
 );
 select lives_ok(
   $$select public.release_media_upload_reservation(
@@ -294,14 +300,108 @@ select lives_ok(
 select is(
   (select bytes_reserved from public.storage_usage
    where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
-  0::bigint,
-  'completion releases the full pending quota charge'
+  10::bigint,
+  'completion retains measured temporary quota until the signed token expires'
 );
 select is(
   (select bytes_used from public.storage_usage
    where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
   10::bigint,
   'completion charges only the verified object size'
+);
+select is(
+  (select status from public.media_upload_reservations
+   where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'
+     and media_id = 'quota-media-complete'),
+  'consumed',
+  'a completed create-only upload remains guarded until token expiry'
+);
+update public.media_upload_reservations
+set expires_at = now() - interval '1 second'
+where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'
+  and media_id = 'quota-media-complete';
+select lives_ok(
+  $$select * from public.claim_stale_media_upload_reservations(25)$$,
+  'expired completed upload guards are claimed for cleanup'
+);
+select lives_ok(
+  $$select public.finalize_stale_media_upload_reservation(
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+    (select id from public.media_upload_reservations
+     where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'
+       and media_id = 'quota-media-complete'),
+    null
+  )$$,
+  'completed upload cleanup releases its measured replay guard'
+);
+select is(
+  (select bytes_reserved from public.storage_usage
+   where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  0::bigint,
+  'cleanup releases the completed upload replay guard'
+);
+select lives_ok(
+  $$select * from public.reserve_media_upload(
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+    'quota-media-legacy-token',
+    'quota-artwork',
+    'cutout',
+    repeat('d', 64),
+    1,
+    'image/png',
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369/legacy-token.png'
+  )$$,
+  'a legacy overwrite-token reservation receives the doubled temporary allowance'
+);
+update public.media_upload_reservations
+set create_only_token = false
+where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'
+  and media_id = 'quota-media-legacy-token';
+select lives_ok(
+  $$select * from public.complete_media_upload(
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+    (select id from public.media_upload_reservations
+     where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'
+       and media_id = 'quota-media-legacy-token'),
+    1
+  )$$,
+  'legacy overwrite-token completion keeps a full replay allowance'
+);
+select is(
+  (select bytes_reserved from public.storage_usage
+   where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  31457280::bigint,
+  'a legacy overwrite token remains charged for its full replayable object'
+);
+select is(
+  (select bytes_used from public.storage_usage
+   where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  11::bigint,
+  'legacy token completion also charges the verified final object'
+);
+update public.media_upload_reservations
+set expires_at = now() - interval '1 second'
+where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'
+  and media_id = 'quota-media-legacy-token';
+select lives_ok(
+  $$select * from public.claim_stale_media_upload_reservations(25)$$,
+  'expired legacy overwrite-token guards are claimed for cleanup'
+);
+select lives_ok(
+  $$select public.finalize_stale_media_upload_reservation(
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+    (select id from public.media_upload_reservations
+     where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'
+       and media_id = 'quota-media-legacy-token'),
+    null
+  )$$,
+  'legacy overwrite-token cleanup releases its full replay allowance'
+);
+select is(
+  (select bytes_reserved from public.storage_usage
+   where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  0::bigint,
+  'legacy overwrite-token cleanup restores all temporary quota'
 );
 select has_function(
   'public',

@@ -8,6 +8,7 @@ import {
   json,
   requestObject,
 } from "../_shared/buki.ts";
+import { copyUploadToFinalPath } from "../_shared/signed-upload.ts";
 
 type ReservationRow = {
   id: string;
@@ -71,7 +72,6 @@ Deno.serve(async (request) => {
     const info = await bucket.info(reservation.storage_path);
     if (info.error || !info.data) throw new HttpError(409, "uploaded_object_missing");
     if (info.data.size !== reservation.requested_bytes) {
-      await bucket.remove([reservation.storage_path]);
       await admin.rpc("release_media_upload_reservation", {
         target_owner: user.id,
         target_reservation_id: reservation.id,
@@ -84,7 +84,6 @@ Deno.serve(async (request) => {
     const bytes = await downloaded.data.arrayBuffer();
     const checksum = hex(await crypto.subtle.digest("SHA-256", bytes));
     if (checksum !== reservation.checksum) {
-      await bucket.remove([reservation.storage_path]);
       await admin.rpc("release_media_upload_reservation", {
         target_owner: user.id,
         target_reservation_id: reservation.id,
@@ -92,13 +91,7 @@ Deno.serve(async (request) => {
       throw new HttpError(422, "uploaded_checksum_mismatch");
     }
 
-    if (reservation.storage_path !== finalStoragePath) {
-      const moved = await bucket.move(
-        reservation.storage_path,
-        finalStoragePath,
-      );
-      if (moved.error) throw new Error("uploaded_object_finalize_failed");
-    }
+    await copyUploadToFinalPath(bucket, reservation.storage_path, finalStoragePath);
 
     const completed = await admin.rpc("complete_media_upload", {
       target_owner: user.id,

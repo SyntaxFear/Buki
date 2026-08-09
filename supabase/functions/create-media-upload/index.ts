@@ -8,6 +8,7 @@ import {
   json,
   requestObject,
 } from "../_shared/buki.ts";
+import { CREATE_ONLY_SIGNED_UPLOAD_OPTIONS } from "../_shared/signed-upload.ts";
 
 const MIME_EXTENSION: Record<string, string> = {
   "image/png": "png",
@@ -101,7 +102,7 @@ Deno.serve(async (request) => {
 
     const signed = await admin.storage
       .from("buki-media")
-      .createSignedUploadUrl(reservation.storage_path, { upsert: true });
+      .createSignedUploadUrl(reservation.storage_path, CREATE_ONLY_SIGNED_UPLOAD_OPTIONS);
     if (signed.error || !signed.data) {
       await admin.rpc("release_media_upload_reservation", {
         target_owner: user.id,
