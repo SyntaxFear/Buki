@@ -87,7 +87,7 @@ export function planBukiArchiveImport(
 
   for (const child of manifest.children) {
     const sourcePads = padsByChild.get(child.id) ?? [];
-    const plannedPadSources: Array<{ source: BukiArchiveSketchpad; artworks: BukiArchiveArtwork[] }> = [];
+    const plannedPadSources: { source: BukiArchiveSketchpad; artworks: BukiArchiveArtwork[] }[] = [];
 
     for (const pad of sourcePads) {
       const sourceArtworks = artworksByPad.get(pad.id) ?? [];

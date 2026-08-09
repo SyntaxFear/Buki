@@ -221,7 +221,7 @@ export function drawingHitTest(
   py: number,
   style: PadStyle,
   unit: number,
-  drawings: ReadonlyArray<{ width: number; height: number } | undefined>,
+  drawings: readonly ({ width: number; height: number } | undefined)[],
   spread: BookLayout,
   padPage: PadPageLayout,
 ): { index: number; rect: Rect } | null {

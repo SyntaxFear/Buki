@@ -368,7 +368,7 @@ function drawSnapshotDecorations(
   const bottom = height - 20;
   const { left: showLeft, right: showRight } = decorationSidesForPlacement(placement);
   if (id === "confetti-pop") {
-    const dots: Array<[number, number, string, number]> = [];
+    const dots: [number, number, string, number][] = [];
     if (showLeft) {
       dots.push(
         [left, top, accent, 4.2],
@@ -639,7 +639,7 @@ export function PadStampMark({ cx, cy, stamp, color }: { cx: number; cy: number;
 }
 
 function tornBorderPath(x: number, y: number, width: number, height: number) {
-  const path = Skia.Path.Make();
+  const path = Skia.PathBuilder.Make();
   const step = 11;
   path.moveTo(x, y);
   for (let px = x; px <= x + width; px += step) {
@@ -655,14 +655,14 @@ function tornBorderPath(x: number, y: number, width: number, height: number) {
     path.lineTo(x + (Math.round((y + height - py) / step) % 2 ? 2 : -1), Math.max(py - step, y));
   }
   path.close();
-  return path;
+  return path.detach();
 }
 
 function heartPath(cx: number, cy: number, scale: number) {
-  const p = Skia.Path.Make();
+  const p = Skia.PathBuilder.Make();
   p.moveTo(cx, cy + 7 * scale);
   p.cubicTo(cx - 11 * scale, cy, cx - 6.5 * scale, cy - 9 * scale, cx, cy - 4 * scale);
   p.cubicTo(cx + 6.5 * scale, cy - 9 * scale, cx + 11 * scale, cy, cx, cy + 7 * scale);
   p.close();
-  return p;
+  return p.detach();
 }

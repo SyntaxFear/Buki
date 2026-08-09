@@ -65,7 +65,7 @@ async function load(uri: string): Promise<void> {
  * images land. Returns a synchronous lookup.
  */
 export function useImageCache(
-  uris: ReadonlyArray<string | undefined>,
+  uris: readonly (string | undefined)[],
 ): (uri: string | null | undefined) => SkImage | null {
   const [, bump] = useReducer((x: number) => x + 1, 0);
   const requestId = useRef(Symbol("image-cache-request")).current;

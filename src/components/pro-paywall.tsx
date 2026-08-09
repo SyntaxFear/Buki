@@ -198,7 +198,7 @@ export function ProPaywallHost() {
     return () => {
       active = false;
     };
-  }, [request?.requestedAt]);
+  }, [request]);
 
   useEffect(() => {
     if (request && tier === "pro") clearRequest();

@@ -135,7 +135,7 @@ describe("extractDrawing", () => {
     const { img } = makePhoto();
     drawRect(img, 240, 80, 80, 70, 12, [25, 25, 25]);
     // deterministic dust: single dark pixels scattered on the paper
-    const dust: Array<[number, number]> = [
+    const dust: [number, number][] = [
       [50, 40], [60, 130], [170, 45], [175, 135], [55, 90],
       [165, 90], [100, 45], [140, 135], [48, 60], [180, 60],
     ];

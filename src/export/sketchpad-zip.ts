@@ -42,7 +42,7 @@ export interface SketchpadZipManifest {
     createdAt: string;
   };
   artworks: SketchpadZipArtwork[];
-  missingFiles: Array<{ artworkId: string; kind: "artwork" | "original" }>;
+  missingFiles: { artworkId: string; kind: "artwork" | "original" }[];
 }
 
 export interface SketchpadZipResult {
@@ -86,13 +86,13 @@ function mediaPlan(drawings: Drawing[]): MediaPlan[] {
 
 export function buildSketchpadZipManifest(input: {
   pad: Sketchpad;
-  media: Array<{
+  media: {
     drawing: Drawing;
     imageFile: string | null;
     originalFile: string | null;
     missingArtwork?: boolean;
     missingOriginal?: boolean;
-  }>;
+  }[];
   childName?: string;
   generatedAt?: number;
 }): SketchpadZipManifest {

@@ -1,7 +1,7 @@
 const mockRestoreSnapshot = jest.fn();
 const mockDownload = jest.fn();
-const mockRangeCalls: Array<{ table: string; from: number; to: number; orders: string[] }> = [];
-const mockDeviceUpdates: Array<Record<string, unknown>> = [];
+const mockRangeCalls: { table: string; from: number; to: number; orders: string[] }[] = [];
+const mockDeviceUpdates: Record<string, unknown>[] = [];
 let mockDeviceUpdateResult: { data: unknown; error: { code?: string; message: string } | null } = {
   data: null,
   error: null,
@@ -20,7 +20,7 @@ async function sha256(bytes: Uint8Array): Promise<string> {
 function mockQuery(table: string) {
   let mode: "select" | "update" = "select";
   let updatePayload: Record<string, unknown> | null = null;
-  const filters: Array<[string, unknown]> = [];
+  const filters: [string, unknown][] = [];
   const orders: string[] = [];
   const builder: any = {
     select: () => builder,

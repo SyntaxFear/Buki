@@ -15,7 +15,7 @@ interface QueuedRelationRow {
 
 interface QueuedTagRemapResult {
   removedKeys: string[];
-  queuedOperations: Array<{ key: string; operation: string }>;
+  queuedOperations: { key: string; operation: string }[];
 }
 
 function timestamp(value: string): number {
@@ -72,7 +72,7 @@ export async function remapQueuedTagReferences(
     queuedRelations.map((row) => [row.entity_id, row]),
   );
   const removedKeys = [`tag:${localTagId}`];
-  const queuedOperations: Array<{ key: string; operation: string }> = [];
+  const queuedOperations: { key: string; operation: string }[] = [];
 
   await db.runAsync(
     "DELETE FROM sync_queue WHERE owner_id = ? AND entity_type = 'tag' AND entity_id = ?",

@@ -373,8 +373,8 @@ describe("Buki archive ZIP integration", () => {
     expect(mockImportBukiLibraryArchive).toHaveBeenCalledTimes(1);
     const [imported, access] = mockImportBukiLibraryArchive.mock.calls[0] as [
       {
-        children: Array<{ name: string }>;
-        pads: Array<{ name: string }>;
+        children: { name: string }[];
+        pads: { name: string }[];
         mediaChecksums: Record<string, { cutout: string }>;
       },
       { assertWriteAllowed: () => void },

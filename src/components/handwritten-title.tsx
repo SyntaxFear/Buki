@@ -93,29 +93,29 @@ export function HandwrittenTitle({ width }: Props) {
   const trailEndX = bearX - TRAIL_BEAR_GAP;
 
   const mainTrail = useMemo(() => {
-    const p = Skia.Path.Make();
+    const p = Skia.PathBuilder.Make();
     const startX = textEnd + 13;
     const endX = trailEndX;
     const y = 50;
-    if (endX <= startX) return p;
+    if (endX <= startX) return p.detach();
     const span = endX - startX;
     p.moveTo(startX, y);
     p.cubicTo(startX + span * 0.23, y + 3, startX + span * 0.52, y - 15, startX + span * 0.72, y - 13);
     p.cubicTo(startX + span * 0.84, y - 12, startX + span * 0.92, y - 9, endX, y - 10);
-    return p;
+    return p.detach();
   }, [textEnd, trailEndX]);
 
   const softTrail = useMemo(() => {
-    const p = Skia.Path.Make();
+    const p = Skia.PathBuilder.Make();
     const startX = textEnd + 13;
     const endX = trailEndX;
     const y = 59;
-    if (endX <= startX) return p;
+    if (endX <= startX) return p.detach();
     const span = endX - startX;
     p.moveTo(startX, y);
     p.cubicTo(startX + span * 0.24, y + 4, startX + span * 0.53, y - 14, startX + span * 0.73, y - 12);
     p.cubicTo(startX + span * 0.84, y - 11, startX + span * 0.93, y - 6, endX, y - 7);
-    return p;
+    return p.detach();
   }, [textEnd, trailEndX]);
 
   const clipB = useDerivedValue(() => Skia.XYWHRect(positions[0] - 4, 0, (widths[0] + 8) * b.value, HEIGHT));

@@ -136,7 +136,7 @@ function persist(
   enqueueLibrarySnapshot(data, currentCapabilities, onError);
 }
 
-function deleteMediaFiles(items: Array<{ uri: string; photoUri?: string }>): void {
+function deleteMediaFiles(items: { uri: string; photoUri?: string }[]): void {
   for (const item of items) {
     for (const uri of [item.uri, item.photoUri]) {
       if (!uri) continue;
@@ -214,12 +214,12 @@ export function rollbackRejectedAdvancedOrganization(
   const previousIndex = drawingIndex(previous);
   const rejectedIndex = drawingIndex(rejected);
   const currentIndex = drawingIndex(current);
-  const candidates: Array<{
+  const candidates: {
     id: string;
     previous: LocatedDrawing;
     current: LocatedDrawing;
     restored: Drawing;
-  }> = [];
+  }[] = [];
 
   for (const [id, rejectedLocation] of rejectedIndex) {
     const previousLocation = previousIndex.get(id);

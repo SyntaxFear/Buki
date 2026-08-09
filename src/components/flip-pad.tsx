@@ -260,7 +260,7 @@ export function FlipPad({
   });
 
   const dotsPath = useMemo(() => {
-    const p = Skia.Path.Make();
+    const builder = Skia.PathBuilder.Make();
     for (
       let y = pageRect.y + PAGE_DOT_INSET;
       y < pageRect.y + pageRect.height - PAGE_DOT_END_INSET;
@@ -271,10 +271,10 @@ export function FlipPad({
         x < pageRect.x + pageRect.width - PAGE_DOT_END_INSET;
         x += PAGE_DOT_STEP
       ) {
-        p.addCircle(x, y, PAGE_DOT_RADIUS);
+        builder.addCircle(x, y, PAGE_DOT_RADIUS);
       }
     }
-    return p;
+    return builder.detach();
   }, [pageRect]);
 
   const rings = useMemo(() => {

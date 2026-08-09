@@ -1,6 +1,6 @@
 const mockRequireExportAccess = jest.fn();
 const mockPrintToFileAsync = jest.fn();
-const mockCopies: Array<{ source: string; destination: string }> = [];
+const mockCopies: { source: string; destination: string }[] = [];
 const mockWrites: string[] = [];
 const mockDeletes: string[] = [];
 const mockLegacyDeletes: string[] = [];

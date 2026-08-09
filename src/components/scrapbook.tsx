@@ -13,7 +13,7 @@ import {
   vec,
   type SkImage,
 } from "@shopify/react-native-skia";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { StyleSheet, useWindowDimensions } from "react-native";
 import { useDerivedValue, type SharedValue } from "react-native-reanimated";
 
@@ -140,11 +140,13 @@ export function Scrapbook({
     return uris;
   }, [drawings, fromIdx, spread, toIdx]);
   const lookup = useImageCache(preloadUris);
-  const imageFor = (drawing: Drawing | undefined): SkImage | null =>
-    drawing ? lookup(drawing.uri) : null;
+  const imageFor = useCallback(
+    (drawing: Drawing | undefined): SkImage | null => (drawing ? lookup(drawing.uri) : null),
+    [lookup],
+  );
 
   const dotsPath = useMemo(() => {
-    const p = Skia.Path.Make();
+    const builder = Skia.PathBuilder.Make();
     for (
       let y = leftPage.y + PAGE_DOT_INSET;
       y < leftPage.y + leftPage.height - PAGE_DOT_END_INSET;
@@ -155,10 +157,10 @@ export function Scrapbook({
         x < rightPage.x + rightPage.width - PAGE_DOT_END_INSET;
         x += PAGE_DOT_STEP
       ) {
-        p.addCircle(x, y, PAGE_DOT_RADIUS);
+        builder.addCircle(x, y, PAGE_DOT_RADIUS);
       }
     }
-    return p;
+    return builder.detach();
   }, [leftPage, rightPage]);
 
   const spineRings = useMemo(() => {
@@ -281,7 +283,7 @@ export function Scrapbook({
     flip,
     leftPage,
     leftSlotLocal,
-    lookup,
+    imageFor,
     paper,
     palette.gridDot,
     baseLeftVisuals,
@@ -299,7 +301,7 @@ export function Scrapbook({
   }, [
     baseRight,
     flip,
-    lookup,
+    imageFor,
     paper,
     palette.gridDot,
     rightPage,
