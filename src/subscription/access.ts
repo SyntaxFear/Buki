@@ -60,6 +60,10 @@ export const FREE_LIMITS = {
   artworks: 20,
 } as const;
 
+// RevenueCat exposes whether grace is currently active but not the grace-end timestamp.
+// Keep a recently verified offline grace state, then require another authoritative refresh.
+export const GRACE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 const FREE_CAPABILITIES: Capabilities = {
   maxChildren: FREE_LIMITS.children,
   maxSketchpads: FREE_LIMITS.sketchpads,
@@ -98,17 +102,32 @@ export function entitlementAtTime(
 ): EntitlementSnapshot {
   if (snapshot.status !== "active" && snapshot.status !== "grace") return snapshot;
 
+  const unknown = () => ({ ...snapshot, status: "unknown" as const, willRenew: false });
+
   if (!snapshot.expiresAt) {
-    if (snapshot.product === "monthly" || snapshot.product === "yearly") {
-      return { ...snapshot, status: "unknown", willRenew: false };
+    if (
+      snapshot.status === "grace" ||
+      snapshot.product === "monthly" ||
+      snapshot.product === "yearly"
+    ) {
+      return unknown();
     }
     return snapshot;
   }
 
   const expiration = Date.parse(snapshot.expiresAt);
-  if (!Number.isFinite(expiration)) {
-    return { ...snapshot, status: "unknown", willRenew: false };
+  if (!Number.isFinite(expiration)) return unknown();
+
+  if (snapshot.status === "grace") {
+    if (expiration > now) return snapshot;
+    const checkedAt = snapshot.checkedAt ? Date.parse(snapshot.checkedAt) : Number.NaN;
+    const graceVerifiedAt = Math.max(expiration, checkedAt);
+    if (!Number.isFinite(checkedAt) || graceVerifiedAt + GRACE_CACHE_MAX_AGE_MS <= now) {
+      return unknown();
+    }
+    return snapshot;
   }
+
   if (expiration <= now) {
     return { ...snapshot, status: "expired", willRenew: false };
   }

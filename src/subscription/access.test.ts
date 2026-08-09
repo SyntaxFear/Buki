@@ -69,6 +69,36 @@ describe("Buki access capabilities", () => {
     ).toMatchObject({ status: "expired", willRenew: false });
   });
 
+  it("keeps a recently verified grace entitlement active after its renewal timestamp", () => {
+    expect(
+      entitlementAtTime(
+        {
+          product: "monthly",
+          status: "grace",
+          expiresAt: "2026-08-09T11:59:59Z",
+          willRenew: false,
+          checkedAt: "2026-08-09T11:58:00Z",
+        },
+        Date.parse("2026-08-09T12:00:00Z"),
+      ),
+    ).toMatchObject({ status: "grace", willRenew: false });
+  });
+
+  it("fails a stale offline grace snapshot closed", () => {
+    expect(
+      entitlementAtTime(
+        {
+          product: "yearly",
+          status: "grace",
+          expiresAt: "2026-08-08T11:59:59Z",
+          willRenew: false,
+          checkedAt: "2026-08-08T12:00:00Z",
+        },
+        Date.parse("2026-08-09T12:00:01Z"),
+      ),
+    ).toMatchObject({ status: "unknown", willRenew: false });
+  });
+
   it.each(["monthly", "yearly"] as const)(
     "fails a cached %s subscription closed when its expiration is missing",
     (product) => {

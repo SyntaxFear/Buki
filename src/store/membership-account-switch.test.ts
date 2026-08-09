@@ -6,7 +6,7 @@ const mockVerifyServerEntitlement = jest.fn();
 
 jest.mock("@/database", () => ({
   loadBukiEntitlement: (...args: unknown[]) => mockLoadEntitlement(...args),
-  saveBukiEntitlement: jest.fn(),
+  saveBukiEntitlement: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/subscription/revenuecat-client", () => ({
@@ -21,7 +21,11 @@ jest.mock("@/subscription/server-entitlement", () => ({
 }));
 jest.mock("@/analytics/client", () => ({ trackAnalyticsEvent: jest.fn() }));
 
-import { EMPTY_ENTITLEMENT, resolveCapabilities } from "@/subscription/access";
+import {
+  EMPTY_ENTITLEMENT,
+  GRACE_CACHE_MAX_AGE_MS,
+  resolveCapabilities,
+} from "@/subscription/access";
 import { useMembership } from "./membership";
 
 function customerInfo(verification: "VERIFIED" | "FAILED" = "VERIFIED") {
@@ -164,5 +168,31 @@ describe("membership account switching", () => {
 
     await expect(restore).resolves.toBe("failed");
     expect(useMembership.getState().ownerId).toBe("adult-b");
+  });
+
+  it("keeps fresh grace access but expires a stale offline grace cache", async () => {
+    jest.useFakeTimers();
+    try {
+      const now = Date.parse("2026-08-09T12:00:00.000Z");
+      jest.setSystemTime(now);
+      useMembership.setState({ ownerId: "adult-a" });
+
+      useMembership.getState().setEntitlement({
+        product: "monthly",
+        status: "grace",
+        expiresAt: new Date(now - 1_000).toISOString(),
+        willRenew: false,
+        checkedAt: new Date(now).toISOString(),
+      });
+      expect(useMembership.getState().tier).toBe("pro");
+
+      await jest.advanceTimersByTimeAsync(GRACE_CACHE_MAX_AGE_MS + 1_000);
+      expect(useMembership.getState()).toMatchObject({
+        tier: "free",
+        entitlement: { status: "unknown" },
+      });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

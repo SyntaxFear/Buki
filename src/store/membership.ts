@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { loadBukiEntitlement, saveBukiEntitlement } from "@/database";
 import {
   EMPTY_ENTITLEMENT,
+  GRACE_CACHE_MAX_AGE_MS,
   entitlementAtTime,
   resolveCapabilities,
   tierForEntitlement,
@@ -89,14 +90,22 @@ function scheduleExpiryCheck(ownerId: string, entitlement: EntitlementSnapshot):
   ) {
     return;
   }
-  const remaining = Date.parse(entitlement.expiresAt) - Date.now();
+  const now = Date.now();
+  const expiration = Date.parse(entitlement.expiresAt);
+  let nextCheckAt = expiration;
+  if (entitlement.status === "grace" && expiration <= now) {
+    const checkedAt = entitlement.checkedAt ? Date.parse(entitlement.checkedAt) : Number.NaN;
+    if (!Number.isFinite(checkedAt)) return;
+    nextCheckAt = Math.max(expiration, checkedAt) + GRACE_CACHE_MAX_AGE_MS;
+  }
+  const remaining = nextCheckAt - now;
   if (!Number.isFinite(remaining)) return;
   const delay = Math.max(0, Math.min(remaining + 500, MAX_TIMER_DELAY));
   expiryTimer = setTimeout(() => {
     const state = useMembership.getState();
     if (state.ownerId !== ownerId) return;
     const current = entitlementAtTime(state.entitlement);
-    if (current.status === "expired") {
+    if (current.status !== "active" && current.status !== "grace") {
       useMembership.setState({ ...resolvedState(current), periodType: null });
       void saveBukiEntitlement(ownerId, current).catch(() => {});
       void useMembership.getState().refreshMembership();
