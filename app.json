@@ -40,8 +40,7 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.parastashvili.bloombook",
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -70,13 +69,16 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Buki uses the camera to scan drawings into your book."
+          "cameraPermission": "Buki uses the camera to scan drawings into your book.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Buki opens your photo library so you can import a drawing photo."
+          "photosPermission": "Buki opens your photo library so you can import a drawing photo.",
+          "microphonePermission": false
         }
       ],
       "expo-sqlite",
