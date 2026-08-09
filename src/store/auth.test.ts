@@ -165,6 +165,7 @@ describe("authentication state boundaries", () => {
     mockProfilesState.hydrate.mockResolvedValue(undefined);
     mockProfilesState.reloadForAccount.mockResolvedValue(undefined);
     mockPreferencesState.hydrate.mockResolvedValue(undefined);
+    mockSyncState.disconnectUser.mockResolvedValue(undefined);
     mockSyncState.initializeForUser.mockResolvedValue(undefined);
     mockAuthListener.mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } });
     mockSignOut.mockResolvedValue({ error: null });
@@ -339,6 +340,39 @@ describe("authentication state boundaries", () => {
   it("clears the OTP context on sign-out", async () => {
     useAuth.setState({ otpEmail: "parent@example.com" });
     await useAuth.getState().signOut();
+    expect(mockSyncState.disconnectUser).toHaveBeenCalledTimes(2);
     expect(useAuth.getState().otpEmail).toBeNull();
+  });
+
+  it("waits for cloud synchronization to disconnect before signing out remotely", async () => {
+    let finishDisconnect!: () => void;
+    mockSyncState.disconnectUser.mockImplementationOnce(() => new Promise<void>((resolve) => {
+      finishDisconnect = resolve;
+    }));
+
+    const signingOut = useAuth.getState().signOut();
+    await Promise.resolve();
+
+    expect(mockSignOut).not.toHaveBeenCalled();
+    finishDisconnect();
+    await signingOut;
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("reconnects cloud synchronization when remote sign-out fails", async () => {
+    const current = session("adult-a", "token-a");
+    useAuth.setState({
+      hydrated: true,
+      status: "signedIn",
+      session: current,
+      user: current.user,
+    });
+    mockSignOut.mockResolvedValueOnce({ error: new Error("offline") });
+
+    await useAuth.getState().signOut();
+
+    expect(mockSyncState.initializeForUser).toHaveBeenCalledWith("adult-a");
+    expect(useAuth.getState().error).toBe("offline");
   });
 });

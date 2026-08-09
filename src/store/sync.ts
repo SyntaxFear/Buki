@@ -41,7 +41,7 @@ interface CloudSyncState {
   lastRestore: CloudRestoreResult | null;
   error: string | null;
   initializeForUser: (ownerId: string) => Promise<void>;
-  disconnectUser: () => void;
+  disconnectUser: () => Promise<void>;
   refreshSyncState: () => Promise<void>;
   setAutomaticBackup: (enabled: boolean) => Promise<void>;
   pauseForPrivacyAction: () => Promise<void>;
@@ -221,7 +221,7 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
     }
   },
 
-  disconnectUser: () => {
+  disconnectUser: async () => {
     teardownListeners();
     set({
       hydrated: true,
@@ -235,6 +235,10 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
       lastRestore: null,
       error: null,
     });
+    const activeRuns = [syncRun, restoreRun].filter(
+      (run): run is Promise<void> | Promise<boolean> => run !== null,
+    );
+    if (activeRuns.length > 0) await Promise.allSettled(activeRuns);
   },
 
   refreshSyncState: async () => {
@@ -295,7 +299,10 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
     if (get().ownerId === ownerId) {
       set({ automaticBackup: false, status: "idle", error: null });
     }
-    if (syncRun) await syncRun;
+    const activeRuns = [syncRun, restoreRun].filter(
+      (run): run is Promise<void> | Promise<boolean> => run !== null,
+    );
+    if (activeRuns.length > 0) await Promise.allSettled(activeRuns);
   },
 
   syncNow: async (force = true) => {

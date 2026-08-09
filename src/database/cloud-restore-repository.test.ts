@@ -1,7 +1,22 @@
 const mockEnqueue = jest.fn();
+const mockDeletedFiles: string[] = [];
 
 jest.mock("expo-file-system", () => ({
-  File: class MockFile {},
+  File: class MockFile {
+    readonly uri: string;
+
+    constructor(uri: string) {
+      this.uri = uri;
+    }
+
+    get exists() {
+      return true;
+    }
+
+    delete() {
+      mockDeletedFiles.push(this.uri);
+    }
+  },
 }));
 
 jest.mock("./sync-repository", () => ({
@@ -9,7 +24,12 @@ jest.mock("./sync-repository", () => ({
 }));
 
 import { artworkTagEntityId } from "./sync-serialization";
-import { remapQueuedTagReferences } from "./cloud-restore-repository";
+import type { RemoteCloudSnapshot } from "@/sync/cloud-types";
+import {
+  applyRemoteCloudSnapshot,
+  CloudRestoreCollisionError,
+  remapQueuedTagReferences,
+} from "./cloud-restore-repository";
 
 interface QueueRow {
   operation: string;
@@ -160,5 +180,84 @@ describe("cloud restore tag queue reconciliation", () => {
 
     expect(mockEnqueue).not.toHaveBeenCalled();
     expect(result).toEqual({ removedKeys: ["tag:local-tag"], queuedOperations: [] });
+  });
+});
+
+describe("cloud restore account isolation", () => {
+  beforeEach(() => {
+    mockDeletedFiles.length = 0;
+  });
+
+  it("rejects a remote parent ID owned by another local account before any write", async () => {
+    const transaction = {
+      getAllAsync: jest.fn(async (sql: string) => {
+        if (sql.includes("FROM child_profiles") && sql.includes("owner_id IS NULL")) {
+          return [{ id: "shared-child" }];
+        }
+        return [];
+      }),
+      getFirstAsync: jest.fn(),
+      runAsync: jest.fn(),
+    };
+    const db = {
+      getAllAsync: jest.fn(async () => []),
+      withExclusiveTransactionAsync: jest.fn(
+        async (operation: (tx: typeof transaction) => Promise<void>) => operation(transaction),
+      ),
+    };
+    const snapshot: RemoteCloudSnapshot = {
+      adult: null,
+      children: [],
+      sketchpads: [{
+        owner_id: "adult-a",
+        id: "pad-a",
+        child_id: "shared-child",
+        name: "Cloud pad",
+        style: "spread",
+        design: "sunshine",
+        border: "none",
+        decoration: "none",
+        cover_color: "#FFD65A",
+        page_color: "#FFFDF4",
+        sort_order: 0,
+        created_at: "2026-08-09T00:00:00.000Z",
+        updated_at: "2026-08-09T00:00:00.000Z",
+        server_updated_at: "2026-08-09T00:00:00.000Z",
+        deleted_at: null,
+      }],
+      artworks: [],
+      tags: [],
+      artworkTags: [],
+      mediaFiles: [{
+        owner_id: "adult-a",
+        id: "orphan-media",
+        artwork_id: "missing-artwork",
+        kind: "preview",
+        storage_path: "adult-a/preview.png",
+        checksum: "a".repeat(64),
+        byte_size: 10,
+        mime_type: "image/png",
+        upload_state: "uploaded",
+        created_at: "2026-08-09T00:00:00.000Z",
+        updated_at: "2026-08-09T00:00:00.000Z",
+        server_updated_at: "2026-08-09T00:00:00.000Z",
+        deleted_at: null,
+        local_uri: "file:///downloaded-preview.png",
+      }],
+      tombstones: [],
+      cloudBytes: 10,
+      cloudLimit: 2 * 1024 * 1024 * 1024,
+      failedMediaCount: 0,
+    };
+
+    await expect(applyRemoteCloudSnapshot(db as never, "adult-a", snapshot)).rejects.toEqual(
+      expect.objectContaining<Partial<CloudRestoreCollisionError>>({
+        code: "cross_account_id_collision",
+        table: "child_profiles",
+      }),
+    );
+
+    expect(transaction.runAsync).not.toHaveBeenCalled();
+    expect(mockDeletedFiles).toEqual(["file:///downloaded-preview.png"]);
   });
 });

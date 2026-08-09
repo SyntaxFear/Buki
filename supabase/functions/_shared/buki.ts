@@ -58,6 +58,20 @@ export async function requestObject(request: Request): Promise<Record<string, un
   }
 }
 
+export function assertExpectedOwner(
+  body: Record<string, unknown>,
+  authenticatedOwnerId: string,
+): void {
+  const expectedOwnerId = body.ownerId;
+  if (expectedOwnerId === undefined) return;
+  if (typeof expectedOwnerId !== "string" || !expectedOwnerId || expectedOwnerId.length > 128) {
+    throw new HttpError(400, "invalid_ownerId");
+  }
+  if (expectedOwnerId !== authenticatedOwnerId) {
+    throw new HttpError(409, "account_session_changed");
+  }
+}
+
 export function handleError(error: unknown, operation: string): Response {
   if (error instanceof HttpError) return json(error.status, { error: error.code });
   console.error(`${operation} failed`, error instanceof Error ? error.message : "unknown_error");

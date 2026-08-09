@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import {
+  assertExpectedOwner,
   authenticatedClients,
   handleError,
   HttpError,
@@ -24,6 +25,7 @@ Deno.serve(async (request) => {
   try {
     const { user, admin } = await authenticatedClients(request);
     const body = await requestObject(request);
+    assertExpectedOwner(body, user.id);
     const mediaId = body.mediaId;
     const deletedAt = body.deletedAt;
     if (typeof mediaId !== "string" || !mediaId || mediaId.length > 240) {

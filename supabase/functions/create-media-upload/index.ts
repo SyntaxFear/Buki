@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import {
+  assertExpectedOwner,
   authenticatedClients,
   handleError,
   HttpError,
@@ -39,6 +40,7 @@ Deno.serve(async (request) => {
   try {
     const { user, admin } = await authenticatedClients(request);
     const body = await requestObject(request);
+    assertExpectedOwner(body, user.id);
     const mediaId = stringField(body, "mediaId", 240);
     const artworkId = stringField(body, "artworkId", 200);
     const kind = stringField(body, "kind", 20);

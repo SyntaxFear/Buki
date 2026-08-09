@@ -81,7 +81,7 @@ async function resetAccountState(hydrateSignedOut: boolean): Promise<unknown> {
     recordCleanupError(error);
   }
   try {
-    useCloudSync.getState().disconnectUser();
+    await useCloudSync.getState().disconnectUser();
   } catch (error) {
     recordCleanupError(error);
   }
@@ -507,12 +507,17 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   signOut: async () => {
+    const ownerId = get().user?.id ?? null;
     set({ busy: true, error: null });
     try {
+      await useCloudSync.getState().disconnectUser();
       const { error } = await getSupabaseClient().auth.signOut();
       if (error) throw error;
       await applySession(null);
     } catch (error) {
+      if (ownerId && get().user?.id === ownerId) {
+        await useCloudSync.getState().initializeForUser(ownerId).catch(() => {});
+      }
       set({ error: errorMessage(error) });
     } finally {
       set({ busy: false });

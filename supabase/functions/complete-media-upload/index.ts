@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import {
+  assertExpectedOwner,
   authenticatedClients,
   handleError,
   HttpError,
@@ -37,6 +38,7 @@ Deno.serve(async (request) => {
   try {
     const { user, admin } = await authenticatedClients(request);
     const body = await requestObject(request);
+    assertExpectedOwner(body, user.id);
     const reservationId = body.reservationId;
     if (typeof reservationId !== "string" || !reservationId) {
       throw new HttpError(400, "invalid_reservationId");

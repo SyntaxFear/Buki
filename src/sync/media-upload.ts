@@ -98,6 +98,9 @@ async function invokeEdge(
     if (code === "cloud_access_required") {
       throw new CloudMediaError("Buki Pro cloud access is required to upload artwork.", code);
     }
+    if (code === "account_session_changed") {
+      throw new CloudMediaError("The Buki account changed while cloud backup was running.", code);
+    }
     throw new CloudMediaError("Buki could not finish the cloud media request.", code ?? "edge_request_failed");
   }
   const response = record(data);
@@ -179,6 +182,7 @@ export async function uploadQueuedMedia(item: SyncQueueItem): Promise<void> {
       throw new CloudMediaError("This artwork image is too large for Buki cloud backup.", "media_too_large");
     }
     const created = createUploadResponse(await invokeEdge("create-media-upload", {
+      ownerId: item.ownerId,
       mediaId: media.id,
       artworkId: media.artworkId,
       kind: media.kind,
@@ -209,6 +213,7 @@ export async function uploadQueuedMedia(item: SyncQueueItem): Promise<void> {
       throw new CloudMediaError("Buki could not upload this artwork image.", "storage_upload_failed");
     }
     const completed = completedUploadResponse(await invokeEdge("complete-media-upload", {
+      ownerId: item.ownerId,
       reservationId: created.reservationId,
     }));
     await persistUpload(item.ownerId, item.entityId, completed);
@@ -234,6 +239,7 @@ export function isCloudQuotaError(error: unknown): boolean {
 export async function deleteQueuedMedia(item: SyncQueueItem): Promise<void> {
   const payload = item.payload ?? {};
   const response = await invokeEdge("delete-media", {
+    ownerId: item.ownerId,
     mediaId: item.entityId,
     deletedAt: typeof payload.deleted_at === "string"
       ? payload.deleted_at

@@ -123,18 +123,20 @@ export async function remapQueuedTagReferences(
   return { removedKeys, queuedOperations };
 }
 
-async function localMediaUris(db: SQLiteDatabase, ownerId: string): Promise<Set<string>> {
+async function localMediaUris(db: SQLiteDatabase, ownerId?: string): Promise<Set<string>> {
+  const ownerFilter = ownerId ? " WHERE owner_id = ?" : "";
+  const ownerArgs = ownerId ? [ownerId] : [];
   const media = await db.getAllAsync<{ local_uri: string | null }>(
-    "SELECT local_uri FROM media_files WHERE owner_id = ? AND local_uri IS NOT NULL",
-    ownerId,
+    `SELECT local_uri FROM media_files${ownerFilter}${ownerId ? " AND" : " WHERE"} local_uri IS NOT NULL`,
+    ...ownerArgs,
   );
   const artworks = await db.getAllAsync<{
     cutout_uri: string;
     photo_uri: string | null;
     preview_uri: string | null;
   }>(
-    "SELECT cutout_uri, photo_uri, preview_uri FROM artworks WHERE owner_id = ?",
-    ownerId,
+    `SELECT cutout_uri, photo_uri, preview_uri FROM artworks${ownerFilter}`,
+    ...ownerArgs,
   );
   return new Set([
     ...media.flatMap((row) => (row.local_uri ? [row.local_uri] : [])),
@@ -149,6 +151,49 @@ function deleteUnreferencedFiles(before: Set<string>, after: Set<string>): void 
       const file = new File(uri);
       if (file.exists) file.delete();
     } catch {}
+  }
+}
+
+type OwnedRestoreTable =
+  | "child_profiles"
+  | "sketchpads"
+  | "artworks"
+  | "tags"
+  | "media_files";
+
+type RestoreIdsByTable = Record<OwnedRestoreTable, readonly string[]>;
+
+const RESTORE_ID_QUERY_BATCH = 400;
+
+export class CloudRestoreCollisionError extends Error {
+  readonly code = "cross_account_id_collision";
+
+  constructor(readonly table: OwnedRestoreTable) {
+    super("Cloud backup identifiers conflict with another Buki account on this device.");
+    this.name = "CloudRestoreCollisionError";
+  }
+}
+
+export async function assertNoCrossAccountRestoreIds(
+  db: SQLiteDatabase,
+  ownerId: string,
+  idsByTable: RestoreIdsByTable,
+): Promise<void> {
+  const entries = Object.entries(idsByTable) as [OwnedRestoreTable, readonly string[]][];
+  for (const [table, rawIds] of entries) {
+    const ids = [...new Set(rawIds.filter(Boolean))];
+    for (let offset = 0; offset < ids.length; offset += RESTORE_ID_QUERY_BATCH) {
+      const batch = ids.slice(offset, offset + RESTORE_ID_QUERY_BATCH);
+      const collisions = await db.getAllAsync<{ id: string }>(
+        `SELECT id FROM ${table}
+         WHERE (owner_id IS NULL OR owner_id <> ?)
+           AND id IN (${batch.map(() => "?").join(",")})
+         LIMIT 1`,
+        ownerId,
+        ...batch,
+      );
+      if (collisions.length > 0) throw new CloudRestoreCollisionError(table);
+    }
   }
 }
 
@@ -230,7 +275,9 @@ export async function applyRemoteCloudSnapshot(
   ownerId: string,
   snapshot: RemoteCloudSnapshot,
 ): Promise<CloudRestoreResult> {
-  const beforeUris = await localMediaUris(db, ownerId);
+  const beforeOwnerUris = await localMediaUris(db, ownerId);
+  const beforeAllUris = await localMediaUris(db);
+  const snapshotUris = new Set(snapshot.mediaFiles.map((media) => media.local_uri));
   const tombstones = new Map(
     snapshot.tombstones
       .filter((row) => row.owner_id === ownerId)
@@ -283,8 +330,27 @@ export async function applyRemoteCloudSnapshot(
       && !tombstones.has(`artwork:${row.id}`)
       && mediaByArtwork.get(row.id)?.has("cutout"),
   );
+  const activeArtworkIds = new Set(activeArtworks.map((artwork) => artwork.id));
+  const restorableMedia = activeMedia.filter((media) => activeArtworkIds.has(media.artwork_id));
 
   await db.withExclusiveTransactionAsync(async (tx) => {
+    await assertNoCrossAccountRestoreIds(tx, ownerId, {
+      child_profiles: [
+        ...activeChildren.map((child) => child.id),
+        ...activePads.map((pad) => pad.child_id),
+        ...activeArtworks.map((artwork) => artwork.child_id),
+      ],
+      sketchpads: [
+        ...activePads.map((pad) => pad.id),
+        ...activeArtworks.map((artwork) => artwork.sketchpad_id),
+      ],
+      artworks: [
+        ...activeArtworks.map((artwork) => artwork.id),
+        ...restorableMedia.map((media) => media.artwork_id),
+      ],
+      tags: activeTags.map((tag) => tag.id),
+      media_files: restorableMedia.map((media) => media.id),
+    });
     const queuedRows = await tx.getAllAsync<{
       operation: string;
       entity_type: string;
@@ -566,7 +632,7 @@ export async function applyRemoteCloudSnapshot(
       );
     }
 
-    for (const media of activeMedia) {
+    for (const media of restorableMedia) {
       if (!localArtworkIds.has(media.artwork_id) || hasQueuedChange("media_file", media.id)) continue;
       await tx.runAsync(
         `INSERT INTO media_files (
@@ -627,18 +693,21 @@ export async function applyRemoteCloudSnapshot(
         Date.now(),
       );
     }
+  }).catch((error) => {
+    deleteUnreferencedFiles(snapshotUris, beforeAllUris);
+    throw error;
   });
 
-  const afterUris = await localMediaUris(db, ownerId);
+  const afterUris = await localMediaUris(db);
   deleteUnreferencedFiles(
-    new Set([...beforeUris, ...snapshot.mediaFiles.map((media) => media.local_uri)]),
+    new Set([...beforeOwnerUris, ...snapshotUris]),
     afterUris,
   );
   return {
     children: activeChildren.length,
     sketchpads: activePads.length,
     artworks: activeArtworks.length,
-    mediaFiles: activeMedia.length,
+    mediaFiles: restorableMedia.length,
     failedMediaCount: snapshot.failedMediaCount,
     restoredAt: new Date().toISOString(),
   };
