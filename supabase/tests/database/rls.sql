@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(45);
+select plan(55);
 
 select has_table('public', 'adult_profiles', 'adult_profiles exists');
 select has_table('public', 'child_profiles', 'child_profiles exists');
@@ -57,6 +57,104 @@ select has_function(
   'record_entitlement_verification',
   array['uuid', 'boolean', 'boolean', 'timestamp with time zone', 'timestamp with time zone'],
   'server entitlement verifier exists'
+);
+
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+insert into auth.users (
+  id,
+  aud,
+  role,
+  email,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+) values (
+  'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+  'authenticated',
+  'authenticated',
+  'entitlement-retention-test@buki.invalid',
+  '{}'::jsonb,
+  '{}'::jsonb,
+  now(),
+  now()
+);
+insert into public.adult_profiles (owner_id, display_name, email)
+values (
+  'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+  'Entitlement Retention Test',
+  'entitlement-retention-test@buki.invalid'
+)
+on conflict (owner_id) do nothing;
+
+select lives_ok(
+  $$select public.record_entitlement_verification(
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+    true,
+    false,
+    '2026-02-01 00:00:00+00'::timestamptz,
+    '2026-01-01 00:00:00+00'::timestamptz
+  )$$,
+  'active entitlement verification executes'
+);
+select is(
+  (select status from public.cloud_retention where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  'active',
+  'active entitlement enables cloud uploads'
+);
+select lives_ok(
+  $$select public.record_entitlement_verification(
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+    false,
+    true,
+    null,
+    '2026-01-02 00:00:00+00'::timestamptz
+  )$$,
+  'expired entitlement verification executes'
+);
+select is(
+  (select status from public.cloud_retention where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  'read_only',
+  'expired Pro cloud content becomes read-only'
+);
+select is(
+  (select delete_after from public.cloud_retention where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  '2026-04-02 00:00:00+00'::timestamptz,
+  'expired Pro cloud content receives exactly 90 days retention'
+);
+select lives_ok(
+  $$select public.record_entitlement_verification(
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+    false,
+    false,
+    null,
+    '2026-01-03 00:00:00+00'::timestamptz
+  )$$,
+  'historical entitlement verification executes'
+);
+select is(
+  (select status from public.cloud_retention where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  'read_only',
+  'historical Pro access preserves retention state'
+);
+select lives_ok(
+  $$select public.record_entitlement_verification(
+    'fcd350ce-32bd-4cf8-a31f-a1f1edee8369',
+    true,
+    true,
+    '2026-02-04 00:00:00+00'::timestamptz,
+    '2026-01-04 00:00:00+00'::timestamptz
+  )$$,
+  'renewed entitlement verification executes'
+);
+select is(
+  (select status from public.cloud_retention where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  'active',
+  'renewal immediately restores cloud uploads'
+);
+select ok(
+  (select delete_after is null from public.cloud_retention where owner_id = 'fcd350ce-32bd-4cf8-a31f-a1f1edee8369'),
+  'renewal clears the retention deletion deadline'
 );
 select has_function(
   'public',
