@@ -11,7 +11,10 @@ import {
   type PadBorderId,
   type PadDecorationId,
 } from "@/pad-visuals";
-import { normalizeArtworkTags } from "@/organization/artwork-organizer";
+import {
+  normalizeArtworkTags,
+  normalizeArtworkText,
+} from "@/organization/artwork-organizer";
 import {
   canCreateContent,
   isContentLimitReachedError,
@@ -173,6 +176,124 @@ function updateDrawingById(
   return { drawingsByPad: changed ? nextByPad : drawingsByPad, changed };
 }
 
+interface LocatedDrawing {
+  padId: string;
+  index: number;
+  drawing: Drawing;
+}
+
+function drawingIndex(drawingsByPad: Record<string, Drawing[]>): Map<string, LocatedDrawing> {
+  const index = new Map<string, LocatedDrawing>();
+  for (const [padId, drawings] of Object.entries(drawingsByPad)) {
+    drawings.forEach((drawing, drawingIndex) => {
+      index.set(drawing.id, { padId, index: drawingIndex, drawing });
+    });
+  }
+  return index;
+}
+
+function organizationTagKey(tags: readonly string[] | undefined): string {
+  return normalizeArtworkTags(tags ?? [])
+    .map(normalizeArtworkText)
+    .sort()
+    .join("\u0000");
+}
+
+function sameOrganization(left: Drawing, right: Drawing): boolean {
+  return (
+    (left.favorite === true) === (right.favorite === true) &&
+    organizationTagKey(left.tags) === organizationTagKey(right.tags)
+  );
+}
+
+export function rollbackRejectedAdvancedOrganization(
+  current: Record<string, Drawing[]>,
+  previous: Record<string, Drawing[]>,
+  rejected: Record<string, Drawing[]>,
+): Record<string, Drawing[]> {
+  const previousIndex = drawingIndex(previous);
+  const rejectedIndex = drawingIndex(rejected);
+  const currentIndex = drawingIndex(current);
+  const candidates: Array<{
+    id: string;
+    previous: LocatedDrawing;
+    current: LocatedDrawing;
+    restored: Drawing;
+  }> = [];
+
+  for (const [id, rejectedLocation] of rejectedIndex) {
+    const previousLocation = previousIndex.get(id);
+    const currentLocation = currentIndex.get(id);
+    if (!previousLocation || !currentLocation) continue;
+    const operationChangedOrganization =
+      previousLocation.padId !== rejectedLocation.padId ||
+      !sameOrganization(previousLocation.drawing, rejectedLocation.drawing);
+    if (!operationChangedOrganization) continue;
+    if (
+      currentLocation.padId !== rejectedLocation.padId ||
+      !sameOrganization(currentLocation.drawing, rejectedLocation.drawing)
+    ) {
+      continue;
+    }
+
+    const restored: Drawing = {
+      ...currentLocation.drawing,
+      favorite: previousLocation.drawing.favorite === true,
+      tags: [...(previousLocation.drawing.tags ?? [])],
+      updatedAt:
+        currentLocation.drawing.updatedAt === rejectedLocation.drawing.updatedAt
+          ? previousLocation.drawing.updatedAt
+          : currentLocation.drawing.updatedAt,
+    };
+    candidates.push({
+      id,
+      previous: previousLocation,
+      current: currentLocation,
+      restored,
+    });
+  }
+
+  if (candidates.length === 0) return current;
+
+  const next = Object.fromEntries(
+    Object.entries(current).map(([padId, drawings]) => [padId, [...drawings]]),
+  );
+  const movedIds = new Set(
+    candidates
+      .filter(({ previous: before, current: after }) => before.padId !== after.padId)
+      .map(({ id }) => id),
+  );
+
+  for (const [padId, drawings] of Object.entries(next)) {
+    next[padId] = drawings.filter((drawing) => !movedIds.has(drawing.id));
+  }
+  for (const candidate of candidates) {
+    if (movedIds.has(candidate.id)) continue;
+    const padDrawings = next[candidate.current.padId];
+    const index = padDrawings?.findIndex((drawing) => drawing.id === candidate.id) ?? -1;
+    if (index >= 0) padDrawings[index] = candidate.restored;
+  }
+  const movedCandidates = candidates
+    .filter(({ id }) => movedIds.has(id))
+    .sort((left, right) => {
+      if (left.previous.padId !== right.previous.padId) {
+        return left.previous.padId < right.previous.padId ? -1 : 1;
+      }
+      return left.previous.index - right.previous.index;
+    });
+  for (const candidate of movedCandidates) {
+    const destination = next[candidate.previous.padId];
+    if (!destination) continue;
+    destination.splice(
+      Math.min(candidate.previous.index, destination.length),
+      0,
+      candidate.restored,
+    );
+  }
+
+  return next;
+}
+
 function introduceProAfterFirstArtwork(attempt = 0): void {
   const membership = useMembership.getState();
   if (!membership.ownerId) return;
@@ -325,7 +446,20 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     }));
     if (!result.changed) return false;
     set({ drawingsByPad: result.drawingsByPad });
-    persist({ activePadId, pads, drawingsByPad: result.drawingsByPad });
+    persist({ activePadId, pads, drawingsByPad: result.drawingsByPad }, (error) => {
+      if (!isProFeatureRequiredError(error, "advancedOrganization")) return;
+      set((state) => ({
+        drawingsByPad: rollbackRejectedAdvancedOrganization(
+          state.drawingsByPad,
+          drawingsByPad,
+          result.drawingsByPad,
+        ),
+      }));
+      useMembership.getState().requestUpgrade(
+        "advancedOrganization",
+        "artwork_favorite_commit",
+      );
+    });
     return true;
   },
 
@@ -341,7 +475,20 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     }));
     if (!result.changed) return false;
     set({ drawingsByPad: result.drawingsByPad });
-    persist({ activePadId, pads, drawingsByPad: result.drawingsByPad });
+    persist({ activePadId, pads, drawingsByPad: result.drawingsByPad }, (error) => {
+      if (!isProFeatureRequiredError(error, "advancedOrganization")) return;
+      set((state) => ({
+        drawingsByPad: rollbackRejectedAdvancedOrganization(
+          state.drawingsByPad,
+          drawingsByPad,
+          result.drawingsByPad,
+        ),
+      }));
+      useMembership.getState().requestUpgrade(
+        "advancedOrganization",
+        "artwork_tags_commit",
+      );
+    });
     return true;
   },
 
@@ -390,7 +537,20 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     );
     if (!changed) return false;
     set({ drawingsByPad: nextByPad });
-    persist({ activePadId, pads, drawingsByPad: nextByPad });
+    persist({ activePadId, pads, drawingsByPad: nextByPad }, (error) => {
+      if (!isProFeatureRequiredError(error, "advancedOrganization")) return;
+      set((state) => ({
+        drawingsByPad: rollbackRejectedAdvancedOrganization(
+          state.drawingsByPad,
+          drawingsByPad,
+          nextByPad,
+        ),
+      }));
+      useMembership.getState().requestUpgrade(
+        "advancedOrganization",
+        "library_bulk_favorite_commit",
+      );
+    });
     return true;
   },
 
@@ -419,7 +579,20 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     );
     if (!changed) return false;
     set({ drawingsByPad: nextByPad });
-    persist({ activePadId, pads, drawingsByPad: nextByPad });
+    persist({ activePadId, pads, drawingsByPad: nextByPad }, (error) => {
+      if (!isProFeatureRequiredError(error, "advancedOrganization")) return;
+      set((state) => ({
+        drawingsByPad: rollbackRejectedAdvancedOrganization(
+          state.drawingsByPad,
+          drawingsByPad,
+          nextByPad,
+        ),
+      }));
+      useMembership.getState().requestUpgrade(
+        "advancedOrganization",
+        "library_bulk_tag_commit",
+      );
+    });
     return true;
   },
 
@@ -444,7 +617,20 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     if (moved.length === 0) return false;
     nextByPad[targetPadId] = [...(drawingsByPad[targetPadId] ?? []), ...moved];
     set({ drawingsByPad: nextByPad });
-    persist({ activePadId, pads, drawingsByPad: nextByPad });
+    persist({ activePadId, pads, drawingsByPad: nextByPad }, (error) => {
+      if (!isProFeatureRequiredError(error, "advancedOrganization")) return;
+      set((state) => ({
+        drawingsByPad: rollbackRejectedAdvancedOrganization(
+          state.drawingsByPad,
+          drawingsByPad,
+          nextByPad,
+        ),
+      }));
+      useMembership.getState().requestUpgrade(
+        "advancedOrganization",
+        "library_bulk_move_commit",
+      );
+    });
     return true;
   },
 

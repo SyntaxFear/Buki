@@ -64,7 +64,28 @@ type ExistingPad = string | {
   decoration: string;
 };
 
-function database(existingPads: ExistingPad[] = [], existingArtworks: string[] = []) {
+type ExistingArtwork = string | {
+  id: string;
+  padId?: string;
+  favorite?: boolean;
+  tags?: string[];
+};
+
+function database(existingPads: ExistingPad[] = [], existingArtworks: ExistingArtwork[] = []) {
+  const artworkRows = existingArtworks.map((artwork) =>
+    typeof artwork === "string"
+      ? { id: artwork, sketchpad_id: "pad-a", favorite: 0 }
+      : {
+          id: artwork.id,
+          sketchpad_id: artwork.padId ?? "pad-a",
+          favorite: artwork.favorite ? 1 : 0,
+        },
+  );
+  const tagRows = existingArtworks.flatMap((artwork) =>
+    typeof artwork === "string"
+      ? []
+      : (artwork.tags ?? []).map((name) => ({ artwork_id: artwork.id, name })),
+  );
   const tx = {
     getAllAsync: jest
       .fn()
@@ -73,7 +94,8 @@ function database(existingPads: ExistingPad[] = [], existingArtworks: string[] =
           ? { id: pad, design: "sunshine", border: "none", decoration: "none" }
           : pad,
       ))
-      .mockResolvedValueOnce(existingArtworks.map((id) => ({ id }))),
+      .mockResolvedValueOnce(artworkRows)
+      .mockResolvedValueOnce(tagRows),
     getFirstAsync: jest.fn(),
     runAsync: jest.fn(),
   };
@@ -205,6 +227,73 @@ describe("library repository capability boundary", () => {
     },
   );
 
+  it("blocks direct Free favorite, tag, and move changes", () => {
+    const data = library(1);
+    data.drawingsByPad["pad-a"][0] = {
+      ...data.drawingsByPad["pad-a"][0],
+      favorite: true,
+      tags: ["School"],
+    };
+
+    expect(() => assertLibrarySnapshotWithinCapabilities(
+      {
+        sketchpads: new Set(["pad-a"]),
+        artworks: new Set(["art-0"]),
+        artworkOrganization: new Map([[
+          "art-0",
+          { padId: "pad-a", favorite: false, tags: [] },
+        ]]),
+      },
+      data,
+      resolveCapabilities("free"),
+    )).toThrow(new ProFeatureRequiredError("advancedOrganization"));
+
+    const secondPad = { ...data.pads[0], id: "pad-b", name: "Second" };
+    const moved = {
+      ...data,
+      pads: [data.pads[0], secondPad],
+      drawingsByPad: {
+        "pad-a": [],
+        "pad-b": [{ ...data.drawingsByPad["pad-a"][0], favorite: false, tags: [] }],
+      },
+    };
+    expect(() => assertLibrarySnapshotWithinCapabilities(
+      {
+        sketchpads: new Set(["pad-a", "pad-b"]),
+        artworks: new Set(["art-0"]),
+        artworkOrganization: new Map([[
+          "art-0",
+          { padId: "pad-a", favorite: false, tags: [] },
+        ]]),
+      },
+      moved,
+      resolveCapabilities("free"),
+    )).toThrow(new ProFeatureRequiredError("advancedOrganization"));
+  });
+
+  it("preserves unchanged organization metadata after Pro expires", () => {
+    const data = library(1);
+    data.drawingsByPad["pad-a"][0] = {
+      ...data.drawingsByPad["pad-a"][0],
+      title: "Updated basic title",
+      favorite: true,
+      tags: ["School", "Space"],
+    };
+
+    expect(() => assertLibrarySnapshotWithinCapabilities(
+      {
+        sketchpads: new Set(["pad-a"]),
+        artworks: new Set(["art-0"]),
+        artworkOrganization: new Map([[
+          "art-0",
+          { padId: "pad-a", favorite: true, tags: ["space", "school"] },
+        ]]),
+      },
+      data,
+      resolveCapabilities("free"),
+    )).not.toThrow();
+  });
+
   it("rechecks authorization after writes so the transaction can roll back", async () => {
     let allowed = true;
     const { db, tx } = database();
@@ -275,6 +364,33 @@ describe("library repository capability boundary", () => {
         getCapabilities: () => resolveCapabilities(pro ? "pro" : "free"),
       }),
     ).rejects.toEqual(new ProFeatureRequiredError("premiumVisuals"));
+
+    expect(tx.runAsync).toHaveBeenCalled();
+  });
+
+  it("rolls back organization changes when Pro expires during the write", async () => {
+    let pro = true;
+    const { db, tx } = database(["pad-a"], [{
+      id: "art-0",
+      favorite: false,
+      tags: [],
+    }]);
+    tx.runAsync.mockImplementation(async () => {
+      pro = false;
+      return undefined as never;
+    });
+    const data = library(1);
+    data.drawingsByPad["pad-a"][0] = {
+      ...data.drawingsByPad["pad-a"][0],
+      favorite: true,
+      tags: ["School"],
+    };
+
+    await expect(
+      saveLibrary(db as never, data, {
+        getCapabilities: () => resolveCapabilities(pro ? "pro" : "free"),
+      }),
+    ).rejects.toEqual(new ProFeatureRequiredError("advancedOrganization"));
 
     expect(tx.runAsync).toHaveBeenCalled();
   });

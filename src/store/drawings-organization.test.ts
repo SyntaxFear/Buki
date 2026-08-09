@@ -1,4 +1,5 @@
 const mockPersist = jest.fn();
+const mockRequestUpgrade = jest.fn();
 const mockDeletedFiles: string[] = [];
 let mockCapabilities: import("@/subscription/access").Capabilities;
 
@@ -32,7 +33,7 @@ jest.mock("@/store/membership", () => ({
       ownerId: "adult-a",
       loading: false,
       tier: "pro",
-      requestUpgrade: jest.fn(),
+      requestUpgrade: mockRequestUpgrade,
     }),
   },
 }));
@@ -46,9 +47,13 @@ jest.mock("@/store/preferences", () => ({
   },
 }));
 
-import { resolveCapabilities } from "@/subscription/access";
+import { ProFeatureRequiredError, resolveCapabilities } from "@/subscription/access";
 import type { Drawing, Sketchpad } from "./migrate";
-import { activeChildPadIdsOf, useDrawings } from "./drawings";
+import {
+  activeChildPadIdsOf,
+  rollbackRejectedAdvancedOrganization,
+  useDrawings,
+} from "./drawings";
 
 const padA: Sketchpad = {
   id: "pad-a",
@@ -87,6 +92,7 @@ function drawing(id: string): Drawing {
 describe("artwork organization child scoping", () => {
   beforeEach(() => {
     mockPersist.mockReset();
+    mockRequestUpgrade.mockReset();
     mockDeletedFiles.length = 0;
     mockCapabilities = resolveCapabilities("pro");
     useDrawings.setState({
@@ -140,5 +146,71 @@ describe("artwork organization child scoping", () => {
     expect(useDrawings.getState().drawingsByPad[padA.id]).toEqual([]);
     expect(useDrawings.getState().drawingsByPad[padB.id]).toEqual([drawing("art-b")]);
     expect(mockDeletedFiles).toEqual(["file:///art-a.png"]);
+  });
+
+  it("rolls back an optimistic favorite if Pro expires during persistence", () => {
+    mockPersist.mockImplementation((...args: unknown[]) => {
+      const onError = args[2] as ((error: unknown) => void) | undefined;
+      onError?.(new ProFeatureRequiredError("advancedOrganization"));
+    });
+
+    expect(useDrawings.getState().toggleDrawingFavorite("art-a")).toBe(true);
+
+    expect(useDrawings.getState().drawingsByPad[padA.id][0].favorite).toBe(false);
+    expect(mockRequestUpgrade).toHaveBeenCalledWith(
+      "advancedOrganization",
+      "artwork_favorite_commit",
+    );
+  });
+
+  it("rolls back an optimistic tag if Pro expires during persistence", () => {
+    mockPersist.mockImplementation((...args: unknown[]) => {
+      const onError = args[2] as ((error: unknown) => void) | undefined;
+      onError?.(new ProFeatureRequiredError("advancedOrganization"));
+    });
+
+    expect(useDrawings.getState().setDrawingTags("art-a", ["School"])).toBe(true);
+
+    expect(useDrawings.getState().drawingsByPad[padA.id][0].tags).toEqual([]);
+    expect(mockRequestUpgrade).toHaveBeenCalledWith(
+      "advancedOrganization",
+      "artwork_tags_commit",
+    );
+  });
+
+  it("restores multiple moved drawings in their original order", () => {
+    const first = drawing("first");
+    const second = drawing("second");
+    const third = drawing("third");
+    const previous = {
+      [padA.id]: [first, second, third],
+      [padA2.id]: [],
+    };
+    const movedAt = 20;
+    const rejected = {
+      [padA.id]: [third],
+      [padA2.id]: [
+        { ...first, updatedAt: movedAt },
+        { ...second, updatedAt: movedAt },
+      ],
+    };
+
+    expect(rollbackRejectedAdvancedOrganization(rejected, previous, rejected)).toEqual(previous);
+  });
+
+  it("rolls back an optimistic bulk move if Pro expires during persistence", () => {
+    mockPersist.mockImplementation((...args: unknown[]) => {
+      const onError = args[2] as ((error: unknown) => void) | undefined;
+      onError?.(new ProFeatureRequiredError("advancedOrganization"));
+    });
+
+    expect(useDrawings.getState().bulkMoveDrawings(["art-a"], padA2.id)).toBe(true);
+
+    expect(useDrawings.getState().drawingsByPad[padA.id]).toEqual([drawing("art-a")]);
+    expect(useDrawings.getState().drawingsByPad[padA2.id]).toEqual([]);
+    expect(mockRequestUpgrade).toHaveBeenCalledWith(
+      "advancedOrganization",
+      "library_bulk_move_commit",
+    );
   });
 });

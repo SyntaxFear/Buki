@@ -3,6 +3,10 @@ import type { SQLiteDatabase } from "expo-sqlite";
 
 import { migrateStoreData, type Drawing, type StoreData } from "@/store/migrate";
 import {
+  normalizeArtworkTags,
+  normalizeArtworkText,
+} from "@/organization/artwork-organizer";
+import {
   hasPremiumPadVisual,
   isPremiumPadBorder,
   isPremiumPadDecoration,
@@ -69,12 +73,26 @@ interface ExistingLibraryIds {
   sketchpads: ReadonlySet<string>;
   artworks: ReadonlySet<string>;
   padVisuals?: ReadonlyMap<string, ExistingPadVisuals>;
+  artworkOrganization?: ReadonlyMap<string, ExistingArtworkOrganization>;
 }
 
 interface ExistingPadVisuals {
   design: string;
   border: string;
   decoration: string;
+}
+
+interface ExistingArtworkOrganization {
+  padId: string;
+  favorite: boolean;
+  tags: readonly string[];
+}
+
+function organizationTagKey(tags: readonly string[] | undefined): string {
+  return normalizeArtworkTags(tags ?? [])
+    .map(normalizeArtworkText)
+    .sort()
+    .join("\u0000");
 }
 
 function assertResourceWithinLimit(
@@ -109,6 +127,19 @@ export function assertLibrarySnapshotWithinCapabilities(
           (saved.decoration !== pad.decoration && isPremiumPadDecoration(pad.decoration))
         : hasPremiumPadVisual(pad);
       if (introducesPremium) throw new ProFeatureRequiredError("premiumVisuals");
+    }
+  }
+  if (!capabilities.advancedOrganization) {
+    for (const pad of data.pads) {
+      for (const drawing of data.drawingsByPad[pad.id] ?? []) {
+        const saved = existing.artworkOrganization?.get(drawing.id);
+        const changed = saved
+          ? saved.padId !== pad.id ||
+            saved.favorite !== (drawing.favorite === true) ||
+            organizationTagKey(saved.tags) !== organizationTagKey(drawing.tags)
+          : drawing.favorite === true || organizationTagKey(drawing.tags) !== "";
+        if (changed) throw new ProFeatureRequiredError("advancedOrganization");
+      }
     }
   }
 }
@@ -237,13 +268,41 @@ export async function saveLibrary(
         { design: row.design, border: row.border, decoration: row.decoration },
       ]),
     );
-    const existingArtworkIds = new Set(
-      (await tx.getAllAsync<{ id: string }>(
-        `SELECT id FROM artworks
+    const existingArtworks = await tx.getAllAsync<{
+      id: string;
+      sketchpad_id: string;
+      favorite: number;
+    }>(
+        `SELECT id, sketchpad_id, favorite FROM artworks
          WHERE deleted_at IS NULL AND ((? IS NULL AND owner_id IS NULL) OR owner_id = ?)`,
         ownerId,
         ownerId,
-      )).map((row) => row.id),
+    );
+    const existingArtworkIds = new Set(existingArtworks.map((row) => row.id));
+    const existingArtworkTags = await tx.getAllAsync<ArtworkTagRow>(
+      `SELECT artwork_tags.artwork_id, tags.name
+       FROM artwork_tags
+       JOIN tags ON tags.id = artwork_tags.tag_id
+       WHERE tags.deleted_at IS NULL
+         AND ((? IS NULL AND tags.owner_id IS NULL) OR tags.owner_id = ?)`,
+      ownerId,
+      ownerId,
+    );
+    const tagsByArtwork = new Map<string, string[]>();
+    for (const row of existingArtworkTags) {
+      const tags = tagsByArtwork.get(row.artwork_id) ?? [];
+      tags.push(row.name);
+      tagsByArtwork.set(row.artwork_id, tags);
+    }
+    const existingArtworkOrganization = new Map(
+      existingArtworks.map((row) => [
+        row.id,
+        {
+          padId: row.sketchpad_id,
+          favorite: row.favorite === 1,
+          tags: tagsByArtwork.get(row.id) ?? [],
+        },
+      ]),
     );
     const existingTagIds = ownerId
       ? new Set((await tx.getAllAsync<{ id: string }>("SELECT id FROM tags WHERE owner_id = ?", ownerId)).map((row) => row.id))
@@ -269,6 +328,7 @@ export async function saveLibrary(
           sketchpads: existingPadIds,
           artworks: existingArtworkIds,
           padVisuals: existingPadVisuals,
+          artworkOrganization: existingArtworkOrganization,
         },
         data,
         access.getCapabilities(),
@@ -479,7 +539,7 @@ async function replaceArtworkTags(
   const tagIds: string[] = [];
   await db.runAsync("DELETE FROM artwork_tags WHERE artwork_id = ?", drawing.id);
   for (const name of drawing.tags ?? []) {
-    const normalizedName = name.trim().toLocaleLowerCase();
+    const normalizedName = normalizeArtworkText(name);
     if (!normalizedName) continue;
     let tag = await db.getFirstAsync<{ id: string }>(
       `SELECT id FROM tags
