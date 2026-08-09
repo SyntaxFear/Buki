@@ -169,7 +169,13 @@ export function OnboardingScreen() {
                 })();
               }}
             />
-            <Pressable onPress={() => void signOut()} disabled={busy} style={styles.textButton}>
+            <Pressable
+              onPress={() => void signOut()}
+              disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel="Use a different account"
+              style={styles.textButton}
+            >
               <Text style={styles.textButtonLabel}>Use a different account</Text>
             </Pressable>
           </View>
@@ -189,6 +195,8 @@ export function OnboardingScreen() {
             <Pressable
               onPress={() => void signInWithGoogle()}
               disabled={busy}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
               style={({ pressed }) => [styles.googleButton, pressed && styles.pressed]}
             >
               <View style={styles.googleMark}>
@@ -198,7 +206,12 @@ export function OnboardingScreen() {
             </Pressable>
 
             {!showEmail ? (
-              <Pressable onPress={() => setShowEmail(true)} style={styles.emailReveal}>
+              <Pressable
+                onPress={() => setShowEmail(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with email code"
+                style={styles.emailReveal}
+              >
                 <Text style={styles.emailRevealLabel}>Continue with email code</Text>
               </Pressable>
             ) : (
@@ -239,6 +252,8 @@ export function OnboardingScreen() {
                         setOtp("");
                       }}
                       disabled={busy}
+                      accessibilityRole="button"
+                      accessibilityLabel="Use a different email"
                       style={styles.textButton}
                     >
                       <Text style={styles.textButtonLabel}>Use a different email</Text>
@@ -268,13 +283,25 @@ export function OnboardingScreen() {
             Buki stores only the adult account details and the child profile information you choose to add. Artwork is not public.
           </Text>
           <View style={styles.linkRow}>
-            <Pressable onPress={() => void openExternal(config.privacyUrl)}>
+            <Pressable
+              onPress={() => void openExternal(config.privacyUrl)}
+              accessibilityRole="link"
+              accessibilityLabel="Privacy policy"
+            >
               <Text style={styles.link}>Privacy</Text>
             </Pressable>
-            <Pressable onPress={() => void openExternal(config.termsUrl)}>
+            <Pressable
+              onPress={() => void openExternal(config.termsUrl)}
+              accessibilityRole="link"
+              accessibilityLabel="Terms of service"
+            >
               <Text style={styles.link}>Terms</Text>
             </Pressable>
-            <Pressable onPress={() => void openExternal(config.supportUrl)}>
+            <Pressable
+              onPress={() => void openExternal(config.supportUrl)}
+              accessibilityRole="link"
+              accessibilityLabel="Support"
+            >
               <Text style={styles.link}>Support</Text>
             </Pressable>
           </View>

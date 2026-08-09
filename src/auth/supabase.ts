@@ -4,6 +4,9 @@ import { createClient, processLock, type SupabaseClient } from "@supabase/supaba
 
 import { getPublicAppConfig } from "@/config/env";
 import { secureSessionStorage } from "./secure-storage";
+import { installSupabaseWebCrypto } from "./web-crypto";
+
+installSupabaseWebCrypto();
 
 let client: SupabaseClient | null = null;
 
