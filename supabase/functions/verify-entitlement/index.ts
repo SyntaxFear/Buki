@@ -37,21 +37,24 @@ Deno.serve(async (request) => {
         .eq("owner_id", user.id)
         .maybeSingle();
       if (cached.error) throw new Error("entitlement_cache_lookup_failed");
-      const checkedAt = cached.data?.checked_at;
+      const cachedData = cached.data;
+      const checkedAt = cachedData?.checked_at;
       const checkedAtMs = typeof checkedAt === "string" ? Date.parse(checkedAt) : Number.NaN;
-      const expiresAt = typeof cached.data?.expires_at === "string"
-        ? cached.data.expires_at
+      const expiresAt = typeof cachedData?.expires_at === "string"
+        ? cachedData.expires_at
         : null;
       if (
+        cachedData
+        &&
         typeof checkedAt === "string"
         && Date.now() - checkedAtMs >= 0
         && Date.now() - checkedAtMs <= ENTITLEMENT_CACHE_MS
       ) {
         verification = {
-          active: cached.data.access_tier === "pro"
-            && cached.data.status === "active"
+          active: cachedData.access_tier === "pro"
+            && cachedData.status === "active"
             && (!expiresAt || Date.parse(expiresAt) > Date.now()),
-          hadPro: cached.data.had_pro === true,
+          hadPro: cachedData.had_pro === true,
           expiresAt,
           checkedAt,
         };
