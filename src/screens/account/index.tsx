@@ -30,6 +30,11 @@ import { usePreferences } from "@/store/preferences";
 import { useProfiles, type ChildProfile } from "@/store/profiles";
 import { useCloudSync } from "@/store/sync";
 import { canCreateContent, type ProFeature } from "@/subscription/access";
+import {
+  currentPurchaseAccountId,
+  PURCHASE_ACCOUNT_CHANGED,
+  PURCHASE_SIGN_IN_REQUIRED,
+} from "@/subscription/purchase-account";
 import { colors } from "@/theme";
 
 const ADULT_AVATARS = ["🌻", "🦊", "🐻", "🌈", "⭐️"] as const;
@@ -257,8 +262,19 @@ export function AccountCenter() {
   };
 
   const confirmRestorePurchases = async () => {
+    const accountId = currentPurchaseAccountId();
+    if (!accountId) {
+      Alert.alert("Sign in required", PURCHASE_SIGN_IN_REQUIRED);
+      return;
+    }
     if (!(await confirmAdult("Restoring a purchase can move store membership to this Buki account."))) return;
-    const accountLabel = profile?.email ?? user?.email ?? profile?.displayName ?? "this account";
+    if (currentPurchaseAccountId() !== accountId) {
+      Alert.alert("Buki account changed", PURCHASE_ACCOUNT_CHANGED);
+      return;
+    }
+    const auth = useAuth.getState();
+    const accountLabel =
+      auth.profile?.email ?? auth.user?.email ?? auth.profile?.displayName ?? "this account";
     Alert.alert(
       "Restore to this Buki account?",
       `Buki Pro will move to ${accountLabel} if Apple finds an eligible purchase. Artwork from another Buki account does not move.`,
@@ -267,6 +283,10 @@ export function AccountCenter() {
         {
           text: "Restore",
           onPress: () => {
+            if (currentPurchaseAccountId() !== accountId) {
+              Alert.alert("Buki account changed", PURCHASE_ACCOUNT_CHANGED);
+              return;
+            }
             void (async () => {
               const result = await restorePurchases("account_center");
               if (result === "restored") {

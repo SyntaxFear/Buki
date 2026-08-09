@@ -248,7 +248,9 @@ export const useMembership = create<MembershipState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const customerInfo = await restoreRevenueCatPurchases();
+      if (get().ownerId !== ownerId) return "failed";
       await applyCustomerInfo(ownerId, customerInfo);
+      if (get().ownerId !== ownerId) return "failed";
       const status = snapshotFromCustomerInfo(customerInfo).status;
       const result = status === "active" || status === "grace" ? "restored" : "not_found";
       void trackAnalyticsEvent(ownerId, {
@@ -294,7 +296,7 @@ export const useMembership = create<MembershipState>((set, get) => ({
     const ownerId = get().ownerId;
     if (!ownerId || (expectedOwnerId && ownerId !== expectedOwnerId)) return false;
     await applyCustomerInfo(ownerId, customerInfo);
-    return get().ownerId === ownerId;
+    return get().ownerId === ownerId && get().tier === "pro";
   },
 
   setEntitlement: (entitlement) => {

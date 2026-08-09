@@ -1,6 +1,8 @@
 const mockLoadEntitlement = jest.fn();
 const mockConnectRevenueCat = jest.fn();
 const mockDisconnectRevenueCat = jest.fn();
+const mockRestoreRevenueCat = jest.fn();
+const mockVerifyServerEntitlement = jest.fn();
 
 jest.mock("@/database", () => ({
   loadBukiEntitlement: (...args: unknown[]) => mockLoadEntitlement(...args),
@@ -11,14 +13,37 @@ jest.mock("@/subscription/revenuecat-client", () => ({
   connectRevenueCatUser: (...args: unknown[]) => mockConnectRevenueCat(...args),
   disconnectRevenueCatUser: (...args: unknown[]) => mockDisconnectRevenueCat(...args),
   refreshRevenueCatCustomerInfo: jest.fn(),
-  restoreRevenueCatPurchases: jest.fn(),
+  restoreRevenueCatPurchases: (...args: unknown[]) => mockRestoreRevenueCat(...args),
 }));
 
-jest.mock("@/subscription/server-entitlement", () => ({ verifyServerEntitlement: jest.fn() }));
+jest.mock("@/subscription/server-entitlement", () => ({
+  verifyServerEntitlement: (...args: unknown[]) => mockVerifyServerEntitlement(...args),
+}));
 jest.mock("@/analytics/client", () => ({ trackAnalyticsEvent: jest.fn() }));
 
 import { EMPTY_ENTITLEMENT, resolveCapabilities } from "@/subscription/access";
 import { useMembership } from "./membership";
+
+function customerInfo(verification: "VERIFIED" | "FAILED" = "VERIFIED") {
+  const entitlement = {
+    isActive: true,
+    productIdentifier: "buki_pro_monthly",
+    expirationDate: "2099-08-08T00:00:00.000Z",
+    willRenew: true,
+    billingIssueDetectedAt: null,
+    periodType: "NORMAL",
+    verification,
+  };
+  return {
+    requestDate: "2026-08-09T00:00:00.000Z",
+    managementURL: null,
+    entitlements: {
+      verification,
+      active: { pro: entitlement },
+      all: { pro: entitlement },
+    },
+  } as never;
+}
 
 describe("membership account switching", () => {
   beforeEach(() => {
@@ -26,6 +51,16 @@ describe("membership account switching", () => {
     useMembership.getState().resetMembership();
     mockConnectRevenueCat.mockResolvedValue(null);
     mockDisconnectRevenueCat.mockResolvedValue(undefined);
+    mockRestoreRevenueCat.mockReset();
+    mockVerifyServerEntitlement.mockReset().mockResolvedValue({
+      hadPro: false,
+      retention: {
+        status: "none",
+        readOnlySince: null,
+        deleteAfter: null,
+        uploadsEnabled: true,
+      },
+    });
   });
 
   afterEach(() => {
@@ -103,6 +138,31 @@ describe("membership account switching", () => {
       useMembership.getState().acceptCustomerInfo({} as never, "adult-a"),
     ).resolves.toBe(false);
 
+    expect(useMembership.getState().ownerId).toBe("adult-b");
+  });
+
+  it("does not report a verification-failed purchase as applied", async () => {
+    useMembership.setState({ ownerId: "adult-a" });
+
+    await expect(
+      useMembership.getState().acceptCustomerInfo(customerInfo("FAILED"), "adult-a"),
+    ).resolves.toBe(false);
+
+    expect(useMembership.getState()).toMatchObject({ ownerId: "adult-a", tier: "free" });
+  });
+
+  it("does not finish a restore after the adult account changes", async () => {
+    let resolveRestore: (value: ReturnType<typeof customerInfo>) => void = () => {};
+    mockRestoreRevenueCat.mockReturnValue(new Promise((resolve) => {
+      resolveRestore = resolve;
+    }));
+    useMembership.setState({ ownerId: "adult-a" });
+
+    const restore = useMembership.getState().restorePurchases("account_center");
+    useMembership.setState({ ownerId: "adult-b" });
+    resolveRestore(customerInfo());
+
+    await expect(restore).resolves.toBe("failed");
     expect(useMembership.getState().ownerId).toBe("adult-b");
   });
 });

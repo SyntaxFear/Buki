@@ -26,6 +26,7 @@ import {
 import { annualSavingsPercent } from "@/subscription/paywall-model";
 import { PRO_ENTITLEMENT_ID } from "@/subscription/customer-info";
 import {
+  PURCHASE_ACCOUNT_CHANGED,
   currentPurchaseAccountId,
   PURCHASE_SIGN_IN_REQUIRED,
 } from "@/subscription/purchase-account";
@@ -218,13 +219,16 @@ export function ProPaywallHost() {
 
   const purchase = async () => {
     if (!selectedPlan || purchasing) return;
-    if (!requirePurchaseAccount()) return;
+    const accountId = requirePurchaseAccount();
+    if (!accountId) return;
     const confirmed = await confirmAdult(
       `This continues to Apple’s purchase confirmation for ${selectedPlan.title} Buki Pro.`,
     );
     if (!confirmed) return;
-    const accountId = requirePurchaseAccount();
-    if (!accountId) return;
+    if (currentPurchaseAccountId() !== accountId) {
+      setError(PURCHASE_ACCOUNT_CHANGED);
+      return;
+    }
     const analyticsSource = request?.source ?? "paywall";
     void trackAnalyticsEvent(accountId, {
       name: "purchase_started",
@@ -239,7 +243,9 @@ export function ProPaywallHost() {
       const applied = await acceptCustomerInfo(result.customerInfo, accountId);
       if (!applied) {
         throw new Error(
-          "Your Buki account changed during purchase. Sign back in to that account and use Restore Purchases.",
+          currentPurchaseAccountId() === accountId
+            ? "Apple returned the purchase, but Buki could not verify Pro access. Use Restore Purchases and try again."
+            : "Your Buki account changed during purchase. Sign back in to that account and use Restore Purchases.",
         );
       }
       void trackAnalyticsEvent(accountId, {
@@ -289,10 +295,13 @@ export function ProPaywallHost() {
   };
 
   const confirmRestore = async () => {
-    if (!requirePurchaseAccount()) return;
-    if (!(await confirmAdult("Restoring can move Apple purchase access to this Buki account."))) return;
     const accountId = requirePurchaseAccount();
     if (!accountId) return;
+    if (!(await confirmAdult("Restoring can move Apple purchase access to this Buki account."))) return;
+    if (currentPurchaseAccountId() !== accountId) {
+      setError(PURCHASE_ACCOUNT_CHANGED);
+      return;
+    }
     const auth = useAuth.getState();
     const accountLabel =
       auth.profile?.email ?? auth.user?.email ?? auth.profile?.displayName ?? "this account";
@@ -305,7 +314,7 @@ export function ProPaywallHost() {
           text: "Restore",
           onPress: () => {
             if (currentPurchaseAccountId() !== accountId) {
-              setError(PURCHASE_SIGN_IN_REQUIRED);
+              setError(PURCHASE_ACCOUNT_CHANGED);
               return;
             }
             setRestoring(true);
