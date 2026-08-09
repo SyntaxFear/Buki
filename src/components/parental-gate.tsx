@@ -1,4 +1,5 @@
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { FullWindowOverlay } from "react-native-screens";
 
 import { useParentalGate } from "@/store/parental-gate";
 import { colors } from "@/theme";
@@ -10,9 +11,10 @@ export function ParentalGateHost() {
   const busy = useParentalGate((state) => state.busy);
   const error = useParentalGate((state) => state.error);
 
-  return (
-    <Modal visible={Boolean(confirmation)} transparent animationType="fade" onRequestClose={cancel}>
-      <View style={styles.backdrop}>
+  if (!confirmation) return null;
+
+  const content = (
+    <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.eyebrow}>GROWN-UPS ONLY</Text>
           <Text style={styles.title}>Confirm with this device</Text>
@@ -32,11 +34,14 @@ export function ParentalGateHost() {
             <Pressable
               disabled={busy}
               onPress={cancel}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel adult confirmation"
               style={({ pressed }) => [styles.secondary, (pressed || busy) && styles.pressed]}
             >
               <Text style={styles.secondaryLabel}>Cancel</Text>
             </Pressable>
             <Pressable
+              accessibilityRole="button"
               accessibilityLabel="Verify adult with device authentication"
               disabled={busy}
               onPress={() => void confirm()}
@@ -46,7 +51,20 @@ export function ParentalGateHost() {
             </Pressable>
           </View>
         </View>
-      </View>
+    </View>
+  );
+
+  if (Platform.OS === "ios") {
+    return (
+      <FullWindowOverlay unstable_accessibilityContainerViewIsModal>
+        {content}
+      </FullWindowOverlay>
+    );
+  }
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={cancel}>
+      {content}
     </Modal>
   );
 }

@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { FullWindowOverlay } from "react-native-screens";
 import type { PurchasesOffering, PurchasesPackage } from "react-native-purchases";
 
 import { getPublicAppConfig } from "@/config/env";
@@ -140,6 +142,12 @@ function selectedDisclosure(plan: Plan, trialEligible: boolean): string {
     return `7 days free, then ${price} per year. Payment is charged to your Apple ID when the trial ends. It renews automatically unless canceled at least 24 hours before the period ends.`;
   }
   return `${price} per ${plan.id === "monthly" ? "month" : "year"}. Payment is charged to your Apple ID at confirmation. It renews automatically unless canceled at least 24 hours before the period ends.`;
+}
+
+function purchaseButtonLabel(plan: Plan, trialEligible: boolean): string {
+  if (plan.id === "yearly" && trialEligible) return "Start 7-Day Free Trial";
+  if (plan.id === "lifetime") return "Unlock Pro for Life";
+  return "Continue with Pro";
 }
 
 export function ProPaywallHost() {
@@ -337,14 +345,10 @@ export function ProPaywallHost() {
   };
 
   const config = getPublicAppConfig();
-  return (
-    <Modal
-      visible={Boolean(request)}
-      animationType="slide"
-      presentationStyle="fullScreen"
-      onRequestClose={clearRequest}
-    >
-      <View style={styles.root}>
+  if (!request) return null;
+
+  const content = (
+    <View style={styles.root}>
         <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
           <Pressable
             onPress={clearRequest}
@@ -441,13 +445,15 @@ export function ProPaywallHost() {
               <Pressable
                 onPress={() => void purchase()}
                 disabled={purchasing}
+                accessibilityRole="button"
+                accessibilityLabel={purchaseButtonLabel(selectedPlan, trialEligible)}
                 style={({ pressed }) => [styles.purchaseButton, pressed && styles.purchasePressed, purchasing && styles.disabled]}
               >
                 {purchasing ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <Text style={styles.purchaseLabel}>
-                    {selectedPlan.id === "yearly" && trialEligible ? "Start 7-Day Free Trial" : selectedPlan.id === "lifetime" ? "Unlock Pro for Life" : "Continue with Pro"}
+                    {purchaseButtonLabel(selectedPlan, trialEligible)}
                   </Text>
                 )}
               </Pressable>
@@ -460,6 +466,8 @@ export function ProPaywallHost() {
           <Pressable
             onPress={() => void confirmRestore()}
             disabled={purchasing || restoring}
+            accessibilityRole="button"
+            accessibilityLabel="Restore Purchases"
             style={({ pressed }) => [styles.restoreButton, pressed && styles.pressed]}
           >
             {restoring ? <ActivityIndicator color={colors.titleTeal} /> : <Text style={styles.restoreLabel}>Restore Purchases</Text>}
@@ -472,7 +480,25 @@ export function ProPaywallHost() {
           </View>
           <Text style={styles.safetyNote}>Existing artwork is never deleted if Pro expires.</Text>
         </ScrollView>
-      </View>
+    </View>
+  );
+
+  if (Platform.OS === "ios") {
+    return (
+      <FullWindowOverlay unstable_accessibilityContainerViewIsModal>
+        {content}
+      </FullWindowOverlay>
+    );
+  }
+
+  return (
+    <Modal
+      visible
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={clearRequest}
+    >
+      {content}
     </Modal>
   );
 }
