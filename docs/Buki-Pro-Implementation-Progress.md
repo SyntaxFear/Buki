@@ -1,6 +1,6 @@
 # Buki Pro implementation and iOS release progress
 
-Last updated: **2026-08-09 15:33 +04 (Asia/Tbilisi)**
+Last updated: **2026-08-09 15:57 +04 (Asia/Tbilisi)**
 
 Release scope: **iOS only**. Android is deferred.
 
@@ -22,7 +22,7 @@ Status legend:
 |---|---|
 | Repository | `SyntaxFear/Buki` |
 | Delivery branch | `main`, pushed directly as previously approved |
-| Implementation baseline before this tracker commit | `007fb75a8150a6a4689b72ff894418e4a84326dc` |
+| Implementation baseline before this tracker update | `f980e24ff963dc3aa3598ec678551498c829ea29` |
 | Main worktree before this tracker | Clean and equal to `origin/main` |
 | App name | Buki |
 | Expo slug | `Bloombook` |
@@ -293,19 +293,21 @@ The following was verified on an iPhone 17 Pro Max simulator running iOS 26.5 wi
 
 ## 8. Current test and quality baseline
 
-Verified on **2026-08-09** from `main` at implementation baseline `007fb75`:
+Verified on **2026-08-09** from `main` at implementation baseline `f980e24`:
 
 - ✅ Jest: **49 suites, 274 tests passed**.
 - ✅ TypeScript: `npx tsc --noEmit` passed.
 - ✅ Expo Doctor: **20/20 checks passed**.
+- ✅ Expo lint: **0 errors and 0 warnings** with a committed, scoped Expo SDK 57 configuration.
+- ✅ iOS Metro export: **2,399 modules bundled successfully**.
 - ✅ Public legal/support pages returned HTTP 200.
 - ✅ GitHub authentication and direct push access are working.
 - ✅ EAS project and production environment are accessible.
 
 Known quality work still open:
 
-- 🟡 `expo lint` previously reported a large pre-existing React 19/Compiler/Reanimated baseline (59 errors and 68 warnings). The temporary ESLint auto-install/config changes were removed and were not committed. Lint needs an intentional cleanup plan before it can become a release gate.
-- 🟡 React Native Skia logs deprecated path-builder API warnings.
+- ✅ The lint strategy is now committed: Reanimated compiler exceptions, intentional state-reset effects, Jest import order, and Deno Edge Functions are narrowly scoped rather than disabled globally.
+- 🟡 All six deprecated mutable Skia path-builder call sites were migrated to `Skia.PathBuilder`; Simulator confirmation that runtime warnings are gone remains pending.
 - 🟡 RevenueCat logs non-blocking custom `ui_config` remote-config assembly warnings; Buki uses its custom paywall successfully.
 - 🟡 A React Native Screens FormSheet/ScrollView subview warning appeared during artwork details and should be investigated for layout stability.
 - 🟡 Final performance, memory, and long-library checks have not run.
@@ -383,9 +385,9 @@ The last run proved active Pro and authoritative cloud access. It was interrupte
 
 6. ⛔ **Resolve or explicitly accept runtime warnings**
    - FormSheet/ScrollView warning.
-   - Skia deprecated path API warnings.
+   - Confirm the Skia deprecated path API warnings are gone after the source migration in `f980e24`.
    - RevenueCat `ui_config` warning.
-   - Decide the intentional lint migration/fix strategy.
+   - ✅ Intentional lint migration/fix strategy is committed and lint passes cleanly.
 
 7. ⏳ **Freeze an exact release-candidate SHA**
    - Main must be clean.
@@ -537,6 +539,7 @@ ffd91ef fix: harden native sign-in security and accessibility
 f134a13 fix: complete native auth callbacks from router params
 3b4a2ad fix: present Pro gates above native modals
 007fb75 fix: open Pro from backup switch
+f980e24 chore: establish release lint baseline
 ```
 
 ## 15. Final release acceptance checklist
@@ -548,7 +551,7 @@ Release is allowed only when all applicable items are checked:
 - [ ] Full Jest suite passes.
 - [ ] TypeScript passes.
 - [ ] Expo Doctor passes.
-- [ ] Intentional lint decision is documented.
+- [x] Intentional lint decision is documented.
 - [ ] Production iOS build succeeds from the final SHA.
 - [ ] TestFlight processing completes.
 - [ ] Monthly sandbox purchase succeeds.
@@ -577,6 +580,11 @@ Release is allowed only when all applicable items are checked:
 - Granted temporary one-day Pro access to the test account.
 - Verified authoritative active Pro/cloud access response.
 - Recorded the interruption point before actual cloud media upload/restore verification.
+- Read the exact Expo SDK 57 reference before changing code.
+- Added and documented the release lint configuration; Expo lint now passes with zero errors and zero warnings.
+- Migrated all six deprecated mutable Skia path-builder call sites to `Skia.PathBuilder`.
+- Re-ran 49 Jest suites/274 tests, TypeScript, Expo Doctor 20/20, and the iOS Metro export successfully at `f980e24`.
+- Confirmed the FormSheet/ScrollView warning still requires Simulator reproduction and was not changed speculatively.
 
 ### Update procedure for every future session
 
