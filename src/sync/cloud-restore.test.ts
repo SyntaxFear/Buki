@@ -1,5 +1,5 @@
 const mockRestoreSnapshot = jest.fn();
-const mockDownload = jest.fn();
+const mockCreateSignedUrl = jest.fn();
 const mockRangeCalls: { table: string; from: number; to: number; orders: string[] }[] = [];
 const mockDeviceUpdates: Record<string, unknown>[] = [];
 let mockDeviceUpdateResult: { data: unknown; error: { code?: string; message: string } | null } = {
@@ -8,6 +8,7 @@ let mockDeviceUpdateResult: { data: unknown; error: { code?: string; message: st
 };
 const mockRows: Record<string, any[]> = {};
 const mockFiles = new Map<string, Uint8Array>();
+let mockDownloadedBytes = Uint8Array.from([1, 2, 3]);
 
 async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await globalThis.crypto.subtle.digest(
@@ -83,6 +84,15 @@ jest.mock("expo-file-system", () => ({
       return mockFiles.has(this.uri);
     }
 
+    get size(): number {
+      return mockFiles.get(this.uri)?.byteLength ?? 0;
+    }
+
+    static async downloadFileAsync(_url: string, destination: { uri: string }) {
+      mockFiles.set(destination.uri, new Uint8Array(mockDownloadedBytes));
+      return destination;
+    }
+
     async arrayBuffer(): Promise<ArrayBuffer> {
       const bytes = mockFiles.get(this.uri);
       if (!bytes) throw new Error("Missing file");
@@ -114,7 +124,7 @@ jest.mock("@/auth/supabase", () => ({
   getSupabaseClient: () => ({
     from: (table: string) => mockQuery(table),
     storage: {
-      from: () => ({ download: (...args: unknown[]) => mockDownload(...args) }),
+      from: () => ({ createSignedUrl: (...args: unknown[]) => mockCreateSignedUrl(...args) }),
     },
   }),
 }));
@@ -150,6 +160,11 @@ describe("cloud restore network boundaries", () => {
     mockRangeCalls.length = 0;
     mockDeviceUpdates.length = 0;
     mockFiles.clear();
+    mockDownloadedBytes = Uint8Array.from([1, 2, 3]);
+    mockCreateSignedUrl.mockResolvedValue({
+      data: { signedUrl: "https://storage.test/signed-media" },
+      error: null,
+    });
     for (const key of Object.keys(mockRows)) delete mockRows[key];
     mockRows.adult_profiles = [{ owner_id: "owner-a", display_name: "Parent" }];
     mockRows.storage_usage = [{
@@ -200,17 +215,14 @@ describe("cloud restore network boundaries", () => {
     expect(snapshot.mediaFiles).toHaveLength(2);
     expect(snapshot.mediaFiles[0].local_uri).toBe(uri);
     expect(snapshot.mediaFiles[1].local_uri).toBe(uri);
-    expect(mockDownload).not.toHaveBeenCalled();
+    expect(mockCreateSignedUrl).not.toHaveBeenCalled();
   });
 
   it("counts corrupt downloads without committing them", async () => {
     const expected = Uint8Array.from([1, 2, 3]);
     const checksum = await sha256(expected);
     mockRows.media_files = [media({ checksum })];
-    mockDownload.mockResolvedValue({
-      data: { arrayBuffer: async () => Uint8Array.from([9, 9, 9]).buffer },
-      error: null,
-    });
+    mockDownloadedBytes = Uint8Array.from([9, 9, 9]);
 
     await restoreCloudAccount("owner-a", null);
 

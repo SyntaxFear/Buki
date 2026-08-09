@@ -92,14 +92,19 @@ async function downloadMedia(
   }
   const file = new File(directory, `${media.checksum}-${media.kind}.${extensionFor(media.mime_type)}`);
   if (!(await validExistingFile(file, media.checksum))) {
-    const { data, error } = await getSupabaseClient().storage.from(MEDIA_BUCKET).download(media.storage_path);
-    if (error || !data) throw new CloudRestoreError("Buki could not download an artwork image.", "media_download_failed");
-    const bytes = await data.arrayBuffer();
-    if (bytes.byteLength !== media.byte_size || await checksum(bytes) !== media.checksum) {
+    const { data, error } = await getSupabaseClient().storage
+      .from(MEDIA_BUCKET)
+      .createSignedUrl(media.storage_path, 60);
+    if (error || !data?.signedUrl) {
+      throw new CloudRestoreError("Buki could not authorize an artwork download.", "media_download_failed");
+    }
+    await File.downloadFileAsync(data.signedUrl, file, { idempotent: true });
+    if (file.size !== media.byte_size || await checksum(await file.arrayBuffer()) !== media.checksum) {
+      try {
+        if (file.exists) file.delete();
+      } catch {}
       throw new CloudRestoreError("A cloud artwork image failed integrity verification.", "media_integrity_failed");
     }
-    file.create({ intermediates: true, overwrite: true });
-    file.write(new Uint8Array(bytes));
   }
   return { ...media, local_uri: file.uri };
 }
