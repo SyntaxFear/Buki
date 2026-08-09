@@ -4,6 +4,10 @@ import type { Drawing } from "@/store/drawings";
 import { colors } from "@/theme";
 import { fitRect, type Rect } from "@/utils/book-layout";
 import { PAD_GEOMETRY } from "@/pad-designs";
+import {
+  drawSnapshotPageVisuals,
+  type SnapshotPageVisuals,
+} from "@/components/pad-ornaments";
 
 export const PAGE_FACE_RADIUS = PAD_GEOMETRY.pageRadius;
 export const PAGE_DOT_INSET = 12;
@@ -147,6 +151,14 @@ export interface FaceItem {
   slotLocal: Rect;
 }
 
+export interface FaceSnapshotOptions {
+  pageColor?: string;
+  dotColor?: string;
+  guideRects?: Rect[];
+  guideColor?: string;
+  visuals?: SnapshotPageVisuals;
+}
+
 /**
  * Render one page face — rounded paper, dot grid, and any drawings
  * fitted into their slots — as an offscreen image in natural screen
@@ -156,11 +168,15 @@ export function buildFaceSnapshot(
   pageW: number,
   pageH: number,
   items: FaceItem[],
-  pageColor: string = colors.page,
-  dotColor: string = colors.gridDot,
-  guideRects: Rect[] = [],
-  guideColor: string = colors.slotBorder,
+  options: FaceSnapshotOptions = {},
 ): SkImage | null {
+  const {
+    pageColor = colors.page,
+    dotColor = colors.gridDot,
+    guideRects = [],
+    guideColor = colors.slotBorder,
+    visuals,
+  } = options;
   // Match modern 3x iPhone screens so curved page edges remain smooth while
   // the sheet is moving through the shader.
   const SS = 3;
@@ -231,5 +247,6 @@ export function buildFaceSnapshot(
     );
     canvas.restore();
   }
+  if (visuals) drawSnapshotPageVisuals(canvas, pageW, pageH, visuals);
   return surface.makeImageSnapshot();
 }

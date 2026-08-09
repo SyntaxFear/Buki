@@ -15,6 +15,7 @@ import { normalizeArtworkTags } from "@/organization/artwork-organizer";
 import {
   canCreateContent,
   isContentLimitReachedError,
+  isProFeatureRequiredError,
   type ContentCounts,
 } from "@/subscription/access";
 import { currentCapabilities, useMembership } from "@/store/membership";
@@ -71,6 +72,7 @@ interface DrawingsState {
   setPadVisuals: (
     id: string,
     visuals: {
+      style: PadStyle;
       design: PadDesignId;
       border: PadBorderId;
       decoration: PadDecorationId;
@@ -509,6 +511,7 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       pad.id === id
         ? {
             ...pad,
+            style: visuals.style,
             design: visuals.design,
             border: visuals.border,
             decoration: visuals.decoration,
@@ -518,7 +521,32 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
         : pad,
     );
     set({ pads: nextPads });
-    persist({ activePadId, pads: nextPads, drawingsByPad });
+    persist({ activePadId, pads: nextPads, drawingsByPad }, (error) => {
+      if (!isProFeatureRequiredError(error, "premiumVisuals")) return;
+      set((state) => ({
+        pads: state.pads.map((pad) => {
+          if (pad.id !== id) return pad;
+          const matchesRejectedVisuals =
+            pad.style === visuals.style &&
+            pad.design === visuals.design &&
+            pad.border === visuals.border &&
+            pad.decoration === visuals.decoration &&
+            pad.pageColor === (visuals.pageColor ?? palette.paper);
+          return matchesRejectedVisuals
+            ? {
+                ...pad,
+                style: current.style,
+                design: current.design,
+                border: current.border,
+                decoration: current.decoration,
+                coverColor: current.coverColor,
+                pageColor: current.pageColor,
+              }
+            : pad;
+        }),
+      }));
+      useMembership.getState().requestUpgrade("premiumVisuals", "premium_visual_save_commit");
+    });
     return true;
   },
 

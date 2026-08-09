@@ -47,7 +47,11 @@ jest.mock("@/store/preferences", () => ({
   },
 }));
 
-import { ContentLimitReachedError, resolveCapabilities } from "@/subscription/access";
+import {
+  ContentLimitReachedError,
+  ProFeatureRequiredError,
+  resolveCapabilities,
+} from "@/subscription/access";
 import type { Drawing, Sketchpad } from "./migrate";
 import { useDrawings } from "./drawings";
 
@@ -167,5 +171,57 @@ describe("artwork limit mutations", () => {
     expect(useDrawings.getState().pads).toEqual([pad]);
     expect(useDrawings.getState().activePadId).toBe(pad.id);
     expect(mockRequestUpgrade).toHaveBeenCalledWith("sketchpads", "sketchpad_limit_commit");
+  });
+
+  it.each(["spread", "vertical", "album", "grid", "strip"] as const)(
+    "lets Free users switch their existing sketchpad to the %s layout",
+    (style) => {
+      expect(useDrawings.getState().setPadVisuals(pad.id, {
+        style,
+        design: "sunshine",
+        border: "none",
+        decoration: "none",
+        pageColor: pad.pageColor,
+      })).toBe(true);
+
+      expect(useDrawings.getState().pads[0].style).toBe(style);
+      expect(mockRequestUpgrade).not.toHaveBeenCalled();
+    },
+  );
+
+  it("blocks a new premium look without changing the saved Free pad", () => {
+    expect(useDrawings.getState().setPadVisuals(pad.id, {
+      style: "grid",
+      design: "moonlight",
+      border: "museum-frame",
+      decoration: "starry-sky",
+    })).toBe(false);
+
+    expect(useDrawings.getState().pads).toEqual([pad]);
+    expect(mockPersist).not.toHaveBeenCalled();
+    expect(mockRequestUpgrade).toHaveBeenCalledWith("premiumVisuals", "premium_visual_save");
+  });
+
+  it("rolls back a premium look when Pro expires during the database write", () => {
+    mockCapabilities = resolveCapabilities("pro");
+    mockPersist.mockImplementationOnce(
+      (_data: unknown, _getCapabilities: unknown, onError: (error: unknown) => void) => {
+        mockCapabilities = resolveCapabilities("free");
+        onError(new ProFeatureRequiredError("premiumVisuals"));
+      },
+    );
+
+    expect(useDrawings.getState().setPadVisuals(pad.id, {
+      style: "album",
+      design: "moonlight",
+      border: "museum-frame",
+      decoration: "starry-sky",
+    })).toBe(true);
+
+    expect(useDrawings.getState().pads).toEqual([pad]);
+    expect(mockRequestUpgrade).toHaveBeenCalledWith(
+      "premiumVisuals",
+      "premium_visual_save_commit",
+    );
   });
 });

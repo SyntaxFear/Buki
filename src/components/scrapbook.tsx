@@ -175,32 +175,58 @@ export function Scrapbook({
 
   const frontImage = imageFor(frontFace);
   const backImage = imageFor(backFace);
+  const snapshotVisuals = useMemo(
+    () => ({
+      border,
+      decoration,
+      accent: palette.stampColor,
+      secondary: palette.tabs[1].color,
+      stamp: palette.stamp,
+    }),
+    [border, decoration, palette.stamp, palette.stampColor, palette.tabs],
+  );
 
   const frontSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
     const items = frontFace ? [{ drawing: frontFace, image: frontImage, slotLocal: rightSlotLocal }] : [];
-    return buildFaceSnapshot(rightPage.width, rightPage.height, items, paper, palette.gridDot);
-  }, [flip, frontFace, frontImage, paper, palette.gridDot, rightPage, rightSlotLocal]);
+    return buildFaceSnapshot(rightPage.width, rightPage.height, items, {
+      pageColor: paper,
+      dotColor: palette.gridDot,
+      visuals: snapshotVisuals,
+    });
+  }, [flip, frontFace, frontImage, paper, palette.gridDot, rightPage, rightSlotLocal, snapshotVisuals]);
 
   const backSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
     const items = backFace ? [{ drawing: backFace, image: backImage, slotLocal: leftSlotLocal }] : [];
-    return buildFaceSnapshot(rightPage.width, rightPage.height, items, paper, palette.gridDot);
-  }, [flip, backFace, backImage, paper, palette.gridDot, rightPage, leftSlotLocal]);
+    return buildFaceSnapshot(rightPage.width, rightPage.height, items, {
+      pageColor: paper,
+      dotColor: palette.gridDot,
+      visuals: snapshotVisuals,
+    });
+  }, [flip, backFace, backImage, paper, palette.gridDot, rightPage, leftSlotLocal, snapshotVisuals]);
 
   const baseLeftSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
     const image = imageFor(baseLeft);
     const items = baseLeft ? [{ drawing: baseLeft, image, slotLocal: leftSlotLocal }] : [];
-    return buildFaceSnapshot(leftPage.width, leftPage.height, items, paper, palette.gridDot);
-  }, [baseLeft, flip, leftPage, leftSlotLocal, lookup, paper, palette.gridDot]);
+    return buildFaceSnapshot(leftPage.width, leftPage.height, items, {
+      pageColor: paper,
+      dotColor: palette.gridDot,
+      visuals: snapshotVisuals,
+    });
+  }, [baseLeft, flip, leftPage, leftSlotLocal, lookup, paper, palette.gridDot, snapshotVisuals]);
 
   const baseRightSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
     const image = imageFor(baseRight);
     const items = baseRight ? [{ drawing: baseRight, image, slotLocal: rightSlotLocal }] : [];
-    return buildFaceSnapshot(rightPage.width, rightPage.height, items, paper, palette.gridDot);
-  }, [baseRight, flip, lookup, paper, palette.gridDot, rightPage, rightSlotLocal]);
+    return buildFaceSnapshot(rightPage.width, rightPage.height, items, {
+      pageColor: paper,
+      dotColor: palette.gridDot,
+      visuals: snapshotVisuals,
+    });
+  }, [baseRight, flip, lookup, paper, palette.gridDot, rightPage, rightSlotLocal, snapshotVisuals]);
 
   useEffect(() => {
     if (!flip) return;
@@ -453,14 +479,14 @@ export function Scrapbook({
         </Group>
       ) : null}
 
-      {decoration === "none" ? (
+      {!flip && decoration === "none" ? (
         <PadStampMark
           cx={leftPage.x + 27}
           cy={leftPage.y + leftPage.height - 27}
           stamp={palette.stamp}
           color={palette.stampColor}
         />
-      ) : (
+      ) : !flip ? (
         <PadDecorationMarks
           id={decoration}
           x={leftPage.x}
@@ -470,7 +496,7 @@ export function Scrapbook({
           accent={palette.stampColor}
           secondary={palette.tabs[1].color}
         />
-      )}
+      ) : null}
     </Canvas>
   );
 }

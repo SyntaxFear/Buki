@@ -1,5 +1,6 @@
 import {
   ContentLimitReachedError,
+  ProFeatureRequiredError,
   resolveCapabilities,
 } from "@/subscription/access";
 import type { Drawing, StoreData } from "@/store/migrate";
@@ -56,11 +57,22 @@ function library(artworks: number, padId = "pad-a"): StoreData {
   };
 }
 
-function database(existingPads: string[] = [], existingArtworks: string[] = []) {
+type ExistingPad = string | {
+  id: string;
+  design: string;
+  border: string;
+  decoration: string;
+};
+
+function database(existingPads: ExistingPad[] = [], existingArtworks: string[] = []) {
   const tx = {
     getAllAsync: jest
       .fn()
-      .mockResolvedValueOnce(existingPads.map((id) => ({ id })))
+      .mockResolvedValueOnce(existingPads.map((pad) =>
+        typeof pad === "string"
+          ? { id: pad, design: "sunshine", border: "none", decoration: "none" }
+          : pad,
+      ))
       .mockResolvedValueOnce(existingArtworks.map((id) => ({ id }))),
     getFirstAsync: jest.fn(),
     runAsync: jest.fn(),
@@ -125,6 +137,74 @@ describe("library repository capability boundary", () => {
     )).not.toThrow();
   });
 
+  it("blocks a direct Free snapshot that changes an existing pad to premium visuals", () => {
+    const data = library(0);
+    data.pads[0] = {
+      ...data.pads[0],
+      design: "moonlight",
+      border: "museum-frame",
+      decoration: "starry-sky",
+    };
+
+    expect(() => assertLibrarySnapshotWithinCapabilities(
+      {
+        sketchpads: new Set(["pad-a"]),
+        artworks: new Set(),
+        padVisuals: new Map([[
+          "pad-a",
+          { design: "sunshine", border: "none", decoration: "none" },
+        ]]),
+      },
+      data,
+      resolveCapabilities("free"),
+    )).toThrow(new ProFeatureRequiredError("premiumVisuals"));
+  });
+
+  it("preserves unchanged premium styling after Pro expires", () => {
+    const data = library(0);
+    data.pads[0] = {
+      ...data.pads[0],
+      style: "grid",
+      design: "moonlight",
+      border: "museum-frame",
+      decoration: "starry-sky",
+    };
+
+    expect(() => assertLibrarySnapshotWithinCapabilities(
+      {
+        sketchpads: new Set(["pad-a"]),
+        artworks: new Set(),
+        padVisuals: new Map([[
+          "pad-a",
+          { design: "moonlight", border: "museum-frame", decoration: "starry-sky" },
+        ]]),
+      },
+      data,
+      resolveCapabilities("free"),
+    )).not.toThrow();
+  });
+
+  it.each(["spread", "vertical", "album", "grid", "strip"] as const)(
+    "keeps the %s layout available to Free users",
+    (style) => {
+      const data = library(0);
+      data.pads[0] = { ...data.pads[0], style };
+
+      expect(() => assertLibrarySnapshotWithinCapabilities(
+        {
+          sketchpads: new Set(["pad-a"]),
+          artworks: new Set(),
+          padVisuals: new Map([[
+            "pad-a",
+            { design: "sunshine", border: "none", decoration: "none" },
+          ]]),
+        },
+        data,
+        resolveCapabilities("free"),
+      )).not.toThrow();
+    },
+  );
+
   it("rechecks authorization after writes so the transaction can roll back", async () => {
     let allowed = true;
     const { db, tx } = database();
@@ -166,6 +246,35 @@ describe("library repository capability boundary", () => {
         getCapabilities: () => resolveCapabilities(pro ? "pro" : "free"),
       }),
     ).rejects.toEqual(new ContentLimitReachedError("artworks"));
+
+    expect(tx.runAsync).toHaveBeenCalled();
+  });
+
+  it("rolls back a premium visual change when Pro expires during the write", async () => {
+    let pro = true;
+    const { db, tx } = database([{
+      id: "pad-a",
+      design: "sunshine",
+      border: "none",
+      decoration: "none",
+    }]);
+    tx.runAsync.mockImplementation(async () => {
+      pro = false;
+      return undefined as never;
+    });
+    const data = library(0);
+    data.pads[0] = {
+      ...data.pads[0],
+      design: "moonlight",
+      border: "museum-frame",
+      decoration: "starry-sky",
+    };
+
+    await expect(
+      saveLibrary(db as never, data, {
+        getCapabilities: () => resolveCapabilities(pro ? "pro" : "free"),
+      }),
+    ).rejects.toEqual(new ProFeatureRequiredError("premiumVisuals"));
 
     expect(tx.runAsync).toHaveBeenCalled();
   });

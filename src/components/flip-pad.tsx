@@ -108,6 +108,16 @@ export function FlipPad({
       })),
     [slots, pageRect],
   );
+  const snapshotVisuals = useMemo(
+    () => ({
+      border,
+      decoration,
+      accent: palette.stampColor,
+      secondary: palette.tabs[1].color,
+      stamp: palette.stamp,
+    }),
+    [border, decoration, palette.stamp, palette.stampColor, palette.tabs],
+  );
 
   const frontSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT || frontUnit === null) return null;
@@ -120,10 +130,13 @@ export function FlipPad({
       pageRect.width,
       pageRect.height,
       items,
-      paper,
-      palette.gridDot,
-      cap > 1 ? slotsLocal : [],
-      palette.slotBorder,
+      {
+        pageColor: paper,
+        dotColor: palette.gridDot,
+        guideRects: cap > 1 ? slotsLocal : [],
+        guideColor: palette.slotBorder,
+        visuals: snapshotVisuals,
+      },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -136,6 +149,7 @@ export function FlipPad({
     palette.gridDot,
     palette.slotBorder,
     paper,
+    snapshotVisuals,
     slotsLocal,
   ]);
 
@@ -145,10 +159,13 @@ export function FlipPad({
       pageRect.width,
       pageRect.height,
       [],
-      paper,
-      palette.gridDot,
-      cap > 1 ? slotsLocal : [],
-      palette.slotBorder,
+      {
+        pageColor: paper,
+        dotColor: palette.gridDot,
+        guideRects: cap > 1 ? slotsLocal : [],
+        guideColor: palette.slotBorder,
+        visuals: snapshotVisuals,
+      },
     );
   }, [
     cap,
@@ -158,6 +175,7 @@ export function FlipPad({
     palette.gridDot,
     palette.slotBorder,
     paper,
+    snapshotVisuals,
     slotsLocal,
   ]);
 
@@ -172,10 +190,13 @@ export function FlipPad({
       pageRect.width,
       pageRect.height,
       items,
-      paper,
-      palette.gridDot,
-      cap > 1 ? slotsLocal : [],
-      palette.slotBorder,
+      {
+        pageColor: paper,
+        dotColor: palette.gridDot,
+        guideRects: cap > 1 ? slotsLocal : [],
+        guideColor: palette.slotBorder,
+        visuals: snapshotVisuals,
+      },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -187,6 +208,7 @@ export function FlipPad({
     palette.gridDot,
     palette.slotBorder,
     paper,
+    snapshotVisuals,
     slotsLocal,
     underUnit,
   ]);
@@ -488,14 +510,14 @@ export function FlipPad({
         </Group>
       ) : null}
 
-      {decoration === "none" ? (
+      {!flip && decoration === "none" ? (
         <PadStampMark
           cx={pageRect.x + 29}
           cy={pageRect.y + pageRect.height - 29}
           stamp={palette.stamp}
           color={palette.stampColor}
         />
-      ) : (
+      ) : !flip ? (
         <PadDecorationMarks
           id={decoration}
           x={pageRect.x}
@@ -505,7 +527,7 @@ export function FlipPad({
           accent={palette.stampColor}
           secondary={palette.tabs[1].color}
         />
-      )}
+      ) : null}
     </Canvas>
   );
 }

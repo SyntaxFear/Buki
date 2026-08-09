@@ -3,8 +3,15 @@ import type { SQLiteDatabase } from "expo-sqlite";
 
 import { migrateStoreData, type Drawing, type StoreData } from "@/store/migrate";
 import {
+  hasPremiumPadVisual,
+  isPremiumPadBorder,
+  isPremiumPadDecoration,
+} from "@/pad-visuals";
+import { isPremiumPadDesign } from "@/pad-designs";
+import {
   ContentLimitReachedError,
   limitFor,
+  ProFeatureRequiredError,
   type Capabilities,
   type ContentResource,
 } from "@/subscription/access";
@@ -61,6 +68,13 @@ export interface LibraryWriteAccess {
 interface ExistingLibraryIds {
   sketchpads: ReadonlySet<string>;
   artworks: ReadonlySet<string>;
+  padVisuals?: ReadonlyMap<string, ExistingPadVisuals>;
+}
+
+interface ExistingPadVisuals {
+  design: string;
+  border: string;
+  decoration: string;
 }
 
 function assertResourceWithinLimit(
@@ -86,6 +100,17 @@ export function assertLibrarySnapshotWithinCapabilities(
   );
   assertResourceWithinLimit("sketchpads", existing.sketchpads, nextPadIds, capabilities);
   assertResourceWithinLimit("artworks", existing.artworks, nextArtworkIds, capabilities);
+  if (!capabilities.premiumVisuals) {
+    for (const pad of data.pads) {
+      const saved = existing.padVisuals?.get(pad.id);
+      const introducesPremium = saved
+        ? (saved.design !== pad.design && isPremiumPadDesign(pad.design)) ||
+          (saved.border !== pad.border && isPremiumPadBorder(pad.border)) ||
+          (saved.decoration !== pad.decoration && isPremiumPadDecoration(pad.decoration))
+        : hasPremiumPadVisual(pad);
+      if (introducesPremium) throw new ProFeatureRequiredError("premiumVisuals");
+    }
+  }
 }
 
 function fileExists(uri: string): boolean {
@@ -194,13 +219,23 @@ export async function saveLibrary(
   const now = Date.now();
   const ownerId = await activeLocalOwnerId(db);
   await db.withExclusiveTransactionAsync(async (tx) => {
-    const existingPadIds = new Set(
-      (await tx.getAllAsync<{ id: string }>(
-        `SELECT id FROM sketchpads
+    const existingPads = await tx.getAllAsync<{
+      id: string;
+      design: string;
+      border: string;
+      decoration: string;
+    }>(
+        `SELECT id, design, border, decoration FROM sketchpads
          WHERE deleted_at IS NULL AND ((? IS NULL AND owner_id IS NULL) OR owner_id = ?)`,
         ownerId,
         ownerId,
-      )).map((row) => row.id),
+    );
+    const existingPadIds = new Set(existingPads.map((row) => row.id));
+    const existingPadVisuals = new Map(
+      existingPads.map((row) => [
+        row.id,
+        { design: row.design, border: row.border, decoration: row.decoration },
+      ]),
     );
     const existingArtworkIds = new Set(
       (await tx.getAllAsync<{ id: string }>(
@@ -230,7 +265,11 @@ export async function saveLibrary(
     const assertAccess = () => {
       access.assertWriteAllowed?.();
       assertLibrarySnapshotWithinCapabilities(
-        { sketchpads: existingPadIds, artworks: existingArtworkIds },
+        {
+          sketchpads: existingPadIds,
+          artworks: existingArtworkIds,
+          padVisuals: existingPadVisuals,
+        },
         data,
         access.getCapabilities(),
       );

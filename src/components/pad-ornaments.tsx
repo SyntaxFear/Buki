@@ -2,10 +2,12 @@ import {
   Blur,
   Circle,
   Group,
+  PaintStyle,
   Path,
   Rect,
   RoundedRect,
   Skia,
+  type SkCanvas,
 } from "@shopify/react-native-skia";
 import type { ReactNode } from "react";
 
@@ -202,6 +204,240 @@ export function PadDecorationMarks({
       <PadStampMark cx={right - 18} cy={bottom} stamp="flower" color={accent} />
     </Group>
   );
+}
+
+export interface SnapshotPageVisuals {
+  border: PadBorderId;
+  decoration: PadDecorationId;
+  accent: string;
+  secondary: string;
+  stamp: PadStamp;
+}
+
+/** Draws the same page styling into an offscreen page-turn snapshot. */
+export function drawSnapshotPageVisuals(
+  canvas: SkCanvas,
+  width: number,
+  height: number,
+  visuals: SnapshotPageVisuals,
+): void {
+  drawSnapshotBorder(canvas, visuals.border, width, height, visuals.accent);
+  if (visuals.decoration === "none") {
+    drawSnapshotStamp(canvas, 29, height - 29, visuals.stamp, visuals.accent);
+    return;
+  }
+  drawSnapshotDecorations(
+    canvas,
+    visuals.decoration,
+    width,
+    height,
+    visuals.accent,
+    visuals.secondary,
+  );
+}
+
+function snapshotPaint(
+  color: string,
+  style: PaintStyle = PaintStyle.Fill,
+  strokeWidth = 1,
+  alpha = 1,
+) {
+  const paint = Skia.Paint();
+  paint.setColor(Skia.Color(color));
+  paint.setStyle(style);
+  paint.setStrokeWidth(strokeWidth);
+  paint.setAlphaf(alpha);
+  return paint;
+}
+
+function drawSnapshotRRect(
+  canvas: SkCanvas,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  color: string,
+  style: PaintStyle = PaintStyle.Fill,
+  strokeWidth = 1,
+  alpha = 1,
+) {
+  canvas.drawRRect(
+    Skia.RRectXY(Skia.XYWHRect(x, y, width, height), radius, radius),
+    snapshotPaint(color, style, strokeWidth, alpha),
+  );
+}
+
+function drawSnapshotBorder(
+  canvas: SkCanvas,
+  id: PadBorderId,
+  width: number,
+  height: number,
+  accent: string,
+) {
+  if (id === "none") return;
+  const x = 8;
+  const y = 8;
+  const innerWidth = width - 16;
+  const innerHeight = height - 16;
+
+  if (id === "gallery-mat") {
+    drawSnapshotRRect(canvas, x, y, innerWidth, innerHeight, 11, "#E8E2D6", PaintStyle.Stroke, 7, 0.72);
+    drawSnapshotRRect(canvas, x + 5, y + 5, innerWidth - 10, innerHeight - 10, 8, accent, PaintStyle.Stroke, 1.5, 0.72);
+    return;
+  }
+  if (id === "polaroid") {
+    drawSnapshotRRect(canvas, x, y, innerWidth, innerHeight, 8, "#FFFFFF", PaintStyle.Stroke, 8, 0.92);
+    canvas.drawRect(
+      Skia.XYWHRect(x + 4, y + innerHeight - 16, innerWidth - 8, 12),
+      snapshotPaint("#FFFFFF", PaintStyle.Fill, 1, 0.88),
+    );
+    drawSnapshotRRect(canvas, x + 4, y + 4, innerWidth - 8, innerHeight - 8, 6, "#28435A", PaintStyle.Stroke, 1, 0.17);
+    return;
+  }
+  if (id === "torn-paper") {
+    canvas.drawPath(tornBorderPath(x, y, innerWidth, innerHeight), snapshotPaint("#75685A", PaintStyle.Stroke, 2.2, 0.52));
+    return;
+  }
+  if (id === "washi-tape") {
+    for (const tape of [
+      { x: x - 2, y, rotation: -9, pivotX: x + 18, pivotY: y + 5 },
+      { x: x + innerWidth - 38, y, rotation: 9, pivotX: x + innerWidth - 18, pivotY: y + 5 },
+      { x: x - 2, y: y + innerHeight - 11, rotation: 7, pivotX: x + 18, pivotY: y + innerHeight - 5 },
+    ]) {
+      const saveCount = canvas.save();
+      canvas.rotate(tape.rotation, tape.pivotX, tape.pivotY);
+      drawSnapshotRRect(canvas, tape.x, tape.y, 40, 11, 3, accent, PaintStyle.Fill, 1, 0.58);
+      canvas.restoreToCount(saveCount);
+    }
+    return;
+  }
+  if (id === "scalloped") {
+    const paint = snapshotPaint(accent, PaintStyle.Fill, 1, 0.34);
+    for (let px = x + 8; px < x + innerWidth - 6; px += 16) {
+      canvas.drawCircle(px, y + 2, 5.2, paint);
+      canvas.drawCircle(px, y + innerHeight - 2, 5.2, paint);
+    }
+    for (let py = y + 18; py < y + innerHeight - 14; py += 16) {
+      canvas.drawCircle(x + 2, py, 5.2, paint);
+      canvas.drawCircle(x + innerWidth - 2, py, 5.2, paint);
+    }
+    return;
+  }
+  if (id === "crayon-edge") {
+    drawSnapshotRRect(canvas, x, y, innerWidth, innerHeight, 10, accent, PaintStyle.Stroke, 3.1, 0.62);
+    drawSnapshotRRect(canvas, x + 3, y + 2, innerWidth - 5, innerHeight - 5, 8, accent, PaintStyle.Stroke, 1.4, 0.62);
+    return;
+  }
+  if (id === "sticker-stars") {
+    drawSnapshotRRect(canvas, x, y, innerWidth, innerHeight, 10, accent, PaintStyle.Stroke, 1.5, 0.34);
+    drawSnapshotStamp(canvas, x + 12, y + 12, "spark", accent);
+    drawSnapshotStamp(canvas, x + innerWidth - 12, y + 12, "spark", accent);
+    drawSnapshotStamp(canvas, x + innerWidth - 12, y + innerHeight - 12, "spark", accent);
+    return;
+  }
+
+  drawSnapshotRRect(canvas, x, y, innerWidth, innerHeight, 8, "#C89B4B", PaintStyle.Stroke, 7, 0.78);
+  drawSnapshotRRect(canvas, x + 5, y + 5, innerWidth - 10, innerHeight - 10, 5, "#7E5A26", PaintStyle.Stroke, 2, 0.72);
+  drawSnapshotRRect(canvas, x + 9, y + 9, innerWidth - 18, innerHeight - 18, 4, "#E6C878", PaintStyle.Stroke, 1, 0.8);
+}
+
+function drawSnapshotDecorations(
+  canvas: SkCanvas,
+  id: PadDecorationId,
+  width: number,
+  height: number,
+  accent: string,
+  secondary: string,
+) {
+  const left = 20;
+  const right = width - 20;
+  const top = 20;
+  const bottom = height - 20;
+  if (id === "confetti-pop") {
+    const dots: Array<[number, number, string, number]> = [
+      [left, top, accent, 4.2],
+      [left + 11, top + 7, secondary, 3.2],
+      [right, top + 4, secondary, 4.2],
+      [right - 12, top - 3, accent, 3.2],
+      [right, bottom, accent, 4.2],
+      [left + 5, bottom, secondary, 3.2],
+    ];
+    for (const [cx, cy, color, radius] of dots) {
+      canvas.drawCircle(cx, cy, radius, snapshotPaint(color, PaintStyle.Fill, 1, 0.72));
+    }
+    return;
+  }
+  if (id === "sparkle-trail") {
+    drawSnapshotStamp(canvas, left, bottom, "spark", accent);
+    drawSnapshotStamp(canvas, right, top, "spark", secondary);
+    canvas.drawCircle(right - 19, top + 17, 3, snapshotPaint(accent, PaintStyle.Fill, 1, 0.58));
+    return;
+  }
+  if (id === "heart-parade") {
+    drawSnapshotStamp(canvas, left, bottom, "heart", accent);
+    drawSnapshotStamp(canvas, right, top, "heart", secondary);
+    return;
+  }
+  if (id === "flower-garden") {
+    drawSnapshotStamp(canvas, left, bottom, "flower", accent);
+    drawSnapshotStamp(canvas, right, top, "flower", secondary);
+    return;
+  }
+  if (id === "starry-sky") {
+    drawSnapshotStamp(canvas, right, top, "spark", accent);
+    canvas.drawCircle(right - 24, top + 8, 5, snapshotPaint(secondary, PaintStyle.Fill, 1, 0.55));
+    canvas.drawCircle(right - 32, top + 1, 2, snapshotPaint(accent, PaintStyle.Fill, 1, 0.65));
+    drawSnapshotStamp(canvas, left, bottom, "spark", secondary);
+    return;
+  }
+  drawSnapshotStamp(canvas, left, bottom, "heart", accent);
+  drawSnapshotStamp(canvas, right, top, "spark", secondary);
+  drawSnapshotStamp(canvas, right - 18, bottom, "flower", accent);
+}
+
+function drawSnapshotStamp(
+  canvas: SkCanvas,
+  cx: number,
+  cy: number,
+  stamp: PadStamp,
+  color: string,
+) {
+  const paint = snapshotPaint(color, PaintStyle.Fill, 1, 0.76);
+  if (stamp === "flower") {
+    for (const angle of [0, 72, 144, 216, 288]) {
+      const radians = (angle * Math.PI) / 180;
+      canvas.drawCircle(cx + Math.cos(radians) * 7, cy + Math.sin(radians) * 7, 4.1, paint);
+    }
+    canvas.drawCircle(cx, cy, 3, snapshotPaint("#FFFFFF", PaintStyle.Fill, 1, 0.62));
+    return;
+  }
+  if (stamp === "heart") {
+    canvas.drawPath(heartPath(cx, cy, 1.25), paint);
+    return;
+  }
+  if (stamp === "spark") {
+    drawSnapshotRRect(canvas, cx - 2.2, cy - 13, 4.4, 26, 2.2, color, PaintStyle.Fill, 1, 0.76);
+    drawSnapshotRRect(canvas, cx - 13, cy - 2.2, 26, 4.4, 2.2, color, PaintStyle.Fill, 1, 0.76);
+    const saveCount = canvas.save();
+    canvas.rotate(45, cx, cy);
+    drawSnapshotRRect(canvas, cx - 1.4, cy - 9, 2.8, 18, 1.4, color, PaintStyle.Fill, 1, 0.76);
+    drawSnapshotRRect(canvas, cx - 9, cy - 1.4, 18, 2.8, 1.4, color, PaintStyle.Fill, 1, 0.76);
+    canvas.restoreToCount(saveCount);
+    return;
+  }
+  const saveCount = canvas.save();
+  canvas.rotate(-14, cx, cy);
+  drawSnapshotRRect(canvas, cx - 7, cy - 2, 14, 11, 6, color, PaintStyle.Fill, 1, 0.76);
+  canvas.restoreToCount(saveCount);
+  for (const [x, y, radius] of [
+    [cx - 9, cy - 8, 3.2],
+    [cx - 3, cy - 12, 3.1],
+    [cx + 4, cy - 12, 3.1],
+    [cx + 10, cy - 7, 3.2],
+  ] as const) {
+    canvas.drawCircle(x, y, radius, paint);
+  }
 }
 
 export function PadTab({

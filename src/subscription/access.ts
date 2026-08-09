@@ -44,6 +44,15 @@ export class ContentLimitReachedError extends Error {
   }
 }
 
+export class ProFeatureRequiredError extends Error {
+  readonly code = "PRO_FEATURE_REQUIRED";
+
+  constructor(readonly feature: Exclude<ProFeature, ContentResource>) {
+    super(`Buki Pro is required to use ${feature === "premiumVisuals" ? "premium visuals" : feature}.`);
+    this.name = "ProFeatureRequiredError";
+  }
+}
+
 export function isContentLimitReachedError(
   error: unknown,
   resource?: ContentResource,
@@ -51,6 +60,16 @@ export function isContentLimitReachedError(
   return (
     error instanceof ContentLimitReachedError &&
     (resource === undefined || error.resource === resource)
+  );
+}
+
+export function isProFeatureRequiredError(
+  error: unknown,
+  feature?: Exclude<ProFeature, ContentResource>,
+): error is ProFeatureRequiredError {
+  return (
+    error instanceof ProFeatureRequiredError &&
+    (feature === undefined || error.feature === feature)
   );
 }
 

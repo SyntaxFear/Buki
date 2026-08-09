@@ -180,7 +180,7 @@ export function PadDrawer({ open, onClose }: Props) {
             <Text style={{ color: colors.titleYellow }}>k</Text>
             <Text style={{ color: colors.titleBlue }}>i</Text>
           </Text>
-          <Text style={styles.headingCaption}>{designingPad ? "Choose a design" : "Sketchpads"}</Text>
+          <Text style={styles.headingCaption}>{designingPad ? "Customize sketchpad" : "Sketchpads"}</Text>
           {designingPad ? (
             <Pressable
               onPress={() => setDesigningPadId(null)}
@@ -282,12 +282,14 @@ export function PadDrawer({ open, onClose }: Props) {
                     />
                     <Text style={styles.sectionLabel}>Border</Text>
                     <VisualOptionGrid
+                      kind="border"
                       options={PAD_BORDERS}
                       selected={newBorder}
                       onSelect={(border) => setNewBorder(border)}
                     />
                     <Text style={styles.sectionLabel}>Decorations</Text>
                     <VisualOptionGrid
+                      kind="decoration"
                       options={PAD_DECORATIONS}
                       selected={newDecoration}
                       onSelect={(decoration) => setNewDecoration(decoration)}
@@ -399,18 +401,21 @@ function DesignChooser({
 }: {
   pad: Sketchpad;
   onSave: (visuals: {
+    style: PadStyle;
     design: PadDesignId;
     border: PadBorderId;
     decoration: PadDecorationId;
     pageColor: string;
   }) => boolean;
 }) {
+  const [style, setStyle] = useState(pad.style);
   const [design, setDesign] = useState(pad.design);
   const [border, setBorder] = useState(pad.border);
   const [decoration, setDecoration] = useState(pad.decoration);
   const [pageColor, setPageColor] = useState(pad.pageColor ?? getPadDesign(pad.design).paper);
 
   useEffect(() => {
+    setStyle(pad.style);
     setDesign(pad.design);
     setBorder(pad.border);
     setDecoration(pad.decoration);
@@ -425,7 +430,7 @@ function DesignChooser({
     >
       <View style={styles.designPreviewCard}>
         <MiniCover
-          style={pad.style}
+          style={style}
           design={design}
           pageColor={pageColor}
           border={border}
@@ -440,9 +445,25 @@ function DesignChooser({
         </View>
       </View>
 
+      <Text style={styles.sectionLabel}>Layout</Text>
+      <View style={styles.layoutChoiceRow}>
+        <Text style={styles.layoutChoiceLabel}>{STYLE_LABEL[style]}</Text>
+        <View style={styles.layoutPicker}>
+          <Host matchContents>
+            <Picker selectedValue={style} onValueChange={(value) => setStyle(value as PadStyle)}>
+              <Picker.Item label="Spread book" value="spread" />
+              <Picker.Item label="Vertical pad" value="vertical" />
+              <Picker.Item label="Album" value="album" />
+              <Picker.Item label="Photo grid" value="grid" />
+              <Picker.Item label="Filmstrip" value="strip" />
+            </Picker>
+          </Host>
+        </View>
+      </View>
+
       <Text style={styles.sectionLabel}>Theme</Text>
       <DesignGrid
-        style={pad.style}
+        style={style}
         selected={design}
         onSelect={(nextDesign) => {
           setDesign(nextDesign);
@@ -451,10 +472,11 @@ function DesignChooser({
       />
 
       <Text style={styles.sectionLabel}>Border</Text>
-      <VisualOptionGrid options={PAD_BORDERS} selected={border} onSelect={setBorder} />
+      <VisualOptionGrid kind="border" options={PAD_BORDERS} selected={border} onSelect={setBorder} />
 
       <Text style={styles.sectionLabel}>Decorations</Text>
       <VisualOptionGrid
+        kind="decoration"
         options={PAD_DECORATIONS}
         selected={decoration}
         onSelect={setDecoration}
@@ -479,7 +501,7 @@ function DesignChooser({
       </View>
 
       <Pressable
-        onPress={() => onSave({ design, border, decoration, pageColor })}
+        onPress={() => onSave({ style, design, border, decoration, pageColor })}
         accessibilityRole="button"
         accessibilityLabel="Save sketchpad look"
         style={({ pressed }) => [styles.createBtn, styles.saveLookButton, pressed && styles.createBtnPressed]}
@@ -491,10 +513,12 @@ function DesignChooser({
 }
 
 function VisualOptionGrid<T extends string>({
+  kind,
   options,
   selected,
   onSelect,
 }: {
+  kind: "border" | "decoration";
   options: readonly PadVisualOption<T>[];
   selected: T;
   onSelect: (id: T) => void;
@@ -518,7 +542,13 @@ function VisualOptionGrid<T extends string>({
             ]}
           >
             <View style={[styles.visualSwatch, { backgroundColor: option.previewColor }]}>
-              {option.id !== "none" ? (
+              {kind === "decoration" && option.id !== "none" ? (
+                <MiniDecorationPreview
+                  id={option.id as PadDecorationId}
+                  accent={colors.surface}
+                  secondary="rgba(255,255,255,0.68)"
+                />
+              ) : option.id !== "none" ? (
                 <View style={[styles.visualSwatchInner, { borderColor: colors.surface }]} />
               ) : null}
             </View>
@@ -673,14 +703,75 @@ function MiniCover({
               ]}
             />
           ) : null}
-          {decoration !== "none" ? (
-            <>
-              <View style={[styles.miniDecoration, styles.miniDecorationTop, { backgroundColor: palette.stampColor }]} />
-              <View style={[styles.miniDecoration, styles.miniDecorationBottom, { backgroundColor: palette.tabs[1].color }]} />
-            </>
-          ) : null}
+          <MiniDecorationPreview
+            id={decoration}
+            accent={palette.stampColor}
+            secondary={palette.tabs[1].color}
+          />
         </View>
       </View>
+    </View>
+  );
+}
+
+function MiniDecorationPreview({
+  id,
+  accent,
+  secondary,
+}: {
+  id: PadDecorationId;
+  accent: string;
+  secondary: string;
+}) {
+  if (id === "none") return null;
+  if (id === "confetti-pop") {
+    return (
+      <View pointerEvents="none" style={styles.miniDecorationLayer}>
+        <View style={[styles.miniDot, styles.miniDotTopLeft, { backgroundColor: accent }]} />
+        <View style={[styles.miniDot, styles.miniDotTopRight, { backgroundColor: secondary }]} />
+        <View style={[styles.miniDotSmall, styles.miniDotBottomLeft, { backgroundColor: secondary }]} />
+        <View style={[styles.miniDotSmall, styles.miniDotBottomRight, { backgroundColor: accent }]} />
+      </View>
+    );
+  }
+  if (id === "sparkle-trail") {
+    return (
+      <View pointerEvents="none" style={styles.miniDecorationLayer}>
+        <Text style={[styles.miniMark, styles.miniMarkTopRight, { color: accent }]}>✦</Text>
+        <Text style={[styles.miniMarkSmall, styles.miniMarkBottomLeft, { color: secondary }]}>✧</Text>
+      </View>
+    );
+  }
+  if (id === "heart-parade") {
+    return (
+      <View pointerEvents="none" style={styles.miniDecorationLayer}>
+        <Text style={[styles.miniMark, styles.miniMarkTopRight, { color: secondary }]}>♥</Text>
+        <Text style={[styles.miniMarkSmall, styles.miniMarkBottomLeft, { color: accent }]}>♥</Text>
+      </View>
+    );
+  }
+  if (id === "flower-garden") {
+    return (
+      <View pointerEvents="none" style={styles.miniDecorationLayer}>
+        <Text style={[styles.miniMark, styles.miniMarkTopRight, { color: secondary }]}>✿</Text>
+        <Text style={[styles.miniMarkSmall, styles.miniMarkBottomLeft, { color: accent }]}>✿</Text>
+      </View>
+    );
+  }
+  if (id === "starry-sky") {
+    return (
+      <View pointerEvents="none" style={styles.miniDecorationLayer}>
+        <Text style={[styles.miniMark, styles.miniMarkTopRight, { color: accent }]}>★</Text>
+        <View style={[styles.miniPlanet, { backgroundColor: secondary }]} />
+        <Text style={[styles.miniMarkSmall, styles.miniMarkBottomLeft, { color: secondary }]}>✦</Text>
+      </View>
+    );
+  }
+  return (
+    <View pointerEvents="none" style={styles.miniDecorationLayer}>
+      <Text style={[styles.miniMarkSmall, styles.miniMarkTopLeft, { color: accent }]}>♥</Text>
+      <Text style={[styles.miniMark, styles.miniMarkTopRight, { color: secondary }]}>✦</Text>
+      <Text style={[styles.miniMarkSmall, styles.miniMarkBottomLeft, { color: secondary }]}>✿</Text>
     </View>
   );
 }
@@ -981,6 +1072,28 @@ const styles = StyleSheet.create({
     color: colors.mutedText,
     marginTop: 2,
   },
+  layoutChoiceRow: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingLeft: 12,
+    borderRadius: 15,
+    borderCurve: "continuous",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  layoutChoiceLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.ink,
+  },
+  layoutPicker: {
+    minWidth: 132,
+    alignItems: "flex-end",
+  },
   designGrid: {
     gap: 10,
   },
@@ -1143,19 +1256,48 @@ const styles = StyleSheet.create({
     bottom: 2,
     borderRadius: 4,
   },
-  miniDecoration: {
+  miniDecorationLayer: {
+    position: "absolute",
+    inset: 0,
+  },
+  miniDot: {
     position: "absolute",
     width: 5,
     height: 5,
     borderRadius: 2.5,
   },
-  miniDecorationTop: {
-    right: 3,
-    top: 3,
+  miniDotSmall: {
+    position: "absolute",
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
   },
-  miniDecorationBottom: {
-    left: 3,
-    bottom: 3,
+  miniDotTopLeft: { left: 3, top: 3 },
+  miniDotTopRight: { right: 3, top: 4 },
+  miniDotBottomLeft: { left: 5, bottom: 3 },
+  miniDotBottomRight: { right: 4, bottom: 3 },
+  miniMark: {
+    position: "absolute",
+    fontSize: 8,
+    lineHeight: 9,
+    fontWeight: "900",
+  },
+  miniMarkSmall: {
+    position: "absolute",
+    fontSize: 6,
+    lineHeight: 7,
+    fontWeight: "900",
+  },
+  miniMarkTopLeft: { left: 2, top: 1 },
+  miniMarkTopRight: { right: 2, top: 1 },
+  miniMarkBottomLeft: { left: 2, bottom: 1 },
+  miniPlanet: {
+    position: "absolute",
+    right: 9,
+    top: 8,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   createBtn: {
     backgroundColor: colors.fab,
