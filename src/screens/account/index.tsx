@@ -708,7 +708,7 @@ export function AccountCenter() {
 
         <Section title="About">
           <SettingRow title="Version" detail={`${Application.nativeApplicationVersion ?? "1.0.0"} (${Application.nativeBuildVersion ?? "development"})`} />
-          <SettingRow title="What’s New" detail="Free and Pro account foundation" onPress={() => Alert.alert("What’s New", "Adult accounts, child profiles, Free limits, and the new Account Center are ready. Purchases, exports, and cloud backup follow in the next implementation phases.")} />
+          <SettingRow title="What’s New" detail="Buki Pro, backup, and protected exports" onPress={() => Alert.alert("What’s New", "Buki Free and Pro now include adult accounts, child profiles, iOS purchases, premium visuals, advanced organization, private cloud backup and restore, plus protected artwork and library exports.")} />
         </Section>
 
         <Section title="Danger Zone" danger>
