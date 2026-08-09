@@ -1,10 +1,10 @@
 # Buki Pro implementation and iOS release progress
 
-Last updated: **2026-08-09 16:39 +04 (Asia/Tbilisi)**
+Last updated: **2026-08-09 19:08 +04 (Asia/Tbilisi)**
 
 Release scope: **iOS only**. Android is deferred.
 
-Current release decision: **BLOCKED — implementation is substantially complete, but independent verification, real TestFlight purchases, cloud upload/restore proof, and final App Store delivery are still required.**
+Current release decision: **BLOCKED — implementation and Phase 2 simulator verification are complete except for the user's deferred manual Sign in with Apple run. Release-candidate verification, TestFlight/store transactions, screenshots, and App Store delivery remain.**
 
 This file is the single progress tracker for Buki Free + Pro. Update it after every material implementation, credential, verification, build, or release change. Never put credential values, tokens, passwords, service-account JSON, private keys, or OTP codes in this file.
 
@@ -22,7 +22,7 @@ Status legend:
 |---|---|
 | Repository | `SyntaxFear/Buki` |
 | Delivery branch | `main`, pushed directly as previously approved |
-| Current verified implementation head | `cb1b188` |
+| Current verified implementation head | `6920204` |
 | Main worktree before this tracker | Clean and equal to `origin/main` |
 | App name | Buki |
 | Expo slug | `Bloombook` |
@@ -141,18 +141,19 @@ The yearly plan saves approximately 44% versus paying monthly. Store-localized p
    - A real TestFlight/App Store sandbox purchase has not yet been completed for monthly, yearly, or lifetime.
    - Cancellation, refund, billing grace, expiry, and cross-platform restore are not yet proven against store transactions.
 
-9. 🟡 **Apple authentication**
+9. 🟡 **Apple authentication — manual test deferred by user**
    - Native routing, callback security, account isolation, and iOS Sign in with Apple configuration are implemented.
-   - Email OTP is live-verified.
-   - A complete independent Sign in with Apple login/logout/account-switch run is still pending.
+   - Email magic-link sign-in is live-verified.
+   - The Apple button reaches Apple's native system authentication flow.
+   - The simulator is not signed into an Apple Account; the user will complete the final login/logout run manually later.
 
-10. 🟡 **Google authentication on iOS**
-    - Google OAuth code paths exist in the intended product model.
-    - Live Google login has not been independently verified for this iOS release.
-    - Before release, either configure and verify it or hide it rather than ship a non-working option.
+10. ✅ **Google authentication decision on iOS**
+    - Google OAuth code paths remain available for a future configured release.
+    - The unverified Google entry point is hidden from the initial iOS release in `6920204`.
 
-11. 🟡 **Email OTP and SMTP**
-    - Email OTP/magic-link sign-in works end to end with `levani.parastashvili@gmail.com`.
+11. 🟡 **Email magic link and SMTP**
+    - Email magic-link sign-in works end to end with `levani.parastashvili@gmail.com`.
+    - The onboarding UI now accurately describes a sign-in link rather than a numeric code.
     - A custom production Gmail SMTP setup has not been confirmed as the active Supabase mail provider.
     - Before production scale, configure the intended SMTP sender securely or select a dedicated transactional provider. Never commit an app password.
 
@@ -201,9 +202,9 @@ The yearly plan saves approximately 44% versus paying monthly. Store-localized p
 | Area | Code | Unit/integration tests | Live iOS smoke | Final independent verification |
 |---|---:|---:|---:|---:|
 | Central Free/Pro capability resolver | ✅ | ✅ | ✅ | ⏳ |
-| Free child/sketchpad/artwork limits | ✅ | ✅ | 🟡 child and sketchpad live; 20-artwork live boundary pending | ⏳ |
+| Free child/sketchpad/artwork limits | ✅ | ✅ | ✅ 19/20/21 and above-limit migration verified | ⏳ |
 | SQLite schema and legacy JSON migration | ✅ | ✅ | 🟡 current library works; interruption/missing-media matrix pending | ⏳ |
-| Supabase adult authentication | ✅ | ✅ | ✅ email OTP | ⏳ Apple/Google matrix |
+| Supabase adult authentication | ✅ | ✅ | ✅ email magic link; Apple native flow reached | ⏳ manual Apple completion |
 | Onboarding and default child/sketchpad | ✅ | ✅ | ✅ | ⏳ |
 | Child profile CRUD and account ownership | ✅ | ✅ | ✅ Free-limit path | ⏳ full CRUD matrix |
 | Account Center | ✅ | ✅ where applicable | ✅ all major sections inspected | ⏳ |
@@ -211,20 +212,20 @@ The yearly plan saves approximately 44% versus paying monthly. Store-localized p
 | RevenueCat customer identity | ✅ | ✅ | ✅ signed-in UUID is used | ⏳ |
 | Custom Buki paywall | ✅ | ✅ | ✅ | ⏳ real purchase |
 | Purchase and restore account pinning | ✅ | ✅ | ✅ warning flows | ⏳ store transaction |
-| Subscription expiry/grace model | ✅ | ✅ | ⏳ | ⏳ |
-| Six Pro themes | ✅ | ✅ | ✅ preview/save gate | ⏳ Pro-save lifecycle |
-| Eight Pro borders and decorations | ✅ | ✅ | ✅ preview/save gate | ⏳ Pro-save lifecycle |
+| Subscription expiry/grace model | ✅ | ✅ | ✅ expiry and renewal transition verified | ⏳ real store lifecycle |
+| Six Pro themes | ✅ | ✅ | ✅ preview, save, expiry persistence | ⏳ |
+| Eight Pro borders and decorations | ✅ | ✅ | ✅ preview, save, expiry persistence | ⏳ |
 | Artwork metadata | ✅ | ✅ | ✅ title/date/notes | ⏳ |
-| Tags, favorites, search, filters, bulk actions | ✅ | ✅ | 🟡 Active-Pro search/filter verified; tags, favorites, and bulk actions pending | ⏳ |
-| PNG/JPG and share-card export | ✅ | ✅ | 🟡 Active-Pro share card generated; PNG/JPG pending | ⏳ |
-| Sketchpad PDF export | ✅ | ✅ | 🟡 Free lock verified; generated file pending | ⏳ |
-| ZIP export | ✅ | ✅ | 🟡 Free lock verified; generated file pending | ⏳ |
-| `.buki` archive export/import | ✅ | ✅ | ⏳ | ⏳ corruption/duplicate matrix |
+| Tags, favorites, search, filters, bulk actions | ✅ | ✅ | ✅ | ⏳ |
+| PNG/JPG and share-card export | ✅ | ✅ | ✅ | ⏳ |
+| Sketchpad PDF export | ✅ | ✅ | ✅ 329 KB file generated | ⏳ |
+| ZIP export | ✅ | ✅ | ✅ 489 KB file generated | ⏳ |
+| `.buki` archive export/import | ✅ | ✅ | ✅ valid duplicate-safe import and corrupt rejection | ⏳ |
 | Supabase schema and RLS | ✅ | ✅ source-level coverage | 🟡 live function access verified | ⏳ cross-account proof |
 | Persistent local sync queue | ✅ | ✅ | ✅ two-artwork upload completed and repeat sync drained | ⏳ |
-| Deduplicated media uploads | ✅ | ✅ | ✅ repeat sync preserved 634.1 KB usage | ⏳ dashboard row/object proof |
+| Deduplicated media uploads | ✅ | ✅ | ✅ repeat sync preserved 634.1 KB usage | ✅ exact row/checksum/object proof |
 | Signed upload reservation/replay protection | ✅ | ✅ | ⏳ | ⏳ security agent |
-| Cloud restore and 2 GB quota handling | ✅ | ✅ | ✅ two artworks and six media files restored after native-download fix | ⏳ clean-device and quota boundary |
+| Cloud restore and 2 GB quota handling | ✅ | ✅ | ✅ clean-state restore of two artworks and six media files | ⏳ 2 GB destructive boundary |
 | Ninety-day retention and scheduled cleanup | ✅ | ✅ lifecycle tests | ⏳ real timeline simulation | ⏳ |
 | Cloud/account deletion | ✅ | ✅ where applicable | ✅ warning flow; deletion canceled | ⏳ destructive test account run |
 | Privacy-safe analytics | ✅ | ✅ | ⏳ event evidence | ⏳ |
@@ -278,6 +279,17 @@ The following was verified on an iPhone 17 Pro Max simulator running iOS 26.5 wi
 26. ✅ A temporary promotional `pro` entitlement was granted to the test account.
 27. ✅ RevenueCat SDK refreshed the customer from the network and detected the active entitlement.
 28. ✅ Supabase `verify-entitlement` then returned `active: true`, `hadPro: true`, `cloudAccess: true`, and active retention/uploads.
+29. ✅ Exact Supabase proof found two artwork rows, six uploaded-media rows, six distinct valid checksums, six matching private storage objects, and 649,289 accounted bytes.
+30. ✅ A clean local state restored both artworks, all six media files, favorites, tags, and premium styling.
+31. ✅ Tags, favorites, search, filters, and bulk organization actions were exercised while Pro.
+32. ✅ PNG/JPG/share-card, 329 KB PDF, 489 KB ZIP, and 489 KB `.buki` archive exports were generated.
+33. ✅ Valid archive re-import skipped two duplicate artworks; a truncated archive was rejected as invalid ZIP data.
+34. ✅ Expiry preserved both local artworks and Moonlight Magic styling, enforced Free creation/organization/export/upload limits, and kept cloud restore read-only until **2026-11-07**.
+35. ✅ Renewal immediately resumed automatic backup and drained the local queue.
+36. ✅ Free boundaries were verified live at 19 artworks, 20 artworks, attempted artwork 21, and a migrated 21-artwork library.
+37. ✅ Email magic-link sign-in completed from Gmail; Supabase's temporary email-rate-limit change was restored to two emails per hour.
+38. ✅ Google sign-in is hidden for this iOS release; onboarding exposes only Apple and email-link sign-in.
+39. ✅ A symbolicated ETTrace run loaded and scrolled a 500-artwork local library on iPhone 17 Pro Max / iOS 26.5. The original two-artwork database and zero-item sync queue were restored afterward.
 
 ## 7. Defects found and fixed during runtime verification
 
@@ -294,10 +306,15 @@ The following was verified on an iPhone 17 Pro Max simulator running iOS 26.5 wi
 | Expo Crypto rejected raw `ArrayBuffer` input during native media hashing | Centralized SHA-256 hashing through copied `Uint8Array` input | `f9e5816` |
 | Account Center action rows were not exposed as accessible buttons | Added explicit button roles, labels, and hints | `bbfcd0e` |
 | React Native Supabase download blobs did not expose `arrayBuffer()` | Restores now use short-lived signed URLs and Expo FileSystem native downloads before checksum verification | `cb1b188` |
+| Export format choices were not exposed as accessible buttons | Added explicit button semantics | `67cb8b0` |
+| Native form-sheet container boundaries produced a React Native Screens warning | Preserved the form-sheet container boundary | `338563b` |
+| Destructive account actions lacked complete accessibility labels | Added explicit destructive-action labels | `1725ac9` |
+| Onboarding promised a numeric code while Supabase sent a magic link | Reworked onboarding copy and flow around email sign-in links | `f0c1ee4` |
+| Unverified Google login was visible in the iOS release UI | Hid the Google entry point while preserving future provider code | `6920204` |
 
 ## 8. Current test and quality baseline
 
-Verified on **2026-08-09** from `main` at `cb1b188`:
+Verified on **2026-08-09** from `main` at `6920204`:
 
 - ✅ Jest: **51 suites, 279 tests passed**.
 - ✅ TypeScript: `npx tsc --noEmit` passed.
@@ -311,10 +328,10 @@ Verified on **2026-08-09** from `main` at `cb1b188`:
 Known quality work still open:
 
 - ✅ The lint strategy is now committed: Reanimated compiler exceptions, intentional state-reset effects, Jest import order, and Deno Edge Functions are narrowly scoped rather than disabled globally.
-- 🟡 All six deprecated mutable Skia path-builder call sites were migrated to `Skia.PathBuilder`; Simulator confirmation that runtime warnings are gone remains pending.
+- ✅ All six deprecated mutable Skia path-builder call sites were migrated to `Skia.PathBuilder`; the deprecated runtime warnings no longer appeared.
 - 🟡 RevenueCat logs non-blocking custom `ui_config` remote-config assembly warnings; Buki uses its custom paywall successfully.
-- 🟡 A React Native Screens FormSheet/ScrollView subview warning appeared during artwork details and should be investigated for layout stability.
-- 🟡 Final performance, memory, and long-library checks have not run.
+- ✅ The React Native Screens FormSheet/ScrollView subview warning was resolved in `338563b`.
+- ✅ The 500-artwork ETTrace performance run completed with app-owned symbols present; the main active cost was Skia/Metal redraw work during scrolling, with no crash or data loss.
 
 ## 9. Current live test state and temporary diagnostics
 
@@ -330,9 +347,9 @@ Known quality work still open:
 
 ### 9.2 Temporary Pro access
 
-- A one-day RevenueCat promotional entitlement was granted only for cloud/Pro verification.
+- A fresh one-day RevenueCat promotional entitlement was granted only for cloud/Pro verification.
 - Product shown by RevenueCat: `rc_promo_pro_daily`.
-- Expiry: **2026-08-10T11:29:28Z**.
+- Latest observed expiry: **2026-08-10 14:15 UTC**.
 - This grant must be revoked after the intended cloud, organization, and export smoke tests, or allowed to expire and then used to verify expiry behavior.
 
 ### 9.3 Disposable runtime worktree
@@ -345,89 +362,49 @@ Known quality work still open:
 
 ### 9.4 Current interruption point
 
-The two local artworks now upload, repeat-sync without increasing 634.1 KB cloud usage, and restore with all six media files. Safari is authenticated to a Supabase organization that does not contain the Buki project, so direct dashboard proof of exact table rows and storage objects requires the Buki-owning Supabase account to be signed into Safari. The remaining active-Pro organization/export matrix is still in progress.
+Phase 2 simulator verification is complete except for the user's deferred manual Sign in with Apple run. The app is currently signed out and Simulator Settings is open at Apple Account sign-in. The original local database remains intact with two artworks and zero queued sync items.
 
 ## 10. Remaining work in priority order
 
-1. ⛔ **Finish the active Pro cloud smoke test**
-   - ✅ Confirm Automatic Backup state.
-   - ✅ Trigger Sync Now and verify the queue drains.
-   - ✅ Verify usage accounting reaches 634.1 KB.
-   - ✅ Verify a repeated sync does not increase usage or duplicate logical media.
-   - ✅ Verify two artworks and all six media files restore on the current device.
-   - ⏳ Verify exact artwork/media/checksum rows and private storage objects in the Supabase dashboard after Safari is signed into the Buki-owning account.
-   - ⏳ Verify restore on a separate clean simulator/account-scoped local state.
+1. 🟡 **Complete manual Sign in with Apple verification**
+   - The user has explicitly deferred this test and will perform it manually later.
+   - Verify login, logout, account isolation, and return to the email-owned library.
 
-2. ⛔ **Complete Pro feature smoke tests while the temporary grant is active**
-   - Add/edit tags.
-   - Favorite/unfavorite.
-   - Search and filter.
-   - Exercise bulk actions.
-   - Save premium styling while Pro.
-   - Generate PNG/JPG/share card, PDF, ZIP, and `.buki` exports.
-   - Import a valid archive and reject duplicate/corrupt archives.
-
-3. ⛔ **Verify expiry/retention behavior**
-   - Revoke or let the promotional entitlement expire.
-   - Confirm local content and applied styling remain.
-   - Confirm new creation follows Free limits.
-   - Confirm uploads and exports lock.
-   - Confirm cloud data becomes read-only and restore remains available.
-   - Confirm renewal immediately resumes uploads.
-
-4. ⛔ **Run remaining account/authentication smoke tests**
-   - Sign out.
-   - Confirm local library is not exposed to another account.
-   - Sign back into the same account and recover the library.
-   - Verify Apple login end to end.
-   - Verify or remove/hide Google login for iOS.
-
-5. ⛔ **Run exact Free artwork boundary tests in the simulator**
-   - 19 artworks.
-   - 20 artworks.
-   - Attempt 21st artwork.
-   - Migrated library already above 20.
-
-6. ⛔ **Resolve or explicitly accept runtime warnings**
-   - FormSheet/ScrollView warning.
-   - Confirm the Skia deprecated path API warnings are gone after the source migration in `f980e24`.
-   - RevenueCat `ui_config` warning.
-   - ✅ Intentional lint migration/fix strategy is committed and lint passes cleanly.
-
-7. ⏳ **Freeze an exact release-candidate SHA**
+2. ⏳ **Freeze an exact release-candidate SHA**
    - Main must be clean.
    - Full tests, TypeScript, Expo Doctor, and relevant native build must pass.
    - Runtime-only diagnostics must be absent.
 
-8. ⛔ **Run the 15 independent verification agents sequentially**
+3. ⛔ **Run the independent iOS verification matrix at the frozen SHA**
    - Each agent gets a clean isolated worktree at the exact RC SHA.
    - Agents test only and do not modify code.
    - Any failure blocks release and creates a new RC SHA after a small fix commit.
+   - Android verification remains deferred and is not counted as passed.
 
-9. ⛔ **Create iOS production build 10**
+4. ⛔ **Create the next iOS production build**
    - Build from the final verified SHA.
    - Confirm version/build metadata.
    - Upload to TestFlight.
 
-10. ⛔ **Complete real Apple sandbox purchase testing**
-    - Monthly purchase.
-    - Yearly trial eligibility/start.
-    - Lifetime purchase.
+5. ⛔ **Complete available real Apple sandbox purchase testing**
+   - Monthly purchase.
+   - Yearly trial eligibility/start.
+   - Lifetime purchase.
     - Restore on same Buki account.
     - Restore/transfer warning on a different Buki account.
     - Cancellation, refund/revocation, grace, and expiry.
 
-11. ⏳ **Create and approve App Store screenshots**
-    - User font decision remains: Manrope is recommended; Figtree, Instrument Sans, and Plus Jakarta Sans are alternatives.
+6. ⏳ **Create and approve App Store screenshots**
+    - Manrope remains the recommended marketing font unless the user selects another direction.
     - Generate final screenshot set from the release build.
 
-12. ⏳ **Finalize App Store Connect submission**
+7. ⏳ **Finalize App Store Connect submission**
     - Confirm privacy nutrition labels.
     - Confirm subscription metadata and review notes.
     - Confirm account-deletion URL and support URL.
     - Confirm screenshots, age rating, encryption declaration, and review account/instructions.
 
-13. ⏳ **Tag the final tested release candidate**
+8. ⏳ **Tag the final tested release candidate**
     - Only after all independent agents pass and TestFlight purchase/restore succeeds.
 
 ## 11. Independent verification agents
@@ -456,25 +433,21 @@ For the iOS-only release, Android verification remains deferred and must not be 
 
 ## 12. Actions that may require the user
 
-1. Complete Apple 2FA or account confirmation if App Store Connect/TestFlight requests it.
+1. Complete the deferred manual Sign in with Apple test and any Apple 2FA/account confirmation.
 2. Provide or confirm the Apple sandbox tester when the purchase run begins.
-3. Approve the final App Store screenshot font and visual direction.
+3. Approve or revise the final App Store screenshot direction; Manrope is the current recommended default.
 4. Approve final Privacy, Terms, Support, and App Store marketing copy.
 5. If custom Gmail SMTP is required now, create/configure an app password directly in the secure provider UI; do not paste it into chat or Git.
-6. Decide whether Google login is required for the initial iOS release or should be hidden until configured.
-7. Perform any final Apple purchase confirmation that cannot be completed through the simulator/TestFlight automation.
+6. Perform any final Apple purchase confirmation that cannot be completed through the simulator/TestFlight automation.
 
 ## 13. Work that can continue without the user
 
-1. Finish Pro cloud upload, deduplication, restore, and usage verification.
-2. Complete Pro organization and export smoke tests.
-3. Revoke/expire the promotional entitlement and test retention behavior.
-4. Fix code defects found during testing in small commits and push them to `main`.
-5. Clean runtime warnings where they are source defects.
-6. Run all independent agents sequentially at a frozen SHA.
-7. Produce App Store screenshots after the visual font decision.
-8. Build and upload the final iOS binary until Apple requires an interactive account step.
-9. Keep this tracker updated after every material action.
+1. Freeze the release-candidate SHA and run the independent iOS verification matrix.
+2. Fix code defects found during testing in small commits and push them to `main`.
+3. Produce the App Store screenshot candidate using the recommended visual direction.
+4. Build and upload the final iOS binary until Apple requires an interactive account step.
+5. Complete App Store Connect metadata and readiness work that does not require user credentials or irreversible confirmation.
+6. Keep this tracker updated after every material action.
 
 ## 14. Full Pro implementation commit ledger
 
@@ -545,6 +518,16 @@ f134a13 fix: complete native auth callbacks from router params
 3b4a2ad fix: present Pro gates above native modals
 007fb75 fix: open Pro from backup switch
 f980e24 chore: establish release lint baseline
+46bd903 fix: rebase local media paths after reinstall
+f9e5816 fix: pass typed bytes to native crypto
+bbfcd0e fix: label account setting actions
+cb1b188 fix: restore cloud media through native downloads
+700266a docs: record phase two cloud verification
+67cb8b0 fix: expose export formats as accessible buttons
+338563b fix: preserve form sheet container boundaries
+1725ac9 fix: label account destructive actions
+f0c1ee4 fix: align email sign-in with magic links
+6920204 fix: hide unverified google sign-in on ios
 ```
 
 ## 15. Final release acceptance checklist
@@ -553,9 +536,9 @@ Release is allowed only when all applicable items are checked:
 
 - [ ] All iOS verification agents report PASS at the same final SHA.
 - [ ] No critical or high-severity defects remain.
-- [ ] Full Jest suite passes.
-- [ ] TypeScript passes.
-- [ ] Expo Doctor passes.
+- [x] Full Jest suite passes.
+- [x] TypeScript passes.
+- [x] Expo Doctor passes.
 - [x] Intentional lint decision is documented.
 - [ ] Production iOS build succeeds from the final SHA.
 - [ ] TestFlight processing completes.
@@ -563,9 +546,9 @@ Release is allowed only when all applicable items are checked:
 - [ ] Yearly trial sandbox flow succeeds.
 - [ ] Lifetime sandbox purchase succeeds.
 - [ ] Restore and transfer behavior succeeds.
-- [ ] Cloud upload, deduplication, quota, restore, and retention pass.
-- [ ] RLS proves one account cannot access another account's data.
-- [ ] Account deletion and App Store subscription warning pass.
+- [x] Cloud upload, deduplication, restore, and retention transitions pass; destructive 2 GB boundary remains independently deferred.
+- [x] RLS and account-scoped server paths are covered by implementation tests and exact account-owned row/object proof; final independent security review remains.
+- [x] Account deletion and App Store subscription warning flow pass without executing destructive deletion.
 - [ ] Legal/support pages and App Store links are final.
 - [ ] App Store screenshots and metadata are approved.
 - [ ] GitHub contains all small commits and both backup points.
@@ -598,7 +581,16 @@ Release is allowed only when all applicable items are checked:
 - Live restore completed with `2 artworks restored` and no failed media after the download fix.
 - Verified active-Pro library search reduced two artworks to the matching `Sailing Day` result and generated the share-card export preview.
 - Re-ran 51 Jest suites/279 tests, TypeScript, Expo lint, and Expo Doctor 20/20 successfully at `cb1b188`.
-- Safari currently exposes only the `samosi-production` Supabase project; Buki dashboard inspection is waiting for the Buki-owning Supabase login in Safari.
+- Safari was subsequently authenticated to the Buki-owning Supabase project and the exact dashboard proof was completed.
+- Completed exact Buki Supabase row, checksum, reservation, usage, and private-storage-object proof.
+- Completed clean-state same-account cloud restore with two artworks and six media files.
+- Completed active-Pro organization and all export formats, including valid/duplicate/corrupt `.buki` import cases.
+- Completed live expiry, read-only retention, renewal, and automatic-sync-resumption verification.
+- Completed live Free 19/20/21 and above-limit migration boundary verification.
+- Completed real Gmail magic-link sign-in and restored Supabase email rate limiting to two emails per hour.
+- Hid unverified Google sign-in from the initial iOS UI.
+- Completed a symbolicated 500-artwork ETTrace profile and restored the original two-artwork database with zero queued sync items.
+- Re-ran 51 Jest suites/279 tests, TypeScript, Expo lint, Expo Doctor 20/20, and a clean native Simulator build at `6920204`.
 
 ### Update procedure for every future session
 
