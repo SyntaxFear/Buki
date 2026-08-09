@@ -3,6 +3,7 @@ import type { SQLiteDatabase } from "expo-sqlite";
 import type { StoreData } from "@/store/migrate";
 import { BUKI_DATABASE_NAME } from "./constants";
 import { migrateLegacyJson } from "./legacy-migration";
+import { rebaseStoredLocalUris } from "./local-uri";
 import { loadLibrary, saveLibrary } from "./library-repository";
 import { migrateDatabaseSchema } from "./schema";
 import {
@@ -75,6 +76,7 @@ export async function initializeBukiDatabase(db: SQLiteDatabase): Promise<void> 
   activeDatabase = db;
   await migrateDatabaseSchema(db);
   await migrateLegacyJson(db);
+  await rebaseStoredLocalUris(db);
 }
 
 export function requireBukiDatabase(): SQLiteDatabase {
