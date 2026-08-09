@@ -6,6 +6,8 @@ import {
 } from "expo-crypto";
 import type { IntBasedTypedArray, UintBasedTypedArray } from "expo-modules-core";
 
+import { copiedDigestBytes } from "@/utils/crypto";
+
 type DigestAlgorithm = string | { name?: string };
 type DigestInput = ArrayBuffer | ArrayBufferView;
 type RandomValueArray = IntBasedTypedArray | UintBasedTypedArray;
@@ -24,11 +26,6 @@ function algorithmName(algorithm: DigestAlgorithm): string {
   return (typeof algorithm === "string" ? algorithm : algorithm.name ?? "").toUpperCase();
 }
 
-function copiedBytes(data: DigestInput): Uint8Array<ArrayBuffer> {
-  if (data instanceof ArrayBuffer) return new Uint8Array(data.slice(0));
-  return new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice();
-}
-
 export async function digestForSupabase(
   algorithm: DigestAlgorithm,
   data: DigestInput,
@@ -36,7 +33,7 @@ export async function digestForSupabase(
   if (algorithmName(algorithm) !== CryptoDigestAlgorithm.SHA256) {
     throw new Error("unsupported_web_crypto_digest");
   }
-  return expoDigest(CryptoDigestAlgorithm.SHA256, copiedBytes(data));
+  return expoDigest(CryptoDigestAlgorithm.SHA256, copiedDigestBytes(data));
 }
 
 export function installSupabaseWebCrypto(

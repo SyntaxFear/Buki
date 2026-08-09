@@ -1,5 +1,5 @@
 import * as Application from "expo-application";
-import * as Crypto from "expo-crypto";
+import { randomUUID } from "expo-crypto";
 import { Directory, File, FileMode, Paths } from "expo-file-system";
 import {
   Unzip,
@@ -22,6 +22,7 @@ import type { Drawing, Sketchpad } from "@/store/migrate";
 import { useDrawings } from "@/store/drawings";
 import { currentCapabilities } from "@/store/membership";
 import { useProfiles } from "@/store/profiles";
+import { sha256Digest } from "@/utils/crypto";
 import {
   BUKI_ARCHIVE_FORMAT,
   BUKI_ARCHIVE_LIMITS,
@@ -69,7 +70,7 @@ function bytesToHex(bytes: Uint8Array): string {
 
 async function sha256File(file: File): Promise<string> {
   const bytes = await file.bytes();
-  const digest = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, bytes);
+  const digest = await sha256Digest(bytes);
   return bytesToHex(new Uint8Array(digest));
 }
 
@@ -325,7 +326,7 @@ export function archiveExtractionBudget(sourceBytes: number, availableDiskSpace?
 function extractArchive(source: File): ExtractedArchive {
   if (!source.exists) throw new Error("The selected Buki archive is unavailable.");
   const maximumExpanded = archiveExtractionBudget(source.size, Paths.availableDiskSpace);
-  const directory = new Directory(Paths.cache, `buki-import-${Crypto.randomUUID()}`);
+  const directory = new Directory(Paths.cache, `buki-import-${randomUUID()}`);
   directory.create({ intermediates: true });
   const entries = new Set<string>();
   const handles = new Set<ReturnType<File["open"]>>();
@@ -494,7 +495,7 @@ export async function importBukiArchive(uri: string): Promise<BukiArchiveImportR
         emptyPadSignatures: currentEmptyPadSignatures(profiles.children, library.pads, library.drawingsByPad),
         artworkChecksums: await currentArtworkChecksums(library.drawingsByPad),
       },
-      () => Crypto.randomUUID(),
+      () => randomUUID(),
     );
 
     if (plan.children.length === 0) {

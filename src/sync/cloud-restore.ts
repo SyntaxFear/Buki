@@ -1,8 +1,8 @@
-import * as Crypto from "expo-crypto";
 import { Directory, File, Paths } from "expo-file-system";
 
 import { getSupabaseClient } from "@/auth/supabase";
 import { restoreBukiCloudSnapshot } from "@/database";
+import { sha256Digest } from "@/utils/crypto";
 import type {
   CloudRestoreResult,
   DownloadedRemoteMedia,
@@ -32,7 +32,7 @@ function hex(buffer: ArrayBuffer): string {
 }
 
 async function checksum(buffer: ArrayBuffer): Promise<string> {
-  return hex(await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, buffer));
+  return hex(await sha256Digest(buffer));
 }
 
 async function fetchRows<T>(table: string, ownerId: string): Promise<T[]> {

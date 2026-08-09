@@ -1,8 +1,8 @@
-import * as Crypto from "expo-crypto";
 import { File } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
 import type { LocalMediaFile } from "@/database/media-repository";
+import { sha256Digest } from "@/utils/crypto";
 
 const PREVIEW_MAX_EDGE = 512;
 const ORIGINAL_MAX_EDGE = 2048;
@@ -97,9 +97,7 @@ export async function prepareMediaUpload(media: LocalMediaFile): Promise<Prepare
 
   try {
     const bytes = await uploadFile.arrayBuffer();
-    const checksum = arrayBufferToHex(
-      await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, bytes),
-    );
+    const checksum = arrayBufferToHex(await sha256Digest(bytes));
     return {
       bytes,
       checksum,
