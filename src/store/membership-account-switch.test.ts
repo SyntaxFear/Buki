@@ -95,4 +95,14 @@ describe("membership account switching", () => {
       error: "subscription unavailable",
     });
   });
+
+  it("does not apply purchase customer info after the adult account changes", async () => {
+    useMembership.setState({ ownerId: "adult-b" });
+
+    await expect(
+      useMembership.getState().acceptCustomerInfo({} as never, "adult-a"),
+    ).resolves.toBe(false);
+
+    expect(useMembership.getState().ownerId).toBe("adult-b");
+  });
 });

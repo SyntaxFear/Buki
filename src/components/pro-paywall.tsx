@@ -25,6 +25,10 @@ import {
 } from "@/subscription/revenuecat-client";
 import { annualSavingsPercent } from "@/subscription/paywall-model";
 import { PRO_ENTITLEMENT_ID } from "@/subscription/customer-info";
+import {
+  currentPurchaseAccountId,
+  PURCHASE_SIGN_IN_REQUIRED,
+} from "@/subscription/purchase-account";
 import { trackAnalyticsEvent } from "@/analytics/client";
 import { colors } from "@/theme";
 
@@ -144,8 +148,6 @@ export function ProPaywallHost() {
   const clearRequest = useMembership((state) => state.clearUpgradeRequest);
   const acceptCustomerInfo = useMembership((state) => state.acceptCustomerInfo);
   const restorePurchases = useMembership((state) => state.restorePurchases);
-  const adultProfile = useAuth((state) => state.profile);
-  const user = useAuth((state) => state.user);
   const [offering, setOffering] = useState<PurchasesOffering | null>(null);
   const [selected, setSelected] = useState<PlanId>("yearly");
   const [trialEligible, setTrialEligible] = useState(false);
@@ -208,14 +210,23 @@ export function ProPaywallHost() {
     });
   };
 
+  const requirePurchaseAccount = (): string | null => {
+    const accountId = currentPurchaseAccountId();
+    if (!accountId) setError(PURCHASE_SIGN_IN_REQUIRED);
+    return accountId;
+  };
+
   const purchase = async () => {
     if (!selectedPlan || purchasing) return;
+    if (!requirePurchaseAccount()) return;
     const confirmed = await confirmAdult(
       `This continues to Apple’s purchase confirmation for ${selectedPlan.title} Buki Pro.`,
     );
     if (!confirmed) return;
+    const accountId = requirePurchaseAccount();
+    if (!accountId) return;
     const analyticsSource = request?.source ?? "paywall";
-    void trackAnalyticsEvent(user?.id, {
+    void trackAnalyticsEvent(accountId, {
       name: "purchase_started",
       source: analyticsSource,
       feature: request?.feature,
@@ -225,8 +236,13 @@ export function ProPaywallHost() {
     setError(null);
     try {
       const result = await purchaseRevenueCatPackage(selectedPlan.aPackage);
-      await acceptCustomerInfo(result.customerInfo);
-      void trackAnalyticsEvent(user?.id, {
+      const applied = await acceptCustomerInfo(result.customerInfo, accountId);
+      if (!applied) {
+        throw new Error(
+          "Your Buki account changed during purchase. Sign back in to that account and use Restore Purchases.",
+        );
+      }
+      void trackAnalyticsEvent(accountId, {
         name: "purchase_completed",
         source: analyticsSource,
         feature: request?.feature,
@@ -234,7 +250,7 @@ export function ProPaywallHost() {
         result: "success",
       });
       if (result.customerInfo.entitlements.active[PRO_ENTITLEMENT_ID]?.periodType === "TRIAL") {
-        void trackAnalyticsEvent(user?.id, {
+        void trackAnalyticsEvent(accountId, {
           name: "trial_started",
           source: analyticsSource,
           feature: request?.feature,
@@ -246,7 +262,7 @@ export function ProPaywallHost() {
       Alert.alert("Buki Pro is ready", "Every Pro feature is now unlocked for this Buki account.");
     } catch (purchaseError) {
       if (isRevenueCatPurchaseCancelled(purchaseError)) {
-        void trackAnalyticsEvent(user?.id, {
+        void trackAnalyticsEvent(accountId, {
           name: "purchase_cancelled",
           source: analyticsSource,
           feature: request?.feature,
@@ -254,7 +270,7 @@ export function ProPaywallHost() {
           result: "cancelled",
         });
       } else {
-        void trackAnalyticsEvent(user?.id, {
+        void trackAnalyticsEvent(accountId, {
           name: "purchase_failed",
           source: analyticsSource,
           feature: request?.feature,
@@ -273,8 +289,13 @@ export function ProPaywallHost() {
   };
 
   const confirmRestore = async () => {
+    if (!requirePurchaseAccount()) return;
     if (!(await confirmAdult("Restoring can move Apple purchase access to this Buki account."))) return;
-    const accountLabel = adultProfile?.email ?? user?.email ?? adultProfile?.displayName ?? "this account";
+    const accountId = requirePurchaseAccount();
+    if (!accountId) return;
+    const auth = useAuth.getState();
+    const accountLabel =
+      auth.profile?.email ?? auth.user?.email ?? auth.profile?.displayName ?? "this account";
     Alert.alert(
       "Restore to this Buki account?",
       `Buki Pro will move to ${accountLabel} if Apple finds an eligible purchase. Artwork from another Buki account does not move.`,
@@ -283,6 +304,10 @@ export function ProPaywallHost() {
         {
           text: "Restore",
           onPress: () => {
+            if (currentPurchaseAccountId() !== accountId) {
+              setError(PURCHASE_SIGN_IN_REQUIRED);
+              return;
+            }
             setRestoring(true);
             setError(null);
             void restorePurchases(request?.source ?? "paywall").then((result) => {
