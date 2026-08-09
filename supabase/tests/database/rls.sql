@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(44);
+select plan(45);
 
 select has_table('public', 'adult_profiles', 'adult_profiles exists');
 select has_table('public', 'child_profiles', 'child_profiles exists');
@@ -14,6 +14,7 @@ select has_table('public', 'media_upload_reservations', 'media upload reservatio
 select has_table('public', 'cloud_retention', 'cloud_retention exists');
 select has_table('public', 'storage_deletion_sweeps', 'delayed storage deletion sweeps exist');
 select has_table('public', 'analytics_events', 'privacy-safe analytics events exist');
+select hasnt_column('public', 'analytics_events', 'owner_id', 'analytics rows do not store account identifiers');
 select has_column('public', 'cloud_retention', 'uploads_enabled', 'privacy hold is persisted server-side');
 select has_column('public', 'cloud_retention', 'last_entitlement_refresh_attempt_at', 'stale active entitlements are refreshable without webhooks');
 select has_column('public', 'entitlement_snapshots', 'had_pro', 'historical Pro access is persisted server-side');
