@@ -124,9 +124,10 @@ export function ArtworkDetails() {
   return (
     <KeyboardAvoidingView
       behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
+      collapsable={false}
       style={styles.root}
     >
-      <View style={[styles.navigation, { paddingTop: insets.top + 8 }]}>
+      <View collapsable={false} style={[styles.navigation, { paddingTop: insets.top + 8 }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.eyebrow}>ARTWORK DETAILS</Text>
           <Text style={styles.navigationTitle} numberOfLines={1}>
