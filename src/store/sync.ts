@@ -54,6 +54,7 @@ let queueUnsubscribe: (() => void) | null = null;
 let membershipUnsubscribe: (() => void) | null = null;
 let appStateSubscription: { remove: () => void } | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let retryTimerDueAt: number | null = null;
 let syncRun: Promise<void> | null = null;
 let restoreRun: Promise<boolean> | null = null;
 let deferredSyncDelay: number | null = null;
@@ -73,18 +74,27 @@ function appVersion(): string | null {
 function clearRetryTimer(): void {
   if (retryTimer) clearTimeout(retryTimer);
   retryTimer = null;
+  retryTimerDueAt = null;
 }
 
 function scheduleSync(delay = 0): void {
+  const boundedDelay = Math.max(0, Math.min(delay, 2_000_000_000));
   if (syncRun) {
-    deferredSyncDelay = deferredSyncDelay === null ? delay : Math.min(deferredSyncDelay, delay);
+    deferredSyncDelay = deferredSyncDelay === null
+      ? boundedDelay
+      : Math.min(deferredSyncDelay, boundedDelay);
     return;
   }
-  if (retryTimer || !useCloudSync.getState().ownerId) return;
+  if (!useCloudSync.getState().ownerId) return;
+  const dueAt = Date.now() + boundedDelay;
+  if (retryTimer && retryTimerDueAt !== null && retryTimerDueAt <= dueAt) return;
+  clearRetryTimer();
+  retryTimerDueAt = dueAt;
   retryTimer = setTimeout(() => {
     retryTimer = null;
+    retryTimerDueAt = null;
     void useCloudSync.getState().syncNow(false);
-  }, Math.max(0, Math.min(delay, 2_000_000_000)));
+  }, boundedDelay);
 }
 
 function teardownListeners(): void {
@@ -308,6 +318,7 @@ export const useCloudSync = create<CloudSyncState>((set, get) => ({
   syncNow: async (force = true) => {
     if (syncRun) return syncRun;
     syncRun = (async () => {
+      if (restoreRun) await restoreRun;
       const ownerId = get().ownerId;
       if (!ownerId) return;
       clearRetryTimer();
