@@ -20,7 +20,13 @@ export function escapeHtml(value: string): string {
 
 export function escapeCsv(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined) return "";
-  const text = String(value);
+  const raw = String(value);
+  const text = typeof value === "string" && (
+    /^[\u0000-\u0020]*[=+\-@]/.test(raw)
+    || /^[\t\r]/.test(raw)
+  )
+    ? `'${raw}`
+    : raw;
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 

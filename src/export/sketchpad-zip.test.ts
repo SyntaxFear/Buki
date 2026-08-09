@@ -78,6 +78,30 @@ describe("sketchpad ZIP metadata", () => {
     expect(csv).toContain("weather | school");
   });
 
+  it("keeps imported metadata inert when the CSV opens in a spreadsheet", () => {
+    const manifest = buildSketchpadZipManifest({
+      pad: { ...pad, name: "=HYPERLINK(\"https://example.invalid\")" },
+      media: [{
+        drawing: {
+          ...drawing,
+          title: "+SUM(1,1)",
+          notes: "\t=WEBSERVICE(\"https://example.invalid\")",
+          tags: ["@malicious"],
+        },
+        imageFile: "images/drawing-1.png",
+        originalFile: null,
+      }],
+      generatedAt: 1_700_000_002_000,
+    });
+
+    const csv = sketchpadMetadataCsv(manifest);
+
+    expect(csv).toContain("\"'+SUM(1,1)\"");
+    expect(csv).toContain("\"'=WEBSERVICE(\"\"https://example.invalid\"\")\"");
+    expect(csv).toContain("'@malicious");
+    expect(csv).toContain("\"'=HYPERLINK(\"\"https://example.invalid\"\")\"");
+  });
+
   it("creates a share-safe ZIP filename", () => {
     expect(sketchpadZipFilename(pad)).toBe("buki-summer-gallery-export.zip");
   });
