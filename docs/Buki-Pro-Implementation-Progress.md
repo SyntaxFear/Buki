@@ -1,10 +1,10 @@
 # Buki Pro implementation and iOS release progress
 
-Last updated: **2026-08-09 19:08 +04 (Asia/Tbilisi)**
+Last updated: **2026-08-09 20:03 +04 (Asia/Tbilisi)**
 
 Release scope: **iOS only**. Android is deferred.
 
-Current release decision: **BLOCKED — implementation and Phase 2 simulator verification are complete except for the user's deferred manual Sign in with Apple run. Release-candidate verification, TestFlight/store transactions, screenshots, and App Store delivery remain.**
+Current release decision: **BLOCKED — implementation, Phase 2 simulator verification, release security hardening, production database migrations, and the affected Edge Function deployments are complete. The user's deferred manual Sign in with Apple run, frozen-SHA verification, TestFlight/store transactions, screenshots, and App Store delivery remain.**
 
 This file is the single progress tracker for Buki Free + Pro. Update it after every material implementation, credential, verification, build, or release change. Never put credential values, tokens, passwords, service-account JSON, private keys, or OTP codes in this file.
 
@@ -22,7 +22,7 @@ Status legend:
 |---|---|
 | Repository | `SyntaxFear/Buki` |
 | Delivery branch | `main`, pushed directly as previously approved |
-| Current verified implementation head | `6920204` |
+| Current verified implementation head | `bc5be37` |
 | Main worktree before this tracker | Clean and equal to `origin/main` |
 | App name | Buki |
 | Expo slug | `Bloombook` |
@@ -108,14 +108,14 @@ The yearly plan saves approximately 44% versus paying monthly. Store-localized p
    - Values are not recorded in Git or this document.
 
 4. ✅ **Supabase project and server secrets**
-   - Project dashboard access to Buki is verified in Brave.
+   - Project dashboard access to Buki is verified in Safari.
    - `REVENUECAT_SECRET_API_KEY`, `REVENUECAT_PROJECT_ID`, and `REVENUECAT_WEBHOOK_AUTH` exist as encrypted Edge Function secrets.
    - Default Supabase server secrets are available to Edge Functions.
    - The local Supabase CLI is linked to the Buki project reference.
 
 5. 🟡 **Supabase CLI account access**
    - The local CLI token currently lists only `samosi-production` and receives insufficient-privilege responses for Buki function administration.
-   - The Buki dashboard itself is accessible in Brave and was used successfully for read-only logs/configuration checks.
+   - The Buki dashboard itself is accessible in Safari and was used to deploy the release migrations and Edge Function updates.
    - Before release maintenance, authenticate the CLI with the personal account that owns Buki or intentionally continue administration through the dashboard.
 
 6. ✅ **RevenueCat project configuration**
@@ -224,9 +224,9 @@ The yearly plan saves approximately 44% versus paying monthly. Store-localized p
 | Supabase schema and RLS | ✅ | ✅ source-level coverage | 🟡 live function access verified | ⏳ cross-account proof |
 | Persistent local sync queue | ✅ | ✅ | ✅ two-artwork upload completed and repeat sync drained | ⏳ |
 | Deduplicated media uploads | ✅ | ✅ | ✅ repeat sync preserved 634.1 KB usage | ✅ exact row/checksum/object proof |
-| Signed upload reservation/replay protection | ✅ | ✅ | ⏳ | ⏳ security agent |
+| Signed upload reservation/replay protection | ✅ | ✅ | ✅ production migration and affected functions deployed | ⏳ security agent |
 | Cloud restore and 2 GB quota handling | ✅ | ✅ | ✅ clean-state restore of two artworks and six media files | ⏳ 2 GB destructive boundary |
-| Ninety-day retention and scheduled cleanup | ✅ | ✅ lifecycle tests | ⏳ real timeline simulation | ⏳ |
+| Ninety-day retention and scheduled cleanup | ✅ | ✅ lifecycle tests | ✅ production function deployed; live timeline remains deferred | ⏳ |
 | Cloud/account deletion | ✅ | ✅ where applicable | ✅ warning flow; deletion canceled | ⏳ destructive test account run |
 | Privacy-safe analytics | ✅ | ✅ | ⏳ event evidence | ⏳ |
 | Legal/support web pages | ✅ | ✅ content tests | ✅ HTTP 200 | ⏳ final copy review |
@@ -314,9 +314,9 @@ The following was verified on an iPhone 17 Pro Max simulator running iOS 26.5 wi
 
 ## 8. Current test and quality baseline
 
-Verified on **2026-08-09** from `main` at `6920204`:
+Verified on **2026-08-09** from `main` at `bc5be37`:
 
-- ✅ Jest: **51 suites, 279 tests passed**.
+- ✅ Jest: **52 suites, 285 tests passed**.
 - ✅ TypeScript: `npx tsc --noEmit` passed.
 - ✅ Expo Doctor: **20/20 checks passed**.
 - ✅ Expo lint: **0 errors and 0 warnings** with a committed, scoped Expo SDK 57 configuration.
@@ -324,6 +324,12 @@ Verified on **2026-08-09** from `main` at `6920204`:
 - ✅ Public legal/support pages returned HTTP 200.
 - ✅ GitHub authentication and direct push access are working.
 - ✅ EAS project and production environment are accessible.
+- ✅ Deno shared tests: **16 tests passed**.
+- ✅ Deno checks passed for the changed Edge Functions.
+- ✅ Production migrations `20260809153000_harden_media_completion.sql` and `20260809154000_rate_limit_analytics.sql` were applied and recorded.
+- ✅ Production schema verification returned true for all eight expected migration, function, constraint, and rate-limit checks.
+- ✅ `complete-media-upload`, `create-media-upload`, `delete-media`, `request-account-deletion`, and `retention-cleanup` were deployed through the Supabase dashboard.
+- ✅ Unauthenticated endpoint smoke tests returned the expected HTTP 401 rejection paths for all five deployed functions.
 
 Known quality work still open:
 
@@ -366,14 +372,14 @@ Phase 2 simulator verification is complete except for the user's deferred manual
 
 ## 10. Remaining work in priority order
 
-1. 🟡 **Complete manual Sign in with Apple verification**
+1. ⏳ **Freeze an exact release-candidate SHA**
+   - Main must be clean.
+   - Full tests, TypeScript, Expo Doctor, Deno checks, and relevant native build must pass.
+   - Runtime-only diagnostics must be absent.
+
+2. 🟡 **Complete manual Sign in with Apple verification**
    - The user has explicitly deferred this test and will perform it manually later.
    - Verify login, logout, account isolation, and return to the email-owned library.
-
-2. ⏳ **Freeze an exact release-candidate SHA**
-   - Main must be clean.
-   - Full tests, TypeScript, Expo Doctor, and relevant native build must pass.
-   - Runtime-only diagnostics must be absent.
 
 3. ⛔ **Run the independent iOS verification matrix at the frozen SHA**
    - Each agent gets a clean isolated worktree at the exact RC SHA.
@@ -528,6 +534,8 @@ cb1b188 fix: restore cloud media through native downloads
 1725ac9 fix: label account destructive actions
 f0c1ee4 fix: align email sign-in with magic links
 6920204 fix: hide unverified google sign-in on ios
+49db0f3 docs: finalize phase two verification
+bc5be37 fix: harden release security boundaries
 ```
 
 ## 15. Final release acceptance checklist
@@ -591,6 +599,10 @@ Release is allowed only when all applicable items are checked:
 - Hid unverified Google sign-in from the initial iOS UI.
 - Completed a symbolicated 500-artwork ETTrace profile and restored the original two-artwork database with zero queued sync items.
 - Re-ran 51 Jest suites/279 tests, TypeScript, Expo lint, Expo Doctor 20/20, and a clean native Simulator build at `6920204`.
+- Hardened RevenueCat identity, cloud-backup consent, archive/image handling, upload completion, storage paths, account deletion, and analytics retention/rate limiting in `bc5be37`.
+- Re-ran 52 Jest suites/285 tests, TypeScript, Expo lint, Expo Doctor 20/20, iOS Metro export, 16 Deno shared tests, and Deno checks successfully at `bc5be37`.
+- Applied and recorded the two pending production database migrations through Safari; all eight live verification assertions returned true.
+- Deployed the five affected Edge Functions through Safari and confirmed expected unauthenticated HTTP 401 rejection paths for each endpoint.
 
 ### Update procedure for every future session
 
