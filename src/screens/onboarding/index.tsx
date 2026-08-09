@@ -42,7 +42,6 @@ export function OnboardingScreen() {
   const sendEmailOtp = useAuth((state) => state.sendEmailOtp);
   const resetEmailOtp = useAuth((state) => state.resetEmailOtp);
   const signInWithApple = useAuth((state) => state.signInWithApple);
-  const signInWithGoogle = useAuth((state) => state.signInWithGoogle);
   const refreshProfile = useAuth((state) => state.refreshProfile);
   const signOut = useAuth((state) => state.signOut);
   const children = useProfiles((state) => state.children);
@@ -190,18 +189,6 @@ export function OnboardingScreen() {
               style={styles.appleButton}
               onPress={() => void signInWithApple()}
             />
-            <Pressable
-              onPress={() => void signInWithGoogle()}
-              disabled={busy}
-              accessibilityRole="button"
-              accessibilityLabel="Continue with Google"
-              style={({ pressed }) => [styles.googleButton, pressed && styles.pressed]}
-            >
-              <View style={styles.googleMark}>
-                <Text style={styles.googleLetter}>G</Text>
-              </View>
-              <Text style={styles.googleLabel}>Continue with Google</Text>
-            </Pressable>
 
             {!showEmail ? (
               <Pressable
@@ -348,21 +335,6 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   appleButton: { width: "100%", height: 52 },
-  googleButton: {
-    minHeight: 52,
-    borderRadius: 14,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "#FFFFFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 11,
-  },
-  googleMark: { width: 25, height: 25, borderRadius: 13, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  googleLetter: { fontSize: 18, fontWeight: "900", color: "#4285F4" },
-  googleLabel: { fontSize: 16, fontWeight: "700", color: "#1F1F1F" },
   emailReveal: { alignItems: "center", paddingVertical: 8 },
   emailRevealLabel: { fontSize: 15, fontWeight: "700", color: colors.titleTeal },
   emailForm: { gap: 12 },
