@@ -176,11 +176,17 @@ export async function restoreCloudAccount(
   const snapshot = await fetchRemoteSnapshot(ownerId);
   const result = await restoreBukiCloudSnapshot(ownerId, snapshot);
   if (deviceId) {
-    await getSupabaseClient()
+    const updated = await getSupabaseClient()
       .from("sync_devices")
       .update({ last_pulled_at: result.restoredAt })
       .eq("owner_id", ownerId)
       .eq("device_id", deviceId);
+    if (updated.error) {
+      throw new CloudRestoreError(
+        "Buki restored this device but could not record the completed cloud pull.",
+        updated.error.code,
+      );
+    }
   }
   return result;
 }
