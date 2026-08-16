@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { loadBooleanPreference, saveBooleanPreference } from "@/database";
+import { syncHapticsEnabled } from "@/utils/haptics";
 
 interface PreferencesState {
   hydrated: boolean;
@@ -23,10 +24,12 @@ export const usePreferences = create<PreferencesState>((set, get) => ({
       loadBooleanPreference("haptics_enabled", true),
       loadBooleanPreference("pro_introduction_shown", false),
     ]);
+    syncHapticsEnabled(hapticsEnabled);
     set({ hydrated: true, hapticsEnabled, proIntroductionShown });
   },
 
   setHapticsEnabled: async (enabled) => {
+    syncHapticsEnabled(enabled);
     set({ hapticsEnabled: enabled });
     await saveBooleanPreference("haptics_enabled", enabled);
   },
@@ -37,6 +40,8 @@ export const usePreferences = create<PreferencesState>((set, get) => ({
     await saveBooleanPreference("pro_introduction_shown", true);
   },
 
-  resetForAccountSwitch: () =>
-    set({ hydrated: false, hapticsEnabled: true, proIntroductionShown: false }),
+  resetForAccountSwitch: () => {
+    syncHapticsEnabled(true);
+    set({ hydrated: false, hapticsEnabled: true, proIntroductionShown: false });
+  },
 }));
