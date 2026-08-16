@@ -1,0 +1,14 @@
+appId: com.parastashvili.bloombook
+---
+# Starts from an empty synthetic book on the approved disposable simulator.
+- assertVisible: "Scan a drawing"
+- tapOn: "Scan a drawing"
+- extendedWaitUntil:
+    visible: "Capture drawing"
+    timeout: 10000
+- tapOn: "Show another demo drawing"
+- tapOn: "Capture drawing"
+- extendedWaitUntil:
+    visible: "Scan a drawing"
+    timeout: 30000
+- assertVisible: "Choose sketchpad.*"

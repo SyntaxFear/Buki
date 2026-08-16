@@ -1,0 +1,19 @@
+appId: com.parastashvili.bloombook
+---
+# Requires a disposable, already signed-in simulator with at least two synthetic artworks.
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Scan a drawing"
+    timeout: 20000
+- swipe:
+    start: 85%, 48%
+    end: 15%, 48%
+    duration: 650
+- waitForAnimationToEnd
+- swipe:
+    start: 15%, 48%
+    end: 85%, 48%
+    duration: 650
+- waitForAnimationToEnd
+- assertVisible: "Choose sketchpad.*"

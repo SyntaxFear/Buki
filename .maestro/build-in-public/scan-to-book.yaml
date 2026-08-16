@@ -1,0 +1,19 @@
+appId: com.parastashvili.bloombook
+---
+# Requires a disposable, already signed-in simulator containing synthetic data only.
+# The capture runner foregrounds the app before recording so the clip contains
+# only the product interaction, not the iOS relaunch transition.
+- extendedWaitUntil:
+    visible: "Scan a drawing"
+    timeout: 20000
+- tapOn: "Scan a drawing"
+- extendedWaitUntil:
+    visible: "Capture drawing"
+    timeout: 10000
+- tapOn: "Show another demo drawing"
+- tapOn: "Capture drawing"
+- extendedWaitUntil:
+    visible: "Scan a drawing"
+    timeout: 30000
+- assertVisible: "Choose sketchpad.*"
+- waitForAnimationToEnd

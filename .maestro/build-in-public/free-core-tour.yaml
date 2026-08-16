@@ -1,0 +1,18 @@
+appId: com.parastashvili.bloombook
+---
+# Requires a disposable, already signed-in Free account with synthetic artwork.
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Scan a drawing"
+    timeout: 20000
+- tapOn: "Choose sketchpad.*"
+- extendedWaitUntil:
+    visible: "Open art library"
+    timeout: 10000
+- tapOn: "Open art library"
+- extendedWaitUntil:
+    visible: "Close art library"
+    timeout: 10000
+- tapOn: "Close art library"
+- assertVisible: "Scan a drawing"
