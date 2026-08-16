@@ -1,29 +1,19 @@
 import { SymbolView } from "expo-symbols";
-import { useEffect, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  useWindowDimensions,
   View,
 } from "react-native";
-import Animated, {
-  Easing,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Host, Picker } from "@expo/ui";
-import { useFonts } from "expo-font";
-
+import { BukiWordmark } from "@/components/buki-wordmark";
+import { Glass } from "@/components/glass";
+import { HapticPressable as Pressable } from "@/components/haptic-pressable";
+import { NativeToolbarButton } from "@/components/native-toolbar-button";
+import { useAuth } from "@/store/auth";
 import { useDrawings, type PadStyle, type Sketchpad } from "@/store/drawings";
 import { useProfiles } from "@/store/profiles";
 import {
@@ -33,24 +23,25 @@ import {
   type PadStamp,
 } from "@/pad-designs";
 import {
-  PAD_BORDERS,
-  PAD_DECORATIONS,
   type PadBorderId,
   type PadDecorationId,
   type PadVisualOption,
 } from "@/pad-visuals";
+import { getPadIcon } from "@/pad-icons";
 import { confirmAdult } from "@/store/parental-gate";
-import { colors, PAGE_COLORS, PATRICK_HAND } from "@/theme";
+import { colors } from "@/theme";
 
 interface Props {
-  open: boolean;
   onClose: () => void;
 }
 
-const PANEL_MAX_W = 352;
-const PANEL_SCREEN_GUTTER = 16;
+const DRAWER_TEXT_SCALE = 1.35;
+const SKETCHPAD_ROW_RADIUS = 16;
+const SKETCHPAD_ICON_INSET = 8;
+const SKETCHPAD_ICON_RADIUS =
+  SKETCHPAD_ROW_RADIUS - SKETCHPAD_ICON_INSET;
 
-const STYLE_LABEL: Record<PadStyle, string> = {
+export const STYLE_LABEL: Record<PadStyle, string> = {
   spread: "Spread book",
   vertical: "Vertical pad",
   album: "Album",
@@ -58,69 +49,44 @@ const STYLE_LABEL: Record<PadStyle, string> = {
   strip: "Filmstrip",
 };
 
-export function PadDrawer({ open, onClose }: Props) {
+export function PadDrawerContent({ onClose }: Props) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
-  const panelWidth = Math.min(PANEL_MAX_W, Math.max(0, windowWidth - PANEL_SCREEN_GUTTER));
   const allPads = useDrawings((s) => s.pads);
   const activeChildId = useProfiles((s) => s.activeChildId);
   const pads = allPads.filter((pad) => pad.childId === activeChildId);
   const activePadId = useDrawings((s) => s.activePadId);
   const drawingsByPad = useDrawings((s) => s.drawingsByPad);
   const setActivePad = useDrawings((s) => s.setActivePad);
-  const createPad = useDrawings((s) => s.createPad);
-  const setPadVisuals = useDrawings((s) => s.setPadVisuals);
   const renamePad = useDrawings((s) => s.renamePad);
   const deletePad = useDrawings((s) => s.deletePad);
+  const adultProfile = useAuth((s) => s.profile);
 
-  const [brandFontLoaded] = useFonts({ PatrickHand: PATRICK_HAND });
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newStyle, setNewStyle] = useState<PadStyle>("spread");
-  const [newDesign, setNewDesign] = useState<PadDesignId>("sunshine");
-  const [newPageColor, setNewPageColor] = useState<string>(getPadDesign("sunshine").paper);
-  const [newBorder, setNewBorder] = useState<PadBorderId>("none");
-  const [newDecoration, setNewDecoration] = useState<PadDecorationId>("none");
-  const [designingPadId, setDesigningPadId] = useState<string | null>(null);
-
-  const anim = useSharedValue(0);
-  useEffect(() => {
-    anim.value = withTiming(open ? 1 : 0, { duration: 260, easing: Easing.out(Easing.cubic) });
-    if (!open) {
-      setCreating(false);
-      setDesigningPadId(null);
-    }
-  }, [open, anim]);
-
-  const panelStyle = useAnimatedStyle(
-    () => ({
-      transform: [{ translateX: interpolate(anim.value, [0, 1], [-panelWidth - 20, 0]) }],
-    }),
-    [panelWidth],
-  );
-  const scrimStyle = useAnimatedStyle(() => ({
-    opacity: anim.value,
-  }));
-
-  const submitCreate = () => {
-    const createdPadId = createPad(
-      newName,
-      newStyle,
-      newDesign,
-      newPageColor,
-      activeChildId ?? undefined,
-      newBorder,
-      newDecoration,
-    );
-    if (!createdPadId) return;
-    setNewName("");
-    setNewBorder("none");
-    setNewDecoration("none");
-    setCreating(false);
-    onClose();
+  const openNewSketchpad = () => {
+    // Keep the drawer mounted beneath the form sheet so dismissing the editor
+    // returns the user to the sketchpad list instead of an empty book canvas.
+    router.push({
+      pathname: "/sketchpad-editor",
+      params: { mode: "create" },
+    });
   };
 
-  const designingPad = pads.find((pad) => pad.id === designingPadId);
+  const openSketchpadEditor = (id: string) => {
+    router.push({
+      pathname: "/sketchpad-editor",
+      params: { id, mode: "edit" },
+    });
+  };
+
+  const openLibrary = () => {
+    onClose();
+    router.push("/library");
+  };
+
+  const openAccount = () => {
+    onClose();
+    router.push("/account");
+  };
 
   const managePad = (pad: Sketchpad) => {
     Alert.alert(pad.name, undefined, [
@@ -148,13 +114,24 @@ export function PadDrawer({ open, onClose }: Props) {
           }
           const count = (drawingsByPad[pad.id] ?? []).length;
           void (async () => {
-            if (!(await confirmAdult("Deleting a sketchpad permanently removes its local artwork."))) return;
+            if (
+              !(await confirmAdult(
+                "Deleting a sketchpad permanently removes its local artwork.",
+              ))
+            )
+              return;
             Alert.alert(
               `Delete “${pad.name}”?`,
-              count > 0 ? `Its ${count} drawing${count === 1 ? "" : "s"} will be deleted too.` : undefined,
+              count > 0
+                ? `Its ${count} drawing${count === 1 ? "" : "s"} will be deleted too.`
+                : undefined,
               [
                 { text: "Cancel", style: "cancel" },
-                { text: "Delete", style: "destructive", onPress: () => deletePad(pad.id) },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: () => deletePad(pad.id),
+                },
               ],
             );
           })();
@@ -165,197 +142,206 @@ export function PadDrawer({ open, onClose }: Props) {
   };
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents={open ? "auto" : "none"}>
-      <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, scrimStyle]}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Close sketchpads"
-        />
-      </Animated.View>
-
-      <Animated.View
-        style={[styles.panel, { width: panelWidth, paddingTop: insets.top + 18 }, panelStyle]}
-      >
-        <View style={styles.headingRow}>
-          <Text style={[styles.brand, brandFontLoaded && styles.brandFont]}>
-            <Text style={{ color: colors.titleCoral }}>B</Text>
-            <Text style={{ color: colors.titleTeal }}>u</Text>
-            <Text style={{ color: colors.titleYellow }}>k</Text>
-            <Text style={{ color: colors.titleBlue }}>i</Text>
+    <View
+      testID="pad-drawer-root"
+      accessibilityViewIsModal
+      style={[
+        styles.panel,
+        {
+          paddingTop: insets.top + 18,
+          paddingBottom: Math.max(insets.bottom, 8),
+        },
+      ]}
+    >
+      <View style={styles.headingRow}>
+        <View style={styles.headingCopy}>
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+            style={styles.headingEyebrow}
+          >
+            SKETCHPAD SHELF
           </Text>
-          <Text style={styles.headingCaption}>{designingPad ? "Customize sketchpad" : "Sketchpads"}</Text>
-          {designingPad ? (
-            <Pressable
-              onPress={() => setDesigningPadId(null)}
-              accessibilityRole="button"
-              accessibilityLabel="Back to sketchpads"
-              style={({ pressed }) => [styles.headingAction, pressed && styles.rowPressed]}
-            >
-              <SymbolView name="xmark" size={15} tintColor={colors.ink} />
-            </Pressable>
-          ) : null}
+          <BukiWordmark fontSize={44} style={styles.brand} />
         </View>
+        <Glass
+          tint={colors.surface}
+          fallbackColor={colors.surfaceAlt}
+          style={styles.closeButton}
+        >
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close sketchpads"
+            testID="pad-drawer-close-button"
+            style={({ pressed }) => [
+              StyleSheet.absoluteFill,
+              styles.glassIconTouchable,
+              pressed && styles.rowPressed,
+            ]}
+          >
+            <SymbolView
+              name="xmark"
+              size={15}
+              weight="semibold"
+              tintColor={colors.ink}
+            />
+          </Pressable>
+        </Glass>
+      </View>
 
-        {designingPad ? (
-          <DesignChooser
-            pad={designingPad}
-            onSave={(visuals) => {
-              const saved = setPadVisuals(designingPad.id, visuals);
-              if (saved) setDesigningPadId(null);
-              return saved;
-            }}
-          />
-        ) : (
-          <>
-            <Pressable
-              onPress={() => setCreating((value) => !value)}
-              accessibilityRole="button"
-              accessibilityLabel={creating ? "Cancel new sketchpad" : "Create a new sketchpad"}
-              style={({ pressed }) => [
-                styles.newRow,
-                styles.newRowTop,
-                creating && styles.newRowActive,
-                pressed && styles.rowPressed,
+      <Pressable
+        onPress={openNewSketchpad}
+        accessibilityRole="button"
+        accessibilityLabel="Create a new sketchpad"
+        style={({ pressed }) => [
+          styles.newRow,
+          styles.newRowTop,
+          pressed && styles.rowPressed,
+        ]}
+      >
+        <View style={styles.newIcon}>
+          <SymbolView name="plus" size={18} tintColor={colors.titleCoral} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+            style={[styles.rowName, { color: colors.titleCoral }]}
+          >
+            New sketchpad
+          </Text>
+          <Text
+            numberOfLines={2}
+            maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+            style={styles.rowMeta}
+          >
+            Choose its name, layout, theme, paper, and details
+          </Text>
+        </View>
+        <SymbolView
+          name="chevron.right"
+          size={13}
+          tintColor={colors.mutedText}
+        />
+      </Pressable>
+
+      <View style={styles.quickActionRow}>
+        <Pressable
+          onPress={openLibrary}
+          accessibilityRole="button"
+          accessibilityLabel="Open art library"
+          style={({ pressed }) => [
+            styles.quickAction,
+            pressed && styles.rowPressed,
+          ]}
+        >
+          <View
+            style={[
+              styles.quickActionIcon,
+              { backgroundColor: "rgba(22,125,130,0.10)" },
+            ]}
+          >
+            <SymbolView
+              name="square.grid.2x2.fill"
+              size={18}
+              tintColor={colors.titleTeal}
+            />
+          </View>
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+            style={styles.quickActionTitle}
+          >
+            Art library
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={openAccount}
+          accessibilityRole="button"
+          accessibilityLabel="Open Adult Account"
+          style={({ pressed }) => [
+            styles.quickAction,
+            pressed && styles.rowPressed,
+          ]}
+        >
+          <View
+            style={[
+              styles.quickActionIcon,
+              { backgroundColor: "rgba(255,118,94,0.11)" },
+            ]}
+          >
+            <Text style={styles.quickActionAvatar}>
+              {adultProfile?.avatarUri?.startsWith("emoji:")
+                ? adultProfile.avatarUri.slice("emoji:".length)
+                : adultProfile?.displayName.trim().charAt(0).toUpperCase() ||
+                  "P"}
+            </Text>
+          </View>
+          <Text
+            style={styles.quickActionTitle}
+            numberOfLines={1}
+            maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+          >
+            Adult Account
+          </Text>
+        </Pressable>
+      </View>
+
+      <Text maxFontSizeMultiplier={DRAWER_TEXT_SCALE} style={styles.listLabel}>
+        Sketchpads
+      </Text>
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 12 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {pads.map((pad) => {
+          const count = (drawingsByPad[pad.id] ?? []).length;
+          const active = pad.id === activePadId;
+          const design = getPadDesign(pad.design, pad.coverColor);
+          const icon = getPadIcon(pad.icon);
+          return (
+            <View
+              key={pad.id}
+              style={[
+                styles.row,
+                active && styles.rowActive,
+                active && {
+                  backgroundColor: design.paper,
+                  borderColor: design.cover,
+                },
               ]}
             >
-              <View style={[styles.newIcon, creating && styles.newIconActive]}>
-                <SymbolView
-                  name={creating ? "xmark" : "plus"}
-                  size={18}
-                  tintColor={colors.titleCoral}
-                />
-              </View>
-              <Text style={[styles.rowName, { color: colors.titleCoral }]}>New sketchpad</Text>
-            </Pressable>
-
-            <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom: 12 }}
-              keyboardShouldPersistTaps="handled"
-            >
-              {creating ? (
-                <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-                  <View style={styles.createBox}>
-                    <TextInput
-                      value={newName}
-                      onChangeText={setNewName}
-                      placeholder="Sketchpad name"
-                      placeholderTextColor="#B9AF9E"
-                      style={styles.input}
-                      accessibilityLabel="Sketchpad name"
-                      autoFocus
-                      returnKeyType="done"
-                      onSubmitEditing={submitCreate}
-                    />
-                    <View style={styles.styleRow}>
-                      <View style={styles.stylePreview}>
-                        <MiniCover
-                          style={newStyle}
-                          design={newDesign}
-                          pageColor={newPageColor}
-                          border={newBorder}
-                          decoration={newDecoration}
-                          large
-                        />
-                        <Text style={styles.styleLabel}>{STYLE_LABEL[newStyle]}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Host matchContents>
-                          <Picker
-                            selectedValue={newStyle}
-                            onValueChange={(v) => setNewStyle(v as PadStyle)}
-                          >
-                            <Picker.Item label="Spread book" value="spread" />
-                            <Picker.Item label="Vertical pad" value="vertical" />
-                            <Picker.Item label="Album" value="album" />
-                            <Picker.Item label="Photo grid" value="grid" />
-                            <Picker.Item label="Filmstrip" value="strip" />
-                          </Picker>
-                        </Host>
-                      </View>
-                    </View>
-                    <Text style={styles.sectionLabel}>Sketchpad design</Text>
-                    <DesignGrid
-                      style={newStyle}
-                      selected={newDesign}
-                      onSelect={(design) => {
-                        setNewDesign(design);
-                        setNewPageColor(getPadDesign(design).paper);
-                      }}
-                    />
-                    <Text style={styles.sectionLabel}>Border</Text>
-                    <VisualOptionGrid
-                      kind="border"
-                      options={PAD_BORDERS}
-                      selected={newBorder}
-                      onSelect={(border) => setNewBorder(border)}
-                    />
-                    <Text style={styles.sectionLabel}>Decorations</Text>
-                    <VisualOptionGrid
-                      kind="decoration"
-                      options={PAD_DECORATIONS}
-                      selected={newDecoration}
-                      onSelect={(decoration) => setNewDecoration(decoration)}
-                    />
-                    <Text style={styles.sectionLabel}>Paper</Text>
-                    <View style={styles.colorRow}>
-                      {PAGE_COLORS.map((c) => (
-                        <Pressable
-                          key={c}
-                          onPress={() => setNewPageColor(c)}
-                          accessibilityRole="radio"
-                          accessibilityLabel={`Page color ${c}`}
-                          accessibilityState={{ selected: newPageColor === c }}
-                          style={[
-                            styles.pageDot,
-                            { backgroundColor: c },
-                            newPageColor === c && styles.pageDotActive,
-                          ]}
-                        />
-                      ))}
-                    </View>
-                    <Pressable
-                      onPress={submitCreate}
-                      accessibilityRole="button"
-                      accessibilityLabel="Create sketchpad"
-                      style={({ pressed }) => [styles.createBtn, pressed && styles.createBtnPressed]}
-                    >
-                      <Text style={styles.createBtnText}>Create</Text>
-                    </Pressable>
-                  </View>
-                </KeyboardAvoidingView>
-              ) : null}
-
-              {pads.map((pad) => {
-                const count = (drawingsByPad[pad.id] ?? []).length;
-                const active = pad.id === activePadId;
-                const design = getPadDesign(pad.design, pad.coverColor);
-                return (
+              <Pressable
+                haptic={active ? false : "selection"}
+                onPress={() => {
+                  setActivePad(pad.id);
+                  onClose();
+                }}
+                onLongPress={() => managePad(pad)}
+                accessibilityRole="button"
+                accessibilityLabel={`${pad.name}, ${icon.name} icon, ${design.name}, ${STYLE_LABEL[pad.style]}, ${count} ${count === 1 ? "drawing" : "drawings"}`}
+                accessibilityHint="Selects this sketchpad. Long-press to rename or delete it."
+                accessibilityState={{ selected: active }}
+                style={({ pressed }) => [
+                  styles.rowMain,
+                  pressed && styles.rowPressed,
+                ]}
+              >
+                <View style={styles.coverStatusWrap}>
                   <View
-                    key={pad.id}
                     style={[
-                      styles.row,
-                      active && styles.rowActive,
-                      active && { backgroundColor: design.paper, borderColor: design.cover },
+                      styles.coverTile,
+                      {
+                        backgroundColor: design.paper,
+                        borderColor: active ? design.cover : colors.border,
+                      },
                     ]}
                   >
-                    {active ? (
-                      <View style={[styles.activeStripe, { backgroundColor: design.cover }]} />
-                    ) : null}
-                    <Pressable
-                      onPress={() => {
-                        setActivePad(pad.id);
-                        onClose();
-                      }}
-                      onLongPress={() => managePad(pad)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${pad.name}, ${design.name}, ${STYLE_LABEL[pad.style]}, ${count} ${count === 1 ? "drawing" : "drawings"}`}
-                      accessibilityHint="Selects this sketchpad. Long-press to rename or delete it."
-                      accessibilityState={{ selected: active }}
-                      style={({ pressed }) => [styles.rowMain, pressed && styles.rowPressed]}
-                    >
+                    {icon.id === "cover" ? (
                       <MiniCover
                         style={pad.style}
                         design={pad.design}
@@ -363,161 +349,84 @@ export function PadDrawer({ open, onClose }: Props) {
                         pageColor={pad.pageColor}
                         border={pad.border}
                         decoration={pad.decoration}
+                        scale={0.78}
                       />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.rowName} numberOfLines={1}>
-                          {pad.name}
-                        </Text>
-                        <Text style={styles.rowMeta} numberOfLines={1}>
-                          {design.name} · {count} {count === 1 ? "drawing" : "drawings"}
-                        </Text>
-                      </View>
-                      {active ? (
-                        <View style={[styles.currentBadge, { backgroundColor: design.cover }]}>
-                          <SymbolView name="sparkles" size={10} tintColor="#FFFDF4" />
-                          <Text style={styles.currentBadgeText}>Current</Text>
-                        </View>
-                      ) : null}
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setDesigningPadId(pad.id)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Change design for ${pad.name}`}
-                      style={({ pressed }) => [styles.designButton, pressed && styles.rowPressed]}
-                    >
-                      <SymbolView name="paintpalette.fill" size={17} tintColor={design.cover} />
-                    </Pressable>
+                    ) : (
+                      <SymbolView
+                        name={icon.symbol}
+                        size={22}
+                        tintColor={design.coverDark}
+                        weight="semibold"
+                      />
+                    )}
                   </View>
-                );
-              })}
-            </ScrollView>
+                  {active ? (
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.currentMarker,
+                        {
+                          backgroundColor: design.cover,
+                          borderColor: design.paper,
+                        },
+                      ]}
+                    >
+                      <SymbolView
+                        name="checkmark"
+                        size={9}
+                        tintColor="#FFFDF4"
+                        weight="bold"
+                      />
+                    </View>
+                  ) : null}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={styles.rowName}
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+                  >
+                    {pad.name}
+                  </Text>
+                  <Text
+                    style={styles.rowMeta}
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+                  >
+                    {design.name} · {count}{" "}
+                    {count === 1 ? "drawing" : "drawings"}
+                  </Text>
+                </View>
+              </Pressable>
+              <NativeToolbarButton
+                label={`Edit ${pad.name}`}
+                hint="Edits this sketchpad's name, layout, theme, paper, border, and decorations."
+                icon="pencil"
+                variant="prominent"
+                size="compact"
+                tintColor={design.coverDark}
+                foregroundColor="#FFFDF4"
+                onPress={() => openSketchpadEditor(pad.id)}
+                testID={`edit-sketchpad-${pad.id}`}
+                style={styles.editButton}
+              />
+            </View>
+          );
+        })}
+      </ScrollView>
 
-            <Text style={styles.hint}>Tap the palette to change a design · long-press to manage</Text>
-          </>
-        )}
-      </Animated.View>
+      <Text
+        numberOfLines={2}
+        maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+        style={styles.hint}
+      >
+        Use the pencil to customize · long-press to delete
+      </Text>
     </View>
   );
 }
 
-function DesignChooser({
-  pad,
-  onSave,
-}: {
-  pad: Sketchpad;
-  onSave: (visuals: {
-    style: PadStyle;
-    design: PadDesignId;
-    border: PadBorderId;
-    decoration: PadDecorationId;
-    pageColor: string;
-  }) => boolean;
-}) {
-  const [style, setStyle] = useState(pad.style);
-  const [design, setDesign] = useState(pad.design);
-  const [border, setBorder] = useState(pad.border);
-  const [decoration, setDecoration] = useState(pad.decoration);
-  const [pageColor, setPageColor] = useState(pad.pageColor ?? getPadDesign(pad.design).paper);
-
-  useEffect(() => {
-    setStyle(pad.style);
-    setDesign(pad.design);
-    setBorder(pad.border);
-    setDecoration(pad.decoration);
-    setPageColor(pad.pageColor ?? getPadDesign(pad.design).paper);
-  }, [pad]);
-
-  return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={styles.designChooserContent}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.designPreviewCard}>
-        <MiniCover
-          style={style}
-          design={design}
-          pageColor={pageColor}
-          border={border}
-          decoration={decoration}
-          large
-        />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.designPreviewTitle}>Preview your sketchpad</Text>
-          <Text style={styles.designPreviewText}>
-            Free members can try every look here. Pro is required only when saving a premium choice.
-          </Text>
-        </View>
-      </View>
-
-      <Text style={styles.sectionLabel}>Layout</Text>
-      <View style={styles.layoutChoiceRow}>
-        <Text style={styles.layoutChoiceLabel}>{STYLE_LABEL[style]}</Text>
-        <View style={styles.layoutPicker}>
-          <Host matchContents>
-            <Picker selectedValue={style} onValueChange={(value) => setStyle(value as PadStyle)}>
-              <Picker.Item label="Spread book" value="spread" />
-              <Picker.Item label="Vertical pad" value="vertical" />
-              <Picker.Item label="Album" value="album" />
-              <Picker.Item label="Photo grid" value="grid" />
-              <Picker.Item label="Filmstrip" value="strip" />
-            </Picker>
-          </Host>
-        </View>
-      </View>
-
-      <Text style={styles.sectionLabel}>Theme</Text>
-      <DesignGrid
-        style={style}
-        selected={design}
-        onSelect={(nextDesign) => {
-          setDesign(nextDesign);
-          setPageColor(getPadDesign(nextDesign).paper);
-        }}
-      />
-
-      <Text style={styles.sectionLabel}>Border</Text>
-      <VisualOptionGrid kind="border" options={PAD_BORDERS} selected={border} onSelect={setBorder} />
-
-      <Text style={styles.sectionLabel}>Decorations</Text>
-      <VisualOptionGrid
-        kind="decoration"
-        options={PAD_DECORATIONS}
-        selected={decoration}
-        onSelect={setDecoration}
-      />
-
-      <Text style={styles.sectionLabel}>Paper</Text>
-      <View style={styles.colorRow}>
-        {PAGE_COLORS.map((color) => (
-          <Pressable
-            key={color}
-            onPress={() => setPageColor(color)}
-            accessibilityRole="radio"
-            accessibilityLabel={`Page color ${color}`}
-            accessibilityState={{ selected: pageColor === color }}
-            style={[
-              styles.pageDot,
-              { backgroundColor: color },
-              pageColor === color && styles.pageDotActive,
-            ]}
-          />
-        ))}
-      </View>
-
-      <Pressable
-        onPress={() => onSave({ style, design, border, decoration, pageColor })}
-        accessibilityRole="button"
-        accessibilityLabel="Save sketchpad look"
-        style={({ pressed }) => [styles.createBtn, styles.saveLookButton, pressed && styles.createBtnPressed]}
-      >
-        <Text style={styles.createBtnText}>Save look</Text>
-      </Pressable>
-    </ScrollView>
-  );
-}
-
-function VisualOptionGrid<T extends string>({
+export function VisualOptionGrid<T extends string>({
   kind,
   options,
   selected,
@@ -535,10 +444,15 @@ function VisualOptionGrid<T extends string>({
         return (
           <Pressable
             key={option.id}
+            haptic={active ? false : "selection"}
             onPress={() => onSelect(option.id)}
             accessibilityRole="radio"
             accessibilityLabel={`${option.name}. ${option.tagline}${option.premium ? ". Pro" : ""}`}
-            accessibilityHint={option.premium ? "Previews a premium look. Pro is required to save it." : undefined}
+            accessibilityHint={
+              option.premium
+                ? "Previews a premium look. Pro is required to save it."
+                : undefined
+            }
             accessibilityState={{ selected: active }}
             style={({ pressed }) => [
               styles.visualOption,
@@ -546,7 +460,12 @@ function VisualOptionGrid<T extends string>({
               pressed && styles.rowPressed,
             ]}
           >
-            <View style={[styles.visualSwatch, { backgroundColor: option.previewColor }]}>
+            <View
+              style={[
+                styles.visualSwatch,
+                { backgroundColor: option.previewColor },
+              ]}
+            >
               {kind === "decoration" ? (
                 <MiniDecorationPreview
                   id={option.id as PadDecorationId}
@@ -555,7 +474,12 @@ function VisualOptionGrid<T extends string>({
                   secondary="rgba(255,255,255,0.68)"
                 />
               ) : option.id !== "none" ? (
-                <View style={[styles.visualSwatchInner, { borderColor: colors.surface }]} />
+                <View
+                  style={[
+                    styles.visualSwatchInner,
+                    { borderColor: colors.surface },
+                  ]}
+                />
               ) : null}
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -571,9 +495,15 @@ function VisualOptionGrid<T extends string>({
                 <Text style={styles.proBadgeText}>PRO</Text>
               </View>
             ) : null}
-            {active ? (
-              <SymbolView name="checkmark.circle.fill" size={17} tintColor={colors.titleTeal} />
-            ) : null}
+            <View style={styles.visualSelectionSlot}>
+              {active ? (
+                <SymbolView
+                  name="checkmark.circle.fill"
+                  size={17}
+                  tintColor={colors.titleTeal}
+                />
+              ) : null}
+            </View>
           </Pressable>
         );
       })}
@@ -581,7 +511,7 @@ function VisualOptionGrid<T extends string>({
   );
 }
 
-function DesignGrid({
+export function DesignGrid({
   style,
   selected,
   onSelect,
@@ -590,8 +520,9 @@ function DesignGrid({
   selected: PadDesignId;
   onSelect: (design: PadDesignId) => void;
 }) {
-  const rows = Array.from({ length: Math.ceil(PAD_DESIGNS.length / 2) }, (_, index) =>
-    PAD_DESIGNS.slice(index * 2, index * 2 + 2),
+  const rows = Array.from(
+    { length: Math.ceil(PAD_DESIGNS.length / 2) },
+    (_, index) => PAD_DESIGNS.slice(index * 2, index * 2 + 2),
   );
 
   return (
@@ -603,10 +534,15 @@ function DesignGrid({
             return (
               <Pressable
                 key={design.id}
+                haptic={active ? false : "selection"}
                 onPress={() => onSelect(design.id)}
                 accessibilityRole="button"
                 accessibilityLabel={`${design.name}. ${design.tagline}${design.premium ? ". Pro" : ""}`}
-                accessibilityHint={design.premium ? "Previews this premium theme. Pro is required to save it." : "Selects this sketchpad theme"}
+                accessibilityHint={
+                  design.premium
+                    ? "Previews this premium theme. Pro is required to save it."
+                    : "Selects this sketchpad theme"
+                }
                 accessibilityState={{ selected: active }}
                 style={({ pressed }) => [
                   styles.designCard,
@@ -628,7 +564,11 @@ function DesignGrid({
                 ) : null}
                 {active ? (
                   <View style={styles.designCheck}>
-                    <SymbolView name="checkmark" size={11} tintColor={colors.surface} />
+                    <SymbolView
+                      name="checkmark"
+                      size={11}
+                      tintColor={colors.surface}
+                    />
                   </View>
                 ) : null}
               </Pressable>
@@ -641,7 +581,7 @@ function DesignGrid({
   );
 }
 
-function MiniCover({
+export function MiniCover({
   style,
   design,
   color,
@@ -649,6 +589,7 @@ function MiniCover({
   border = "none",
   decoration = "none",
   large = false,
+  scale,
 }: {
   style: PadStyle;
   design?: PadDesignId;
@@ -657,20 +598,34 @@ function MiniCover({
   border?: PadBorderId;
   decoration?: PadDecorationId;
   large?: boolean;
+  scale?: number;
 }) {
   const palette = getPadDesign(design, color);
   const wide = style === "spread" || style === "album";
-  const w = (wide ? 42 : 30) * (large ? 1.35 : 1);
-  const h = (wide ? 30 : 40) * (large ? 1.35 : 1);
-  const ringStyle = style === "album" ? styles.coverRingsLeft : styles.coverRings;
+  const sizeScale = scale ?? (large ? 1.35 : 1);
+  const w = (wide ? 42 : 30) * sizeScale;
+  const h = (wide ? 30 : 40) * sizeScale;
+  const ringStyle =
+    style === "album" ? styles.coverRingsLeft : styles.coverRings;
   return (
-    <View
-      style={[styles.coverWrap, { width: w + 8, height: h + 4 }]}
-    >
-      <View style={[styles.coverTabLeft, { backgroundColor: palette.tabs[0].color }]} />
-      <View style={[styles.coverTabRight, { backgroundColor: palette.tabs[1].color }]} />
+    <View style={[styles.coverWrap, { width: w + 8, height: h + 4 }]}>
       <View
-        style={[styles.cover, { width: w, height: h, backgroundColor: color ?? palette.cover }]}
+        style={[
+          styles.coverTabLeft,
+          { backgroundColor: palette.tabs[0].color },
+        ]}
+      />
+      <View
+        style={[
+          styles.coverTabRight,
+          { backgroundColor: palette.tabs[1].color },
+        ]}
+      />
+      <View
+        style={[
+          styles.cover,
+          { width: w, height: h, backgroundColor: color ?? palette.cover },
+        ]}
       >
         <View
           style={[
@@ -679,20 +634,40 @@ function MiniCover({
             style === "album" && { flexDirection: "row" },
           ]}
         >
-          {style === "spread" ? <View style={[styles.coverSpine, { backgroundColor: palette.ring }]} /> : null}
-          {style === "vertical" ? <View style={[ringStyle, { backgroundColor: palette.ring }]} /> : null}
-          {style === "album" ? <View style={[ringStyle, { backgroundColor: palette.ring }]} /> : null}
+          {style === "spread" ? (
+            <View
+              style={[styles.coverSpine, { backgroundColor: palette.ring }]}
+            />
+          ) : null}
+          {style === "vertical" ? (
+            <View style={[ringStyle, { backgroundColor: palette.ring }]} />
+          ) : null}
+          {style === "album" ? (
+            <View style={[ringStyle, { backgroundColor: palette.ring }]} />
+          ) : null}
           {style === "grid" ? (
             <View style={styles.coverGrid}>
               {[0, 1, 2, 3].map((i) => (
-                <View key={i} style={[styles.coverGridDot, { backgroundColor: palette.slotBorder }]} />
+                <View
+                  key={i}
+                  style={[
+                    styles.coverGridDot,
+                    { backgroundColor: palette.slotBorder },
+                  ]}
+                />
               ))}
             </View>
           ) : null}
           {style === "strip" ? (
             <View style={styles.coverStrip}>
               {[0, 1, 2].map((i) => (
-                <View key={i} style={[styles.coverStripLine, { backgroundColor: palette.slotBorder }]} />
+                <View
+                  key={i}
+                  style={[
+                    styles.coverStripLine,
+                    { backgroundColor: palette.slotBorder },
+                  ]}
+                />
               ))}
             </View>
           ) : null}
@@ -702,9 +677,16 @@ function MiniCover({
               style={[
                 styles.miniBorder,
                 {
-                  borderColor: border === "museum-frame" ? "#C89B4B" : palette.stampColor,
-                  borderWidth: border === "gallery-mat" || border === "museum-frame" ? 2 : 1,
-                  borderStyle: border === "torn-paper" || border === "crayon-edge" ? "dashed" : "solid",
+                  borderColor:
+                    border === "museum-frame" ? "#C89B4B" : palette.stampColor,
+                  borderWidth:
+                    border === "gallery-mat" || border === "museum-frame"
+                      ? 2
+                      : 1,
+                  borderStyle:
+                    border === "torn-paper" || border === "crayon-edge"
+                      ? "dashed"
+                      : "solid",
                 },
               ]}
             />
@@ -754,107 +736,196 @@ function MiniDecorationPreview({
   if (id === "confetti-pop") {
     return (
       <View pointerEvents="none" style={styles.miniDecorationLayer}>
-        <View style={[styles.miniDot, styles.miniDotTopLeft, { backgroundColor: accent }]} />
-        <View style={[styles.miniDot, styles.miniDotTopRight, { backgroundColor: secondary }]} />
-        <View style={[styles.miniDotSmall, styles.miniDotBottomLeft, { backgroundColor: secondary }]} />
-        <View style={[styles.miniDotSmall, styles.miniDotBottomRight, { backgroundColor: accent }]} />
+        <View
+          style={[
+            styles.miniDot,
+            styles.miniDotTopLeft,
+            { backgroundColor: accent },
+          ]}
+        />
+        <View
+          style={[
+            styles.miniDot,
+            styles.miniDotTopRight,
+            { backgroundColor: secondary },
+          ]}
+        />
+        <View
+          style={[
+            styles.miniDotSmall,
+            styles.miniDotBottomLeft,
+            { backgroundColor: secondary },
+          ]}
+        />
+        <View
+          style={[
+            styles.miniDotSmall,
+            styles.miniDotBottomRight,
+            { backgroundColor: accent },
+          ]}
+        />
       </View>
     );
   }
   if (id === "sparkle-trail") {
     return (
       <View pointerEvents="none" style={styles.miniDecorationLayer}>
-        <Text style={[styles.miniMark, styles.miniMarkTopRight, { color: accent }]}>✦</Text>
-        <Text style={[styles.miniMarkSmall, styles.miniMarkBottomLeft, { color: secondary }]}>✧</Text>
+        <Text
+          style={[styles.miniMark, styles.miniMarkTopRight, { color: accent }]}
+        >
+          ✦
+        </Text>
+        <Text
+          style={[
+            styles.miniMarkSmall,
+            styles.miniMarkBottomLeft,
+            { color: secondary },
+          ]}
+        >
+          ✧
+        </Text>
       </View>
     );
   }
   if (id === "heart-parade") {
     return (
       <View pointerEvents="none" style={styles.miniDecorationLayer}>
-        <Text style={[styles.miniMark, styles.miniMarkTopRight, { color: secondary }]}>♥</Text>
-        <Text style={[styles.miniMarkSmall, styles.miniMarkBottomLeft, { color: accent }]}>♥</Text>
+        <Text
+          style={[
+            styles.miniMark,
+            styles.miniMarkTopRight,
+            { color: secondary },
+          ]}
+        >
+          ♥
+        </Text>
+        <Text
+          style={[
+            styles.miniMarkSmall,
+            styles.miniMarkBottomLeft,
+            { color: accent },
+          ]}
+        >
+          ♥
+        </Text>
       </View>
     );
   }
   if (id === "flower-garden") {
     return (
       <View pointerEvents="none" style={styles.miniDecorationLayer}>
-        <Text style={[styles.miniMark, styles.miniMarkTopRight, { color: secondary }]}>✿</Text>
-        <Text style={[styles.miniMarkSmall, styles.miniMarkBottomLeft, { color: accent }]}>✿</Text>
+        <Text
+          style={[
+            styles.miniMark,
+            styles.miniMarkTopRight,
+            { color: secondary },
+          ]}
+        >
+          ✿
+        </Text>
+        <Text
+          style={[
+            styles.miniMarkSmall,
+            styles.miniMarkBottomLeft,
+            { color: accent },
+          ]}
+        >
+          ✿
+        </Text>
       </View>
     );
   }
   if (id === "starry-sky") {
     return (
       <View pointerEvents="none" style={styles.miniDecorationLayer}>
-        <Text style={[styles.miniMark, styles.miniMarkTopRight, { color: accent }]}>★</Text>
+        <Text
+          style={[styles.miniMark, styles.miniMarkTopRight, { color: accent }]}
+        >
+          ★
+        </Text>
         <View style={[styles.miniPlanet, { backgroundColor: secondary }]} />
-        <Text style={[styles.miniMarkSmall, styles.miniMarkBottomLeft, { color: secondary }]}>✦</Text>
+        <Text
+          style={[
+            styles.miniMarkSmall,
+            styles.miniMarkBottomLeft,
+            { color: secondary },
+          ]}
+        >
+          ✦
+        </Text>
       </View>
     );
   }
   return (
     <View pointerEvents="none" style={styles.miniDecorationLayer}>
-      <Text style={[styles.miniMarkSmall, styles.miniMarkTopLeft, { color: accent }]}>♥</Text>
-      <Text style={[styles.miniMark, styles.miniMarkTopRight, { color: secondary }]}>✦</Text>
-      <Text style={[styles.miniMarkSmall, styles.miniMarkBottomLeft, { color: secondary }]}>✿</Text>
+      <Text
+        style={[
+          styles.miniMarkSmall,
+          styles.miniMarkTopLeft,
+          { color: accent },
+        ]}
+      >
+        ♥
+      </Text>
+      <Text
+        style={[styles.miniMark, styles.miniMarkTopRight, { color: secondary }]}
+      >
+        ✦
+      </Text>
+      <Text
+        style={[
+          styles.miniMarkSmall,
+          styles.miniMarkBottomLeft,
+          { color: secondary },
+        ]}
+      >
+        ✿
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: {
-    backgroundColor: colors.scrimDark,
-    zIndex: 0,
-  },
   panel: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
+    flex: 1,
     backgroundColor: colors.background,
     borderRightWidth: 1,
     borderRightColor: colors.border,
-    borderTopRightRadius: 22,
-    borderBottomRightRadius: 22,
     paddingHorizontal: 16,
-    shadowColor: colors.ink,
-    shadowOffset: { width: 6, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    zIndex: 1,
-    elevation: 12,
   },
   headingRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 10,
+    alignItems: "center",
+    gap: 12,
+    minHeight: 58,
     marginBottom: 14,
   },
+  headingCopy: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+  headingEyebrow: {
+    marginLeft: 2,
+    marginBottom: -3,
+    fontSize: 10,
+    lineHeight: 12,
+    fontWeight: "900",
+    letterSpacing: 1.15,
+    color: colors.titleCoral,
+  },
   brand: {
-    fontSize: 26,
-    fontWeight: "800",
+    flexShrink: 0,
+    marginVertical: -3,
   },
-  brandFont: {
-    fontFamily: "PatrickHand",
-    fontSize: 38,
-    fontWeight: "400",
-    lineHeight: 40,
+  closeButton: {
+    width: 40,
+    height: 40,
+    flexShrink: 0,
+    borderRadius: 20,
   },
-  headingCaption: {
-    fontSize: 13,
-    color: colors.mutedText,
-    marginBottom: 8,
-  },
-  headingAction: {
-    marginLeft: "auto",
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+  glassIconTouchable: {
     alignItems: "center",
     justifyContent: "center",
   },
@@ -862,33 +933,28 @@ const styles = StyleSheet.create({
     position: "relative",
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 5,
+    gap: 2,
+    paddingVertical: 4,
     paddingLeft: 8,
-    paddingRight: 5,
-    borderRadius: 16,
+    paddingRight: 2,
+    borderRadius: SKETCHPAD_ROW_RADIUS,
+    borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "transparent",
-    minHeight: 60,
+    minHeight: 58,
     marginBottom: 2,
     overflow: "hidden",
   },
   rowMain: {
     flex: 1,
-    minHeight: 50,
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 9,
   },
-  designButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
+  editButton: {
+    flexShrink: 0,
+    marginRight: 2,
   },
   newRow: {
     flexDirection: "row",
@@ -905,49 +971,94 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  newRowActive: {
-    backgroundColor: "rgba(255,112,93,0.08)",
-    borderColor: "rgba(255,112,93,0.32)",
+  quickActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+  quickAction: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 74,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    gap: 8,
+    borderRadius: 16,
+    borderCurve: "continuous",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickActionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderCurve: "continuous",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionAvatar: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: colors.titleCoral,
+  },
+  quickActionTitle: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: colors.ink,
+  },
+  listLabel: {
+    paddingHorizontal: 4,
+    paddingBottom: 7,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+    color: colors.mutedText,
   },
   rowActive: {
     borderWidth: 1.5,
-    boxShadow: "0 3px 10px rgba(40,67,90,0.10)",
+    boxShadow: "0 2px 8px rgba(40,67,90,0.10)",
   },
-  activeStripe: {
-    position: "absolute",
-    left: 0,
-    top: 11,
-    bottom: 11,
-    width: 5,
-    borderTopRightRadius: 5,
-    borderBottomRightRadius: 5,
+  coverStatusWrap: {
+    position: "relative",
+    flexShrink: 0,
+    width: 44,
+    height: 44,
   },
-  currentBadge: {
-    minHeight: 25,
-    flexDirection: "row",
+  coverTile: {
+    width: 44,
+    height: 44,
+    borderRadius: SKETCHPAD_ICON_RADIUS,
+    borderCurve: "continuous",
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: 7,
-    borderRadius: 999,
-    boxShadow: "0 2px 5px rgba(40,67,90,0.15)",
+    overflow: "hidden",
   },
-  currentBadgeText: {
-    color: "#FFFDF4",
-    fontSize: 10.5,
-    lineHeight: 13,
-    fontWeight: "800",
+  currentMarker: {
+    position: "absolute",
+    right: -3,
+    top: -3,
+    width: 19,
+    height: 19,
+    borderRadius: 10,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 1px 4px rgba(40,67,90,0.18)",
   },
   rowPressed: {
     opacity: 0.7,
   },
   rowName: {
-    fontSize: 16.5,
-    fontWeight: "700",
+    fontSize: 15.5,
+    fontWeight: "800",
     color: colors.ink,
   },
   rowMeta: {
-    fontSize: 12.5,
+    fontSize: 11.5,
+    lineHeight: 14,
     color: colors.mutedText,
     marginTop: 1,
   },
@@ -1032,95 +1143,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  newIconActive: {
-    borderStyle: "solid",
-  },
-  createBox: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 20,
-    padding: 14,
-    marginBottom: 8,
-    gap: 12,
-  },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15.5,
-    color: colors.ink,
-  },
-  styleRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  stylePreview: {
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 4,
-    minWidth: 84,
-  },
-  styleLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.mutedText,
-  },
-  sectionLabel: {
-    fontSize: 12.5,
-    fontWeight: "700",
-    color: colors.ink,
-    marginTop: 2,
-  },
-  designChooserContent: {
-    paddingBottom: 28,
-    gap: 12,
-  },
-  designPreviewCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 18,
-    borderCurve: "continuous",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  designPreviewTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: colors.ink,
-  },
-  designPreviewText: {
-    fontSize: 11.5,
-    lineHeight: 16,
-    color: colors.mutedText,
-    marginTop: 2,
-  },
-  layoutChoiceRow: {
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingLeft: 12,
-    borderRadius: 15,
-    borderCurve: "continuous",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  layoutChoiceLabel: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "800",
-    color: colors.ink,
-  },
-  layoutPicker: {
-    minWidth: 132,
-    alignItems: "flex-end",
-  },
   designGrid: {
     gap: 10,
   },
@@ -1133,7 +1155,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     minHeight: 132,
     backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
     borderRadius: 18,
     paddingHorizontal: 9,
@@ -1145,7 +1167,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   designCardActive: {
-    borderWidth: 2,
     borderColor: colors.titleTeal,
     backgroundColor: "rgba(72,198,183,0.08)",
   },
@@ -1200,13 +1221,18 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderCurve: "continuous",
     backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
   },
   visualOptionActive: {
-    borderWidth: 2,
     borderColor: colors.titleTeal,
     backgroundColor: "rgba(72,198,183,0.08)",
+  },
+  visualSelectionSlot: {
+    width: 17,
+    height: 17,
+    alignItems: "center",
+    justifyContent: "center",
   },
   visualSwatch: {
     width: 39,
@@ -1248,22 +1274,6 @@ const styles = StyleSheet.create({
     lineHeight: 11,
     fontWeight: "900",
     letterSpacing: 0.5,
-  },
-  colorRow: {
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "center",
-  },
-  pageDot: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  pageDotActive: {
-    borderWidth: 2.5,
-    borderColor: colors.titleCoral,
   },
   coverStrip: {
     width: "72%",
@@ -1374,26 +1384,6 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-  },
-  createBtn: {
-    backgroundColor: colors.fab,
-    borderRadius: 12,
-    paddingVertical: 11,
-    alignItems: "center",
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  createBtnPressed: {
-    backgroundColor: colors.fabPressed,
-    transform: [{ scale: 0.985 }],
-  },
-  createBtnText: {
-    color: "#FFF7EE",
-    fontSize: 15.5,
-    fontWeight: "700",
-  },
-  saveLookButton: {
-    marginTop: 2,
   },
   hint: {
     fontSize: 12,
