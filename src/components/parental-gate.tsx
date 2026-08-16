@@ -1,6 +1,7 @@
-import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Platform, StyleSheet, Text, View } from "react-native";
 import { FullWindowOverlay } from "react-native-screens";
 
+import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import { useParentalGate } from "@/store/parental-gate";
 import { colors } from "@/theme";
 

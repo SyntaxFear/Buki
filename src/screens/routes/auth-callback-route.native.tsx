@@ -1,9 +1,10 @@
 import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import { oauthCallbackUrlFromRouteParams } from "@/auth/oauth";
+import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import { useAuth } from "@/store/auth";
 import { colors } from "@/theme";
 
