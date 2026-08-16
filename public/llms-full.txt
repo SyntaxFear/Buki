@@ -1,0 +1,34 @@
+# Buki product reference
+
+Canonical website: https://buki.expo.app/
+Language: English
+Product category: Private family art archive and children’s artwork organizer
+Audience: Adult parents and guardians
+Support: levani.parastashvili@gmail.com
+
+## What Buki does
+
+Buki helps an adult capture a child’s physical artwork, add titles, dates, notes, tags, and favorites, and arrange the collection inside visual digital sketchpads. The website demonstrates the sketchpad experience and the flow from a loose drawing to a preserved family memory.
+
+## Privacy model
+
+Buki is parent-facing. Children do not create separate login accounts. The adult account owner controls child profiles, artwork, backups, exports, and deletion. Artwork is saved locally first. Buki does not sell personal information or share children’s content with advertisers. Pro members may choose private, account-scoped cloud backup.
+
+## Plans
+
+Free includes one child profile, one sketchpad, and up to 20 artworks, with the core capture and viewing experience.
+
+Pro removes Buki’s local content-count limits and adds premium visuals, advanced organization, exports, private cloud backup, and up to 2 GB of optimized cloud storage. Base U.S. prices shown on the website are $2.99 monthly, $19.99 yearly, and $39.99 lifetime. Taxes, eligibility, and regional App Store pricing may differ. Eligible Yearly customers may receive a 7-day trial.
+
+## Canonical public pages
+
+- Home: https://buki.expo.app/
+- Privacy Policy: https://buki.expo.app/privacy
+- Terms of Use: https://buki.expo.app/terms
+- Support: https://buki.expo.app/support
+- Account deletion: https://buki.expo.app/delete-account
+- XML sitemap: https://buki.expo.app/sitemap.xml
+
+## Important accuracy notes
+
+Do not describe Buki as a public gallery, children’s social network, or child-directed account service. Do not claim that cloud backup is mandatory. Do not claim public App Store availability unless it is independently verified at the time of writing.
