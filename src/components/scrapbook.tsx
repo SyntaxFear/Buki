@@ -12,6 +12,7 @@ import {
   Skia,
   vec,
   type SkImage,
+  useFont,
 } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useMemo } from "react";
 import { StyleSheet, useWindowDimensions } from "react-native";
@@ -33,6 +34,10 @@ import {
   PadTab,
   PageBorder,
 } from "@/components/pad-ornaments";
+import {
+  PAGE_FOLIO_FONT_SIZE,
+  PageFolio,
+} from "@/components/sketchpad-page-numbers";
 import { getPadDesign, PAD_GEOMETRY, type PadDesignId } from "@/pad-designs";
 import {
   SPREAD_SNAPSHOT_DECORATION_PLACEMENT,
@@ -40,12 +45,24 @@ import {
   type PadDecorationId,
 } from "@/pad-visuals";
 import type { Drawing } from "@/store/drawings";
-import { colors, padDarkColor } from "@/theme";
+import { colors, padDarkColor, PATRICK_HAND } from "@/theme";
+import { centeredBindingRingPositions } from "@/utils/binding-layout";
 import { useImageCache } from "@/utils/image-cache";
-import { fitRect, type BookLayout, type Rect as LayoutRect } from "@/utils/book-layout";
-import { logPageFlip } from "@/utils/page-flip";
+import { PAGE_FOLIO_EDGES } from "@/utils/page-folio";
+import {
+  fitRect,
+  type BookLayout,
+  type Rect as LayoutRect,
+} from "@/utils/book-layout";
+import {
+  logPageFlip,
+  pageFlipImageId,
+  pageFlipShaderProgress,
+} from "@/utils/page-flip";
 
 export interface FlipState {
+  id: number;
+  source: "pagination" | "gesture";
   from: number;
   to: number;
 }
@@ -57,12 +74,17 @@ interface Props {
   spread: number;
   flip: FlipState | null;
   flipAnim: SharedValue<number>;
+  flipDirection: SharedValue<number>;
   flipCurl: SharedValue<number>;
   coverColor?: string;
   pageColor?: string;
   design?: PadDesignId;
   border?: PadBorderId;
   decoration?: PadDecorationId;
+}
+
+function drawingTraceLabel(drawing: Drawing | undefined): string {
+  return drawing ? `${drawing.id}:${pageFlipImageId(drawing.uri)}` : "empty";
 }
 
 function DrawingOnPage({
@@ -79,7 +101,10 @@ function DrawingOnPage({
   const cx = rect.x + rect.width / 2;
   const cy = rect.y + rect.height / 2;
   return (
-    <Group transform={[{ rotate: (drawing.rotation * Math.PI) / 180 }]} origin={{ x: cx, y: cy }}>
+    <Group
+      transform={[{ rotate: (drawing.rotation * Math.PI) / 180 }]}
+      origin={{ x: cx, y: cy }}
+    >
       <SkiaImage
         image={image}
         rect={{ x: rect.x, y: rect.y, width: rect.width, height: rect.height }}
@@ -95,6 +120,7 @@ export function Scrapbook({
   spread,
   flip,
   flipAnim,
+  flipDirection,
   flipCurl,
   coverColor,
   pageColor,
@@ -107,7 +133,9 @@ export function Scrapbook({
   const palette = getPadDesign(design, coverColor);
   const cover = coverColor ?? palette.cover;
   const paper = pageColor ?? palette.paper;
-  const coverDark = cover === palette.cover ? palette.coverDark : padDarkColor(cover);
+  const coverDark =
+    cover === palette.cover ? palette.coverDark : padDarkColor(cover);
+  const folioFont = useFont(PATRICK_HAND, PAGE_FOLIO_FONT_SIZE);
 
   const dir = flip ? Math.sign(flip.to - flip.from) : 1;
   const fromIdx = flip ? flip.from : spread;
@@ -118,32 +146,65 @@ export function Scrapbook({
   // its back is the incoming left page.
   const staticLeft = drawings[2 * spread];
   const staticRight = drawings[2 * spread + 1];
-  const baseLeft = flip ? (dir > 0 ? drawings[2 * fromIdx] : drawings[2 * toIdx]) : staticLeft;
+  const baseLeft = flip
+    ? dir > 0
+      ? drawings[2 * fromIdx]
+      : drawings[2 * toIdx]
+    : staticLeft;
   const baseRight = flip
     ? dir > 0
       ? drawings[2 * toIdx + 1]
       : drawings[2 * fromIdx + 1]
     : staticRight;
-  const frontFace = flip ? (dir > 0 ? drawings[2 * fromIdx + 1] : drawings[2 * toIdx + 1]) : undefined;
-  const backFace = flip ? (dir > 0 ? drawings[2 * toIdx] : drawings[2 * fromIdx]) : undefined;
+  const frontFace = flip
+    ? dir > 0
+      ? drawings[2 * fromIdx + 1]
+      : drawings[2 * toIdx + 1]
+    : undefined;
+  const backFace = flip
+    ? dir > 0
+      ? drawings[2 * toIdx]
+      : drawings[2 * fromIdx]
+    : undefined;
 
-  const preloadUris = useMemo(() => {
-    const units = new Set([spread - 1, spread, spread + 1, fromIdx, toIdx]);
-    const uris: string[] = [];
-    for (const unit of units) {
-      if (unit < 0) continue;
-      const left = drawings[unit * 2];
-      const right = drawings[unit * 2 + 1];
-      if (left) uris.push(left.uri);
-      if (right) uris.push(right.uri);
-    }
-    return uris;
-  }, [drawings, fromIdx, spread, toIdx]);
-  const lookup = useImageCache(preloadUris);
+  const imageUrisForUnits = useCallback(
+    (units: ReadonlySet<number>) => {
+      const uris: string[] = [];
+      for (const unit of units) {
+        if (unit < 0) continue;
+        const left = drawings[unit * 2];
+        const right = drawings[unit * 2 + 1];
+        if (left) uris.push(left.uri);
+        if (right) uris.push(right.uri);
+      }
+      return uris;
+    },
+    [drawings],
+  );
+  const watchedUris = useMemo(
+    () => imageUrisForUnits(new Set([spread, fromIdx, toIdx])),
+    [fromIdx, imageUrisForUnits, spread, toIdx],
+  );
+  const preloadUris = useMemo(
+    () =>
+      imageUrisForUnits(
+        new Set([spread - 1, spread, spread + 1, fromIdx, toIdx]),
+      ),
+    [fromIdx, imageUrisForUnits, spread, toIdx],
+  );
+  const {
+    lookup,
+    revision: imageCacheRevision,
+    readyCount: readyImageCount,
+    watchedCount: watchedImageCount,
+  } = useImageCache(watchedUris, preloadUris);
   const imageFor = useCallback(
-    (drawing: Drawing | undefined): SkImage | null => (drawing ? lookup(drawing.uri) : null),
+    (drawing: Drawing | undefined): SkImage | null =>
+      drawing ? lookup(drawing.uri) : null,
     [lookup],
   );
+  const staticLeftImage = imageFor(staticLeft);
+  const staticRightImage = imageFor(staticRight);
 
   const dotsPath = useMemo(() => {
     const builder = Skia.PathBuilder.Make();
@@ -164,9 +225,7 @@ export function Scrapbook({
   }, [leftPage, rightPage]);
 
   const spineRings = useMemo(() => {
-    const out: number[] = [];
-    for (let y = book.y + 30; y < book.y + book.height - 22; y += 38) out.push(y);
-    return out;
+    return centeredBindingRingPositions(book.y, book.height, 30, 22);
   }, [book]);
 
   const rightSlotLocal = useMemo(
@@ -191,6 +250,8 @@ export function Scrapbook({
 
   const frontImage = imageFor(frontFace);
   const backImage = imageFor(backFace);
+  const baseLeftImage = imageFor(baseLeft);
+  const baseRightImage = imageFor(baseRight);
   const snapshotVisuals = useMemo(
     () => ({
       border,
@@ -233,85 +294,189 @@ export function Scrapbook({
 
   const frontSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
-    const items = frontFace ? [{ drawing: frontFace, image: frontImage, slotLocal: rightSlotLocal }] : [];
+    const items = frontFace
+      ? [{ drawing: frontFace, image: frontImage, slotLocal: rightSlotLocal }]
+      : [];
     return buildFaceSnapshot(rightPage.width, rightPage.height, items, {
       pageColor: paper,
       dotColor: palette.gridDot,
       visuals: turningFrontVisuals,
+      folio: {
+        number: (dir > 0 ? fromIdx : toIdx) * 2 + 2,
+        edge: PAGE_FOLIO_EDGES.spreadRight,
+        color: palette.stampColor,
+        font: folioFont,
+      },
     });
   }, [
+    dir,
     flip,
+    folioFont,
     frontFace,
     frontImage,
+    fromIdx,
     paper,
     palette.gridDot,
+    palette.stampColor,
     rightPage,
     rightSlotLocal,
+    toIdx,
     turningFrontVisuals,
   ]);
 
   const backSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
-    const items = backFace ? [{ drawing: backFace, image: backImage, slotLocal: leftSlotLocal }] : [];
+    const items = backFace
+      ? [{ drawing: backFace, image: backImage, slotLocal: leftSlotLocal }]
+      : [];
     return buildFaceSnapshot(rightPage.width, rightPage.height, items, {
       pageColor: paper,
       dotColor: palette.gridDot,
       visuals: turningBackVisuals,
+      folio: {
+        number: (dir > 0 ? toIdx : fromIdx) * 2 + 1,
+        edge: PAGE_FOLIO_EDGES.spreadLeft,
+        color: palette.stampColor,
+        font: folioFont,
+      },
     });
   }, [
+    dir,
     flip,
+    folioFont,
     backFace,
     backImage,
+    fromIdx,
     paper,
     palette.gridDot,
+    palette.stampColor,
     rightPage,
     leftSlotLocal,
+    toIdx,
     turningBackVisuals,
   ]);
 
   const baseLeftSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
-    const image = imageFor(baseLeft);
-    const items = baseLeft ? [{ drawing: baseLeft, image, slotLocal: leftSlotLocal }] : [];
+    const items = baseLeft
+      ? [{ drawing: baseLeft, image: baseLeftImage, slotLocal: leftSlotLocal }]
+      : [];
     return buildFaceSnapshot(leftPage.width, leftPage.height, items, {
       pageColor: paper,
       dotColor: palette.gridDot,
       visuals: baseLeftVisuals,
+      folio: {
+        number: (dir > 0 ? fromIdx : toIdx) * 2 + 1,
+        edge: PAGE_FOLIO_EDGES.spreadLeft,
+        color: palette.stampColor,
+        font: folioFont,
+      },
     });
   }, [
     baseLeft,
+    baseLeftImage,
+    dir,
     flip,
+    folioFont,
+    fromIdx,
     leftPage,
     leftSlotLocal,
-    imageFor,
     paper,
     palette.gridDot,
+    palette.stampColor,
     baseLeftVisuals,
+    toIdx,
   ]);
 
   const baseRightSnapshot = useMemo(() => {
     if (!flip || !PAGE_FLIP_EFFECT) return null;
-    const image = imageFor(baseRight);
-    const items = baseRight ? [{ drawing: baseRight, image, slotLocal: rightSlotLocal }] : [];
+    const items = baseRight
+      ? [
+          {
+            drawing: baseRight,
+            image: baseRightImage,
+            slotLocal: rightSlotLocal,
+          },
+        ]
+      : [];
     return buildFaceSnapshot(rightPage.width, rightPage.height, items, {
       pageColor: paper,
       dotColor: palette.gridDot,
       visuals: baseRightVisuals,
+      folio: {
+        number: (dir > 0 ? toIdx : fromIdx) * 2 + 2,
+        edge: PAGE_FOLIO_EDGES.spreadRight,
+        color: palette.stampColor,
+        font: folioFont,
+      },
     });
   }, [
     baseRight,
+    baseRightImage,
+    dir,
     flip,
-    imageFor,
+    folioFont,
+    fromIdx,
     paper,
     palette.gridDot,
+    palette.stampColor,
     rightPage,
     rightSlotLocal,
     baseRightVisuals,
+    toIdx,
+  ]);
+
+  useEffect(() => {
+    logPageFlip("renderer-cache-state", {
+      turnId: flip?.id,
+      source: flip?.source,
+      mode: "spread",
+      unit: spread,
+      from: flip?.from,
+      to: flip?.to,
+      cacheRevision: imageCacheRevision,
+      imagesReady: readyImageCount,
+      imagesWatched: watchedImageCount,
+      isLastUnit: spread === Math.floor(drawings.length / 2),
+      settledLeft: drawingTraceLabel(staticLeft),
+      settledRight: drawingTraceLabel(staticRight),
+      settledLeftReady: Boolean(staticLeftImage),
+      settledRightReady: Boolean(staticRightImage),
+      frontFace: drawingTraceLabel(frontFace),
+      backFace: drawingTraceLabel(backFace),
+      baseLeft: drawingTraceLabel(baseLeft),
+      baseRight: drawingTraceLabel(baseRight),
+      frontReady: Boolean(frontImage),
+      backReady: Boolean(backImage),
+      baseLeftReady: Boolean(baseLeftImage),
+      baseRightReady: Boolean(baseRightImage),
+    });
+  }, [
+    backFace,
+    backImage,
+    baseLeft,
+    baseLeftImage,
+    baseRight,
+    baseRightImage,
+    drawings.length,
+    flip,
+    frontFace,
+    frontImage,
+    imageCacheRevision,
+    readyImageCount,
+    spread,
+    staticLeft,
+    staticLeftImage,
+    staticRight,
+    staticRightImage,
+    watchedImageCount,
   ]);
 
   useEffect(() => {
     if (!flip) return;
     logPageFlip("renderer-ready", {
+      turnId: flip.id,
+      source: flip.source,
       mode: "spread",
       from: flip.from,
       to: flip.to,
@@ -320,30 +485,63 @@ export function Scrapbook({
       back: Boolean(backSnapshot),
       underLeft: Boolean(baseLeftSnapshot),
       underRight: Boolean(baseRightSnapshot),
+      cacheRevision: imageCacheRevision,
+      imagesReady: readyImageCount,
+      imagesWatched: watchedImageCount,
+      frontFace: drawingTraceLabel(frontFace),
+      backFace: drawingTraceLabel(backFace),
+      baseLeft: drawingTraceLabel(baseLeft),
+      baseRight: drawingTraceLabel(baseRight),
     });
-  }, [backSnapshot, baseLeftSnapshot, baseRightSnapshot, flip, frontSnapshot]);
+  }, [
+    backFace,
+    backSnapshot,
+    baseLeft,
+    baseLeftSnapshot,
+    baseRight,
+    baseRightSnapshot,
+    flip,
+    frontFace,
+    frontSnapshot,
+    imageCacheRevision,
+    readyImageCount,
+    watchedImageCount,
+  ]);
 
   const flipUniforms = useDerivedValue(() => ({
     origin: [leftPage.x, rightPage.y],
     size: [rightPage.width, rightPage.height],
-    t: dir > 0 ? flipAnim.value : 1 - flipAnim.value,
+    t: pageFlipShaderProgress(flipAnim.value, flipDirection.value),
     transposed: 0,
     spineOff: rightPage.width,
     curl: flipCurl.value,
     hasLeftBase: 1,
+    foldOnly: 0,
   }));
 
-  const bindingOverlayOpacity = useDerivedValue(() => {
-    const turn = dir > 0 ? flipAnim.value : 1 - flipAnim.value;
-    const endpoint = Math.abs(turn - 0.5) * 2;
-    const x = Math.max(0, Math.min(1, (endpoint - 0.68) / 0.22));
-    return x * x * (3 - 2 * x);
-  });
+  const foldOcclusionUniforms = useDerivedValue(() => ({
+    origin: [leftPage.x, rightPage.y],
+    size: [rightPage.width, rightPage.height],
+    t: pageFlipShaderProgress(flipAnim.value, flipDirection.value),
+    transposed: 0,
+    spineOff: rightPage.width,
+    curl: flipCurl.value,
+    hasLeftBase: 1,
+    foldOnly: 1,
+  }));
+
+  const bindingOcclusionClip = useMemo(
+    () => Skia.XYWHRect(spineX - 22, leftPage.y, 44, leftPage.height),
+    [leftPage.height, leftPage.y, spineX],
+  );
 
   const pageRadius = PAGE_FACE_RADIUS;
 
   return (
-    <Canvas style={[StyleSheet.absoluteFill, { width: screenW, height: screenH }]} pointerEvents="none">
+    <Canvas
+      style={[StyleSheet.absoluteFill, { width: screenW, height: screenH }]}
+      pointerEvents="none"
+    >
       {/* Warm studio shadow. */}
       <RoundedRect
         x={book.x + 3}
@@ -360,7 +558,7 @@ export function Scrapbook({
       <PadTab
         x={book.x - PAD_GEOMETRY.tabProtrusion}
         y={book.y + book.height * 0.61}
-        width={36}
+        width={PAD_GEOMETRY.tabWidth}
         height={58}
         color={palette.tabs[0].color}
         glyph={palette.tabs[0].glyph}
@@ -368,9 +566,13 @@ export function Scrapbook({
         side="left"
       />
       <PadTab
-        x={book.x + book.width - 22}
+        x={
+          book.x +
+          book.width -
+          (PAD_GEOMETRY.tabWidth - PAD_GEOMETRY.tabProtrusion)
+        }
         y={book.y + book.height * 0.5}
-        width={36}
+        width={PAD_GEOMETRY.tabWidth}
         height={58}
         color={palette.tabs[1].color}
         glyph={palette.tabs[1].glyph}
@@ -378,9 +580,13 @@ export function Scrapbook({
         side="right"
       />
       <PadTab
-        x={book.x + book.width - 22}
+        x={
+          book.x +
+          book.width -
+          (PAD_GEOMETRY.tabWidth - PAD_GEOMETRY.tabProtrusion)
+        }
         y={book.y + book.height * 0.5 + 64}
-        width={36}
+        width={PAD_GEOMETRY.tabWidth}
         height={58}
         color={palette.tabs[2].color}
         glyph={palette.tabs[2].glyph}
@@ -459,7 +665,13 @@ export function Scrapbook({
       <Path path={dotsPath} color={palette.gridDot} />
 
       {/* center crease shading */}
-      <Rect x={spineX - 22} y={leftPage.y} width={44} height={leftPage.height} opacity={0.12}>
+      <Rect
+        x={spineX - 22}
+        y={leftPage.y}
+        width={44}
+        height={leftPage.height}
+        opacity={0.12}
+      >
         <LinearGradient
           start={vec(spineX - 22, 0)}
           end={vec(spineX + 22, 0)}
@@ -468,10 +680,24 @@ export function Scrapbook({
       </Rect>
 
       {/* left page drawing (static through a flip until the page lands) */}
-      {staticLeft ? <DrawingOnPage drawing={staticLeft} image={imageFor(staticLeft)} slot={leftSlot} /> : null}
+      {staticLeft ? (
+        <DrawingOnPage
+          key={`${staticLeft.id}-${staticLeftImage ? "ready" : "pending"}`}
+          drawing={staticLeft}
+          image={staticLeftImage}
+          slot={leftSlot}
+        />
+      ) : null}
 
       {/* right page drawing being revealed (or the settled one) */}
-      {staticRight ? <DrawingOnPage drawing={staticRight} image={imageFor(staticRight)} slot={rightSlot} /> : null}
+      {staticRight ? (
+        <DrawingOnPage
+          key={`${staticRight.id}-${staticRightImage ? "ready" : "pending"}`}
+          drawing={staticRight}
+          image={staticRightImage}
+          slot={rightSlot}
+        />
+      ) : null}
 
       <PageBorder
         id={border}
@@ -480,6 +706,21 @@ export function Scrapbook({
         width={leftPage.width}
         height={leftPage.height}
         accent={palette.stampColor}
+      />
+
+      <PageFolio
+        number={spread * 2 + 1}
+        frame={leftPage}
+        edge={PAGE_FOLIO_EDGES.spreadLeft}
+        color={palette.stampColor}
+        font={folioFont}
+      />
+      <PageFolio
+        number={spread * 2 + 2}
+        frame={rightPage}
+        edge={PAGE_FOLIO_EDGES.spreadRight}
+        color={palette.stampColor}
+        font={folioFont}
       />
       <PageBorder
         id={border}
@@ -523,29 +764,49 @@ export function Scrapbook({
             <ImageShader
               image={frontSnapshot}
               fit="fill"
-              rect={{ x: 0, y: 0, width: rightPage.width, height: rightPage.height }}
+              rect={{
+                x: 0,
+                y: 0,
+                width: rightPage.width,
+                height: rightPage.height,
+              }}
             />
             <ImageShader
               image={backSnapshot}
               fit="fill"
-              rect={{ x: 0, y: 0, width: rightPage.width, height: rightPage.height }}
+              rect={{
+                x: 0,
+                y: 0,
+                width: rightPage.width,
+                height: rightPage.height,
+              }}
             />
             <ImageShader
               image={baseLeftSnapshot}
               fit="fill"
-              rect={{ x: 0, y: 0, width: leftPage.width, height: leftPage.height }}
+              rect={{
+                x: 0,
+                y: 0,
+                width: leftPage.width,
+                height: leftPage.height,
+              }}
             />
             <ImageShader
               image={baseRightSnapshot}
               fit="fill"
-              rect={{ x: 0, y: 0, width: rightPage.width, height: rightPage.height }}
+              rect={{
+                x: 0,
+                y: 0,
+                width: rightPage.width,
+                height: rightPage.height,
+              }}
             />
           </Shader>
         </Rect>
       ) : null}
 
       {flip ? (
-        <Group opacity={bindingOverlayOpacity}>
+        <Group>
           {spineRings.map((y) => (
             <BindingRing
               key={`overlay-${y}`}
@@ -557,6 +818,70 @@ export function Scrapbook({
               hole={palette.ringHole}
             />
           ))}
+        </Group>
+      ) : null}
+
+      {/*
+       * Rings sit above settled paper. Repaint only the loose folded portion
+       * over the narrow spine band so each connector disappears solely while
+       * the diagonal sheet is physically crossing it.
+       */}
+      {flip &&
+      PAGE_FLIP_EFFECT &&
+      frontSnapshot &&
+      backSnapshot &&
+      baseLeftSnapshot &&
+      baseRightSnapshot ? (
+        <Group clip={bindingOcclusionClip}>
+          <Rect
+            x={leftPage.x}
+            y={rightPage.y}
+            width={leftPage.width + rightPage.width}
+            height={rightPage.height}
+          >
+            <Shader source={PAGE_FLIP_EFFECT} uniforms={foldOcclusionUniforms}>
+              <ImageShader
+                image={frontSnapshot}
+                fit="fill"
+                rect={{
+                  x: 0,
+                  y: 0,
+                  width: rightPage.width,
+                  height: rightPage.height,
+                }}
+              />
+              <ImageShader
+                image={backSnapshot}
+                fit="fill"
+                rect={{
+                  x: 0,
+                  y: 0,
+                  width: rightPage.width,
+                  height: rightPage.height,
+                }}
+              />
+              <ImageShader
+                image={baseLeftSnapshot}
+                fit="fill"
+                rect={{
+                  x: 0,
+                  y: 0,
+                  width: leftPage.width,
+                  height: leftPage.height,
+                }}
+              />
+              <ImageShader
+                image={baseRightSnapshot}
+                fit="fill"
+                rect={{
+                  x: 0,
+                  y: 0,
+                  width: rightPage.width,
+                  height: rightPage.height,
+                }}
+              />
+            </Shader>
+          </Rect>
         </Group>
       ) : null}
 

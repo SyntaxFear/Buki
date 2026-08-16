@@ -42,7 +42,8 @@ export const PAD_GEOMETRY = {
   pageRadius: 18,
   slotRadius: 14,
   tabRadius: 15,
-  tabProtrusion: 14,
+  tabWidth: 40,
+  tabProtrusion: 20,
   pageInset: 12,
 } as const;
 

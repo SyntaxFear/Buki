@@ -8,6 +8,14 @@ import {
   drawSnapshotPageVisuals,
   type SnapshotPageVisuals,
 } from "@/components/pad-ornaments";
+import {
+  drawSnapshotPageFolio,
+  type PageFolioSpec,
+} from "@/components/sketchpad-page-numbers";
+import {
+  PAGE_FOLD_OCCLUSION_BEND_END,
+  PAGE_FOLD_OCCLUSION_BEND_START,
+} from "@/utils/page-fold-occlusion";
 
 export const PAGE_FACE_RADIUS = PAD_GEOMETRY.pageRadius;
 export const PAGE_DOT_INSET = 12;
@@ -33,6 +41,7 @@ uniform float transposed;
 uniform float spineOff;
 uniform float curl;
 uniform float hasLeftBase;
+uniform float foldOnly;
 
 half4 sampleFront(float s, float v) {
   float2 c = transposed > 0.5 ? float2(v, s) : float2(s, v);
@@ -80,38 +89,40 @@ half4 main(float2 xy) {
   float tip = 2.0 * crease - pw;
   float shadowWidth = max(8.0, pw * (0.05 + 0.13 * bend));
 
-  // Paint the stationary pages inside this same shader pass. This makes the
-  // first and last frames visually complete even if React mounts or removes
-  // the flip node one frame earlier/later under load.
   half4 result = half4(0.0);
-  if (u >= 0.0 && u <= pw) {
-    result = sampleUnderRight(u, v);
-  } else if (hasLeftBase > 0.5 && u >= -pw && u < 0.0) {
-    result = sampleUnderLeft(u + pw, v);
-  }
+  if (foldOnly < 0.5) {
+    // Paint the stationary pages inside this same shader pass. This makes the
+    // first and last frames visually complete even if React mounts or removes
+    // the flip node one frame earlier/later under load.
+    if (u >= 0.0 && u <= pw) {
+      result = sampleUnderRight(u, v);
+    } else if (hasLeftBase > 0.5 && u >= -pw && u < 0.0) {
+      result = sampleUnderLeft(u + pw, v);
+    }
 
-  // Flat portion still attached to the binding.
-  if (u >= 0.0 && u <= pw && u <= crease) {
-    half4 front = sampleFront(u, v);
-    float nearCrease = 1.0 - clamp((crease - u) / shadowWidth, 0.0, 1.0);
-    float shade = 1.0 - 0.18 * bend * nearCrease;
-    result = half4(front.rgb * shade, front.a);
-  }
+    // Flat portion still attached to the binding.
+    if (u >= 0.0 && u <= pw && u <= crease) {
+      half4 front = sampleFront(u, v);
+      float nearCrease = 1.0 - clamp((crease - u) / shadowWidth, 0.0, 1.0);
+      float shade = 1.0 - 0.18 * bend * nearCrease;
+      result = half4(front.rgb * shade, front.a);
+    }
 
-  // Shadow on the page being uncovered, directly beyond the travelling fold.
-  if (u > crease && u <= crease + shadowWidth) {
-    float falloff = 1.0 - (u - crease) / shadowWidth;
-    float shade = 0.24 * bend * falloff * falloff;
-    result = half4(result.rgb * (1.0 - shade), result.a);
-  }
+    // Shadow on the page being uncovered, directly beyond the travelling fold.
+    if (u > crease && u <= crease + shadowWidth) {
+      float falloff = 1.0 - (u - crease) / shadowWidth;
+      float shade = 0.24 * bend * falloff * falloff;
+      result = half4(result.rgb * (1.0 - shade), result.a);
+    }
 
-  // The free edge needs only a narrow contact shadow. Tying this width to the
-  // page-sized crease shadow made tall pads produce a second triangular end.
-  float tipShadowWidth = 2.0 + 5.0 * bend;
-  if (u < tip && u >= tip - tipShadowWidth) {
-    float falloff = 1.0 - (tip - u) / tipShadowWidth;
-    float shade = 0.10 * bend * falloff * falloff;
-    result = half4(result.rgb * (1.0 - shade), result.a);
+    // The free edge needs only a narrow contact shadow. Tying this width to the
+    // page-sized crease shadow made tall pads produce a second triangular end.
+    float tipShadowWidth = 2.0 + 5.0 * bend;
+    if (u < tip && u >= tip - tipShadowWidth) {
+      float falloff = 1.0 - (tip - u) / tipShadowWidth;
+      float shade = 0.10 * bend * falloff * falloff;
+      result = half4(result.rgb * (1.0 - shade), result.a);
+    }
   }
 
   // Folded portion. Mirroring across the crease preserves the sheet's length;
@@ -130,8 +141,19 @@ half4 main(float2 xy) {
       shade *= 1.0 - 0.06 * bend * freeEdge;
       float tipAlpha = smoothstep(tip - 1.2, tip + 1.2, u);
       float creaseAlpha = 1.0 - smoothstep(crease, crease + 1.2, u);
-      float alpha = tipAlpha * creaseAlpha * folded.a;
-      result = mix(result, half4(folded.rgb * shade, folded.a), alpha);
+      float edgeCoverage = tipAlpha * creaseAlpha;
+      float alpha = edgeCoverage * folded.a;
+      if (foldOnly > 0.5) {
+        float looseSheet = smoothstep(
+          ${PAGE_FOLD_OCCLUSION_BEND_START},
+          ${PAGE_FOLD_OCCLUSION_BEND_END},
+          bend
+        );
+        result =
+          half4(folded.rgb * shade, folded.a) * edgeCoverage * looseSheet;
+      } else {
+        result = mix(result, half4(folded.rgb * shade, folded.a), alpha);
+      }
     }
   }
 
@@ -157,6 +179,7 @@ export interface FaceSnapshotOptions {
   guideRects?: Rect[];
   guideColor?: string;
   visuals?: SnapshotPageVisuals;
+  folio?: PageFolioSpec;
 }
 
 /**
@@ -176,6 +199,7 @@ export function buildFaceSnapshot(
     guideRects = [],
     guideColor = colors.slotBorder,
     visuals,
+    folio,
   } = options;
   // Match modern 3x iPhone screens so curved page edges remain smooth while
   // the sheet is moving through the shader.
@@ -248,5 +272,6 @@ export function buildFaceSnapshot(
     canvas.restore();
   }
   if (visuals) drawSnapshotPageVisuals(canvas, pageW, pageH, visuals);
+  if (folio) drawSnapshotPageFolio(canvas, pageW, pageH, folio);
   return surface.makeImageSnapshot();
 }
