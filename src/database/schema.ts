@@ -209,6 +209,10 @@ CREATE INDEX IF NOT EXISTS analytics_queue_owner_ready_idx
 ON analytics_queue(owner_id, available_at, occurred_at);
 `;
 
+const SCHEMA_V6 = `
+ALTER TABLE sketchpads ADD COLUMN icon TEXT NOT NULL DEFAULT 'cover';
+`;
+
 export async function migrateDatabaseSchema(db: SQLiteDatabase): Promise<void> {
   await db.execAsync("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   const current = await db.getFirstAsync<{ user_version: number }>("PRAGMA user_version");
@@ -246,6 +250,13 @@ export async function migrateDatabaseSchema(db: SQLiteDatabase): Promise<void> {
     await db.withExclusiveTransactionAsync(async (tx) => {
       await tx.execAsync(SCHEMA_V5);
       await tx.execAsync("PRAGMA user_version = 5");
+    });
+  }
+
+  if (currentVersion < 6) {
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      await tx.execAsync(SCHEMA_V6);
+      await tx.execAsync("PRAGMA user_version = 6");
     });
   }
 

@@ -10,6 +10,11 @@ import {
 } from "@/pad-designs";
 import { DEFAULT_CHILD_ID } from "@/database/constants";
 import {
+  DEFAULT_PAD_ICON_ID,
+  isPadIconId,
+  type PadIconId,
+} from "@/pad-icons";
+import {
   isPadBorderId,
   isPadDecorationId,
   type PadBorderId,
@@ -20,6 +25,7 @@ import { normalizeArtworkTags } from "@/organization/artwork-organizer";
 export type PadStyle = "spread" | "vertical" | "album" | "grid" | "strip";
 
 export const PAD_STYLES: readonly PadStyle[] = ["spread", "vertical", "album", "grid", "strip"];
+export const DEFAULT_PAD_STYLE: PadStyle = "vertical";
 
 export interface Drawing {
   id: string;
@@ -46,6 +52,7 @@ export interface Sketchpad {
   design: PadDesignId;
   border: PadBorderId;
   decoration: PadDecorationId;
+  icon?: PadIconId;
   coverColor: string;
   /** Page tint; older pads omit it and render the classic cream */
   pageColor?: string;
@@ -73,6 +80,7 @@ export function makePad(
   childId: string = DEFAULT_CHILD_ID,
   border: PadBorderId = "none",
   decoration: PadDecorationId = "none",
+  icon: PadIconId = DEFAULT_PAD_ICON_ID,
 ): Sketchpad {
   const palette = getPadDesign(design);
   return {
@@ -83,6 +91,7 @@ export function makePad(
     design,
     border,
     decoration,
+    icon,
     coverColor: palette.cover,
     pageColor: pageColor ?? palette.paper,
     createdAt: now,
@@ -90,7 +99,7 @@ export function makePad(
 }
 
 function emptyStore(now: number): StoreData {
-  const pad = makePad(DEFAULT_PAD_NAME, "spread", DEFAULT_PAD_DESIGN_ID, now, "pad-default");
+  const pad = makePad(DEFAULT_PAD_NAME, DEFAULT_PAD_STYLE, DEFAULT_PAD_DESIGN_ID, now, "pad-default");
   return { version: 5, activePadId: pad.id, pads: [pad], drawingsByPad: { [pad.id]: [] } };
 }
 
@@ -120,7 +129,7 @@ function normalizeDrawing(d: unknown): Drawing | null {
 /**
  * Accepts whatever JSON was on disk — v1 ({version:1, drawings}), v2-v5, or
  * garbage — and returns a valid v5 store. v1 collections become a single
- * default spread pad so nothing is lost.
+ * default single-page vertical pad so nothing is lost.
  */
 export function migrateStoreData(raw: unknown, now: number): StoreData {
   if (typeof raw !== "object" || raw === null) return emptyStore(now);
@@ -186,6 +195,7 @@ function normalizePad(value: unknown): Sketchpad | null {
     design,
     border: isPadBorderId(pad.border) ? pad.border : "none",
     decoration: isPadDecorationId(pad.decoration) ? pad.decoration : "none",
+    icon: isPadIconId(pad.icon) ? pad.icon : DEFAULT_PAD_ICON_ID,
     coverColor: typeof pad.coverColor === "string" ? pad.coverColor : palette.cover,
     pageColor: typeof pad.pageColor === "string" ? pad.pageColor : palette.paper,
     createdAt: typeof pad.createdAt === "number" ? pad.createdAt : 0,

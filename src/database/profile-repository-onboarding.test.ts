@@ -78,4 +78,19 @@ describe("onboarding replay organization safety", () => {
     ]);
     expect(mockEnqueueCurrentSketchpad).toHaveBeenCalledWith(tx, "adult-a", "legacy-pad");
   });
+
+  it("creates the first sketchpad as a vertical single-page pad", async () => {
+    const { db, tx } = database(null, null);
+
+    await completeLocalOnboarding(db as never, input);
+
+    expect(normalizedStatements(tx)).toContainEqual(
+      expect.stringContaining("'My Book', 'vertical', 'sunshine'"),
+    );
+    expect(mockEnqueueCurrentSketchpad).toHaveBeenCalledWith(
+      tx,
+      "adult-a",
+      "pad-new",
+    );
+  });
 });

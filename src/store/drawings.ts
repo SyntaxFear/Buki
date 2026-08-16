@@ -2,8 +2,17 @@ import { File } from "expo-file-system";
 import { create } from "zustand";
 
 import type { ProcessedCutout } from "@/utils/imageio";
-import { enqueueLibrarySnapshot, loadLibrarySnapshot } from "@/database";
-import { getPadDesign, isPremiumPadDesign, type PadDesignId } from "@/pad-designs";
+import {
+  enqueueLibrarySnapshot,
+  enqueueSketchpadViewedUnit,
+  loadLibrarySnapshot,
+  loadSketchpadViewedUnits,
+} from "@/database";
+import {
+  getPadDesign,
+  isPremiumPadDesign,
+  type PadDesignId,
+} from "@/pad-designs";
 import {
   hasPremiumPadVisual,
   isPremiumPadBorder,
@@ -11,6 +20,7 @@ import {
   type PadBorderId,
   type PadDecorationId,
 } from "@/pad-visuals";
+import type { PadIconId } from "@/pad-icons";
 import {
   normalizeArtworkTags,
   normalizeArtworkText,
@@ -33,6 +43,7 @@ import {
 } from "./migrate";
 
 export type { Drawing, PadStyle, Sketchpad } from "./migrate";
+export { DEFAULT_PAD_STYLE } from "./migrate";
 
 /** A freshly scanned cutout travelling from the scan screen to the book. */
 export interface PendingDrawing extends ProcessedCutout {
@@ -44,18 +55,22 @@ interface DrawingsState {
   pads: Sketchpad[];
   activePadId: string;
   drawingsByPad: Record<string, Drawing[]>;
+  viewedUnitsByPad: Record<string, number>;
   pending: PendingDrawing | null;
   hydrate: () => Promise<void>;
   reloadForAccount: () => Promise<void>;
   resetForAccountSwitch: () => void;
   requestArtworkCreation: (source?: string) => boolean;
-  setPending: (cutout: ProcessedCutout) => void;
+  setPending: (drawing: PendingDrawing) => void;
   /** Land the pending cutout in the active pad and persist it. */
   commitPending: () => boolean;
   clearPending: () => void;
   /** Wipe the active pad's drawings (long-press on the camera button). */
   clearActivePad: () => void;
-  updateDrawingMetadata: (id: string, updates: { title: string; notes: string }) => boolean;
+  updateDrawingMetadata: (
+    id: string,
+    updates: { title: string; notes: string },
+  ) => boolean;
   toggleDrawingFavorite: (id: string) => boolean;
   setDrawingTags: (id: string, tags: string[]) => boolean;
   deleteDrawing: (id: string) => boolean;
@@ -71,7 +86,20 @@ interface DrawingsState {
     childId?: string,
     border?: PadBorderId,
     decoration?: PadDecorationId,
+    icon?: PadIconId,
   ) => string | null;
+  updatePad: (
+    id: string,
+    updates: {
+      name: string;
+      style: PadStyle;
+      design: PadDesignId;
+      border: PadBorderId;
+      decoration: PadDecorationId;
+      icon?: PadIconId;
+      pageColor?: string;
+    },
+  ) => boolean;
   setPadVisuals: (
     id: string,
     visuals: {
@@ -86,6 +114,7 @@ interface DrawingsState {
   /** Deletes the pad and its drawings from disk. No-op on the last pad. */
   deletePad: (id: string) => void;
   setActivePad: (id: string) => void;
+  rememberViewedUnit: (padId: string, unit: number) => void;
   setActiveChild: (childId: string) => void;
   removeChildContent: (childId: string) => void;
 }
@@ -99,7 +128,10 @@ export function contentCountsOf(s: {
   return {
     children: 1,
     sketchpads: s.pads.length,
-    artworks: Object.values(s.drawingsByPad).reduce((total, drawings) => total + drawings.length, 0),
+    artworks: Object.values(s.drawingsByPad).reduce(
+      (total, drawings) => total + drawings.length,
+      0,
+    ),
   };
 }
 
@@ -110,7 +142,10 @@ export function activeDrawingsOf(s: {
   return s.drawingsByPad[s.activePadId] ?? EMPTY_DRAWINGS;
 }
 
-export function activePadOf(s: { pads: Sketchpad[]; activePadId: string }): Sketchpad | undefined {
+export function activePadOf(s: {
+  pads: Sketchpad[];
+  activePadId: string;
+}): Sketchpad | undefined {
   return s.pads.find((p) => p.id === s.activePadId);
 }
 
@@ -120,11 +155,17 @@ export function activeChildPadIdsOf(s: {
 }): ReadonlySet<string> {
   const childId = s.pads.find((pad) => pad.id === s.activePadId)?.childId;
   if (!childId) return new Set();
-  return new Set(s.pads.filter((pad) => pad.childId === childId).map((pad) => pad.id));
+  return new Set(
+    s.pads.filter((pad) => pad.childId === childId).map((pad) => pad.id),
+  );
 }
 
 function persist(
-  s: { activePadId: string; pads: Sketchpad[]; drawingsByPad: Record<string, Drawing[]> },
+  s: {
+    activePadId: string;
+    pads: Sketchpad[];
+    drawingsByPad: Record<string, Drawing[]>;
+  },
   onError?: (error: unknown) => void,
 ): void {
   const data: StoreData = {
@@ -182,7 +223,9 @@ interface LocatedDrawing {
   drawing: Drawing;
 }
 
-function drawingIndex(drawingsByPad: Record<string, Drawing[]>): Map<string, LocatedDrawing> {
+function drawingIndex(
+  drawingsByPad: Record<string, Drawing[]>,
+): Map<string, LocatedDrawing> {
   const index = new Map<string, LocatedDrawing>();
   for (const [padId, drawings] of Object.entries(drawingsByPad)) {
     drawings.forEach((drawing, drawingIndex) => {
@@ -260,7 +303,9 @@ export function rollbackRejectedAdvancedOrganization(
   );
   const movedIds = new Set(
     candidates
-      .filter(({ previous: before, current: after }) => before.padId !== after.padId)
+      .filter(
+        ({ previous: before, current: after }) => before.padId !== after.padId,
+      )
       .map(({ id }) => id),
   );
 
@@ -270,7 +315,8 @@ export function rollbackRejectedAdvancedOrganization(
   for (const candidate of candidates) {
     if (movedIds.has(candidate.id)) continue;
     const padDrawings = next[candidate.current.padId];
-    const index = padDrawings?.findIndex((drawing) => drawing.id === candidate.id) ?? -1;
+    const index =
+      padDrawings?.findIndex((drawing) => drawing.id === candidate.id) ?? -1;
     if (index >= 0) padDrawings[index] = candidate.restored;
   }
   const movedCandidates = candidates
@@ -301,8 +347,15 @@ function introduceProAfterFirstArtwork(attempt = 0): void {
     setTimeout(() => introduceProAfterFirstArtwork(attempt + 1), 1000);
     return;
   }
-  if (membership.tier !== "free" || usePreferences.getState().proIntroductionShown) return;
-  void usePreferences.getState().markProIntroductionShown().catch(() => {});
+  if (
+    membership.tier !== "free" ||
+    usePreferences.getState().proIntroductionShown
+  )
+    return;
+  void usePreferences
+    .getState()
+    .markProIntroductionShown()
+    .catch(() => {});
   membership.requestUpgrade("premiumVisuals", "first_artwork");
 }
 
@@ -311,17 +364,25 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
   pads: [],
   activePadId: "",
   drawingsByPad: {},
+  viewedUnitsByPad: {},
   pending: null,
 
   hydrate: async () => {
     if (get().hydrated) return;
     try {
       const data = await loadLibrarySnapshot();
+      const viewedUnitsByPad = await loadSketchpadViewedUnits().catch(
+        (error) => {
+          console.warn("Failed to hydrate Buki page positions", error);
+          return {};
+        },
+      );
       set({
         hydrated: true,
         pads: data.pads,
         activePadId: data.activePadId,
         drawingsByPad: data.drawingsByPad,
+        viewedUnitsByPad,
       });
     } catch (error) {
       console.warn("Failed to hydrate Buki library", error);
@@ -331,38 +392,53 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
         pads: data.pads,
         activePadId: data.activePadId,
         drawingsByPad: data.drawingsByPad,
+        viewedUnitsByPad: {},
       });
     }
   },
 
   reloadForAccount: async () => {
     const data = await loadLibrarySnapshot();
+    const viewedUnitsByPad = await loadSketchpadViewedUnits().catch((error) => {
+      console.warn("Failed to reload Buki page positions", error);
+      return {};
+    });
     set({
       hydrated: true,
       pads: data.pads,
       activePadId: data.activePadId,
       drawingsByPad: data.drawingsByPad,
+      viewedUnitsByPad,
       pending: null,
     });
   },
 
   resetForAccountSwitch: () =>
-    set({ hydrated: false, pads: [], activePadId: "", drawingsByPad: {}, pending: null }),
+    set({
+      hydrated: false,
+      pads: [],
+      activePadId: "",
+      drawingsByPad: {},
+      viewedUnitsByPad: {},
+      pending: null,
+    }),
 
   requestArtworkCreation: (source = "artwork_limit") => {
     const { pads, drawingsByPad } = get();
-    if (canCreateContent("artworks", contentCountsOf({ pads, drawingsByPad }), currentCapabilities())) {
+    if (
+      canCreateContent(
+        "artworks",
+        contentCountsOf({ pads, drawingsByPad }),
+        currentCapabilities(),
+      )
+    ) {
       return true;
     }
     useMembership.getState().requestUpgrade("artworks", source);
     return false;
   },
 
-  setPending: (cutout) => {
-    set({
-      pending: { ...cutout, rotation: (Math.random() - 0.5) * 10 },
-    });
-  },
+  setPending: (drawing) => set({ pending: drawing }),
 
   commitPending: () => {
     const { pending, drawingsByPad, activePadId, pads } = get();
@@ -389,8 +465,13 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       tags: [],
       updatedAt: Date.now(),
     };
-    const isFirstArtwork = Object.values(drawingsByPad).every((drawings) => drawings.length === 0);
-    const nextByPad = { ...drawingsByPad, [activePadId]: [...current, drawing] };
+    const isFirstArtwork = Object.values(drawingsByPad).every(
+      (drawings) => drawings.length === 0,
+    );
+    const nextByPad = {
+      ...drawingsByPad,
+      [activePadId]: [...current, drawing],
+    };
     set({ drawingsByPad: nextByPad, pending: null });
     persist({ activePadId, pads, drawingsByPad: nextByPad }, (error) => {
       if (!isContentLimitReachedError(error, "artworks")) return;
@@ -403,13 +484,19 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
           ]),
         ),
       }));
-      useMembership.getState().requestUpgrade("artworks", "artwork_limit_commit");
+      useMembership
+        .getState()
+        .requestUpgrade("artworks", "artwork_limit_commit");
     });
     if (isFirstArtwork) setTimeout(() => introduceProAfterFirstArtwork(), 700);
     return true;
   },
 
-  clearPending: () => set({ pending: null }),
+  clearPending: () => {
+    const pending = get().pending;
+    if (pending) deleteMediaFiles([pending]);
+    set({ pending: null });
+  },
 
   clearActivePad: () => {
     const { drawingsByPad, activePadId, pads } = get();
@@ -423,12 +510,17 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     const { drawingsByPad, activePadId, pads } = get();
     const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
     const now = Date.now();
-    const result = updateDrawingById(drawingsByPad, id, allowedPadIds, (drawing) => ({
-      ...drawing,
-      title: updates.title.trim().slice(0, 100) || undefined,
-      notes: updates.notes.trim().slice(0, 2_000) || undefined,
-      updatedAt: now,
-    }));
+    const result = updateDrawingById(
+      drawingsByPad,
+      id,
+      allowedPadIds,
+      (drawing) => ({
+        ...drawing,
+        title: updates.title.trim().slice(0, 100) || undefined,
+        notes: updates.notes.trim().slice(0, 2_000) || undefined,
+        updatedAt: now,
+      }),
+    );
     if (!result.changed) return false;
     set({ drawingsByPad: result.drawingsByPad });
     persist({ activePadId, pads, drawingsByPad: result.drawingsByPad });
@@ -439,27 +531,34 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     if (!advancedOrganizationAllowed("artwork_favorite")) return false;
     const { drawingsByPad, activePadId, pads } = get();
     const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
-    const result = updateDrawingById(drawingsByPad, id, allowedPadIds, (drawing) => ({
-      ...drawing,
-      favorite: !drawing.favorite,
-      updatedAt: Date.now(),
-    }));
+    const result = updateDrawingById(
+      drawingsByPad,
+      id,
+      allowedPadIds,
+      (drawing) => ({
+        ...drawing,
+        favorite: !drawing.favorite,
+        updatedAt: Date.now(),
+      }),
+    );
     if (!result.changed) return false;
     set({ drawingsByPad: result.drawingsByPad });
-    persist({ activePadId, pads, drawingsByPad: result.drawingsByPad }, (error) => {
-      if (!isProFeatureRequiredError(error, "advancedOrganization")) return;
-      set((state) => ({
-        drawingsByPad: rollbackRejectedAdvancedOrganization(
-          state.drawingsByPad,
-          drawingsByPad,
-          result.drawingsByPad,
-        ),
-      }));
-      useMembership.getState().requestUpgrade(
-        "advancedOrganization",
-        "artwork_favorite_commit",
-      );
-    });
+    persist(
+      { activePadId, pads, drawingsByPad: result.drawingsByPad },
+      (error) => {
+        if (!isProFeatureRequiredError(error, "advancedOrganization")) return;
+        set((state) => ({
+          drawingsByPad: rollbackRejectedAdvancedOrganization(
+            state.drawingsByPad,
+            drawingsByPad,
+            result.drawingsByPad,
+          ),
+        }));
+        useMembership
+          .getState()
+          .requestUpgrade("advancedOrganization", "artwork_favorite_commit");
+      },
+    );
     return true;
   },
 
@@ -468,27 +567,34 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     const normalizedTags = normalizeArtworkTags(tags);
     const { drawingsByPad, activePadId, pads } = get();
     const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
-    const result = updateDrawingById(drawingsByPad, id, allowedPadIds, (drawing) => ({
-      ...drawing,
-      tags: normalizedTags,
-      updatedAt: Date.now(),
-    }));
+    const result = updateDrawingById(
+      drawingsByPad,
+      id,
+      allowedPadIds,
+      (drawing) => ({
+        ...drawing,
+        tags: normalizedTags,
+        updatedAt: Date.now(),
+      }),
+    );
     if (!result.changed) return false;
     set({ drawingsByPad: result.drawingsByPad });
-    persist({ activePadId, pads, drawingsByPad: result.drawingsByPad }, (error) => {
-      if (!isProFeatureRequiredError(error, "advancedOrganization")) return;
-      set((state) => ({
-        drawingsByPad: rollbackRejectedAdvancedOrganization(
-          state.drawingsByPad,
-          drawingsByPad,
-          result.drawingsByPad,
-        ),
-      }));
-      useMembership.getState().requestUpgrade(
-        "advancedOrganization",
-        "artwork_tags_commit",
-      );
-    });
+    persist(
+      { activePadId, pads, drawingsByPad: result.drawingsByPad },
+      (error) => {
+        if (!isProFeatureRequiredError(error, "advancedOrganization")) return;
+        set((state) => ({
+          drawingsByPad: rollbackRejectedAdvancedOrganization(
+            state.drawingsByPad,
+            drawingsByPad,
+            result.drawingsByPad,
+          ),
+        }));
+        useMembership
+          .getState()
+          .requestUpgrade("advancedOrganization", "artwork_tags_commit");
+      },
+    );
     return true;
   },
 
@@ -529,7 +635,8 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
         !allowedPadIds.has(padId)
           ? drawings
           : drawings.map((drawing) => {
-              if (!selected.has(drawing.id) || drawing.favorite === favorite) return drawing;
+              if (!selected.has(drawing.id) || drawing.favorite === favorite)
+                return drawing;
               changed = true;
               return { ...drawing, favorite, updatedAt: now };
             }),
@@ -546,10 +653,9 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
           nextByPad,
         ),
       }));
-      useMembership.getState().requestUpgrade(
-        "advancedOrganization",
-        "library_bulk_favorite_commit",
-      );
+      useMembership
+        .getState()
+        .requestUpgrade("advancedOrganization", "library_bulk_favorite_commit");
     });
     return true;
   },
@@ -570,7 +676,10 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
           ? drawings
           : drawings.map((drawing) => {
               if (!selected.has(drawing.id)) return drawing;
-              const tags = normalizeArtworkTags([...(drawing.tags ?? []), normalizedTag]);
+              const tags = normalizeArtworkTags([
+                ...(drawing.tags ?? []),
+                normalizedTag,
+              ]);
               if (tags.length === (drawing.tags ?? []).length) return drawing;
               changed = true;
               return { ...drawing, tags, updatedAt: now };
@@ -588,10 +697,9 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
           nextByPad,
         ),
       }));
-      useMembership.getState().requestUpgrade(
-        "advancedOrganization",
-        "library_bulk_tag_commit",
-      );
+      useMembership
+        .getState()
+        .requestUpgrade("advancedOrganization", "library_bulk_tag_commit");
     });
     return true;
   },
@@ -601,7 +709,9 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     const selected = new Set(ids);
     const { drawingsByPad, activePadId, pads } = get();
     const allowedPadIds = activeChildPadIdsOf({ pads, activePadId });
-    const targetPad = pads.find((pad) => pad.id === targetPadId && allowedPadIds.has(pad.id));
+    const targetPad = pads.find(
+      (pad) => pad.id === targetPadId && allowedPadIds.has(pad.id),
+    );
     if (!targetPad || selected.size === 0) return false;
     const moved: Drawing[] = [];
     const nextByPad = { ...drawingsByPad };
@@ -609,7 +719,8 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       if (pad.id === targetPadId || !allowedPadIds.has(pad.id)) continue;
       const remaining: Drawing[] = [];
       for (const drawing of drawingsByPad[pad.id] ?? []) {
-        if (selected.has(drawing.id)) moved.push({ ...drawing, updatedAt: Date.now() });
+        if (selected.has(drawing.id))
+          moved.push({ ...drawing, updatedAt: Date.now() });
         else remaining.push(drawing);
       }
       nextByPad[pad.id] = remaining;
@@ -626,10 +737,9 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
           nextByPad,
         ),
       }));
-      useMembership.getState().requestUpgrade(
-        "advancedOrganization",
-        "library_bulk_move_commit",
-      );
+      useMembership
+        .getState()
+        .requestUpgrade("advancedOrganization", "library_bulk_move_commit");
     });
     return true;
   },
@@ -660,9 +770,24 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     return true;
   },
 
-  createPad: (name, style, design, pageColor, childId, border = "none", decoration = "none") => {
+  createPad: (
+    name,
+    style,
+    design,
+    pageColor,
+    childId,
+    border = "none",
+    decoration = "none",
+    icon,
+  ) => {
     const { pads, drawingsByPad, activePadId: previousActivePadId } = get();
-    if (!canCreateContent("sketchpads", contentCountsOf({ pads, drawingsByPad }), currentCapabilities())) {
+    if (
+      !canCreateContent(
+        "sketchpads",
+        contentCountsOf({ pads, drawingsByPad }),
+        currentCapabilities(),
+      )
+    ) {
       useMembership.getState().requestUpgrade("sketchpads", "sketchpad_limit");
       return null;
     }
@@ -671,7 +796,9 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       hasPremiumPadVisual({ design, border, decoration }) &&
       !currentCapabilities().premiumVisuals
     ) {
-      useMembership.getState().requestUpgrade("premiumVisuals", "premium_visual_create");
+      useMembership
+        .getState()
+        .requestUpgrade("premiumVisuals", "premium_visual_create");
       return null;
     }
     const pad = makePad(
@@ -684,58 +811,79 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
       childId,
       border,
       decoration,
+      icon,
     );
     const nextPads = [...pads, pad];
     const nextByPad = { ...drawingsByPad, [pad.id]: [] };
     set({ pads: nextPads, drawingsByPad: nextByPad, activePadId: pad.id });
-    persist({ activePadId: pad.id, pads: nextPads, drawingsByPad: nextByPad }, (error) => {
-      if (!isContentLimitReachedError(error, "sketchpads")) return;
-      set((state) => {
-        const rollbackPads = state.pads.filter((item) => item.id !== pad.id);
-        const rollbackDrawings = { ...state.drawingsByPad };
-        delete rollbackDrawings[pad.id];
-        return {
-          pads: rollbackPads,
-          drawingsByPad: rollbackDrawings,
-          activePadId:
-            state.activePadId === pad.id
-              ? (rollbackPads.some((item) => item.id === previousActivePadId)
+    persist(
+      { activePadId: pad.id, pads: nextPads, drawingsByPad: nextByPad },
+      (error) => {
+        if (!isContentLimitReachedError(error, "sketchpads")) return;
+        set((state) => {
+          const rollbackPads = state.pads.filter((item) => item.id !== pad.id);
+          const rollbackDrawings = { ...state.drawingsByPad };
+          delete rollbackDrawings[pad.id];
+          return {
+            pads: rollbackPads,
+            drawingsByPad: rollbackDrawings,
+            activePadId:
+              state.activePadId === pad.id
+                ? rollbackPads.some((item) => item.id === previousActivePadId)
                   ? previousActivePadId
-                  : (rollbackPads[0]?.id ?? ""))
-              : state.activePadId,
-        };
-      });
-      useMembership.getState().requestUpgrade("sketchpads", "sketchpad_limit_commit");
-    });
+                  : (rollbackPads[0]?.id ?? "")
+                : state.activePadId,
+          };
+        });
+        useMembership
+          .getState()
+          .requestUpgrade("sketchpads", "sketchpad_limit_commit");
+      },
+    );
     return pad.id;
   },
 
-  setPadVisuals: (id, visuals) => {
+  updatePad: (id, updates) => {
     const { pads, drawingsByPad, activePadId } = get();
     const current = pads.find((pad) => pad.id === id);
     if (!current) return false;
     const introducesPremium =
-      (current.design !== visuals.design && isPremiumPadDesign(visuals.design)) ||
-      (current.border !== visuals.border && isPremiumPadBorder(visuals.border)) ||
-      (current.decoration !== visuals.decoration && isPremiumPadDecoration(visuals.decoration));
+      (current.design !== updates.design &&
+        isPremiumPadDesign(updates.design)) ||
+      (current.border !== updates.border &&
+        isPremiumPadBorder(updates.border)) ||
+      (current.decoration !== updates.decoration &&
+        isPremiumPadDecoration(updates.decoration));
     if (introducesPremium && !currentCapabilities().premiumVisuals) {
-      useMembership.getState().requestUpgrade("premiumVisuals", "premium_visual_save");
+      useMembership
+        .getState()
+        .requestUpgrade("premiumVisuals", "premium_visual_save");
       return false;
     }
-    const palette = getPadDesign(visuals.design);
-    const nextPads = pads.map((pad) =>
-      pad.id === id
-        ? {
-            ...pad,
-            style: visuals.style,
-            design: visuals.design,
-            border: visuals.border,
-            decoration: visuals.decoration,
-            coverColor: palette.cover,
-            pageColor: visuals.pageColor ?? palette.paper,
-          }
-        : pad,
-    );
+    const palette = getPadDesign(updates.design);
+    const nextPad: Sketchpad = {
+      ...current,
+      name: updates.name.trim() || "My Book",
+      style: updates.style,
+      design: updates.design,
+      border: updates.border,
+      decoration: updates.decoration,
+      icon: updates.icon ?? current.icon,
+      coverColor: palette.cover,
+      pageColor: updates.pageColor ?? palette.paper,
+    };
+    const unchanged =
+      current.name === nextPad.name &&
+      current.style === nextPad.style &&
+      current.design === nextPad.design &&
+      current.border === nextPad.border &&
+      current.decoration === nextPad.decoration &&
+      current.icon === nextPad.icon &&
+      current.coverColor === nextPad.coverColor &&
+      current.pageColor === nextPad.pageColor;
+    if (unchanged) return true;
+
+    const nextPads = pads.map((pad) => (pad.id === id ? nextPad : pad));
     set({ pads: nextPads });
     persist({ activePadId, pads: nextPads, drawingsByPad }, (error) => {
       if (!isProFeatureRequiredError(error, "premiumVisuals")) return;
@@ -743,34 +891,40 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
         pads: state.pads.map((pad) => {
           if (pad.id !== id) return pad;
           const matchesRejectedVisuals =
-            pad.style === visuals.style &&
-            pad.design === visuals.design &&
-            pad.border === visuals.border &&
-            pad.decoration === visuals.decoration &&
-            pad.pageColor === (visuals.pageColor ?? palette.paper);
-          return matchesRejectedVisuals
-            ? {
-                ...pad,
-                style: current.style,
-                design: current.design,
-                border: current.border,
-                decoration: current.decoration,
-                coverColor: current.coverColor,
-                pageColor: current.pageColor,
-              }
-            : pad;
+            pad.name === nextPad.name &&
+            pad.style === nextPad.style &&
+            pad.design === nextPad.design &&
+            pad.border === nextPad.border &&
+            pad.decoration === nextPad.decoration &&
+            pad.icon === nextPad.icon &&
+            pad.coverColor === nextPad.coverColor &&
+            pad.pageColor === nextPad.pageColor;
+          return matchesRejectedVisuals ? current : pad;
         }),
       }));
-      useMembership.getState().requestUpgrade("premiumVisuals", "premium_visual_save_commit");
+      useMembership
+        .getState()
+        .requestUpgrade("premiumVisuals", "premium_visual_save_commit");
     });
     return true;
+  },
+
+  setPadVisuals: (id, visuals) => {
+    const current = get().pads.find((pad) => pad.id === id);
+    if (!current) return false;
+    return get().updatePad(id, {
+      name: current.name,
+      ...visuals,
+    });
   },
 
   renamePad: (id, name) => {
     const trimmed = name.trim();
     if (!trimmed) return;
     const { pads, drawingsByPad, activePadId } = get();
-    const nextPads = pads.map((p) => (p.id === id ? { ...p, name: trimmed } : p));
+    const nextPads = pads.map((p) =>
+      p.id === id ? { ...p, name: trimmed } : p,
+    );
     set({ pads: nextPads });
     persist({ activePadId, pads: nextPads, drawingsByPad });
   },
@@ -778,16 +932,26 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
   deletePad: (id) => {
     const { pads, drawingsByPad, activePadId } = get();
     const target = pads.find((pad) => pad.id === id);
-    if (!target || pads.filter((pad) => pad.childId === target.childId).length <= 1) return;
+    if (
+      !target ||
+      pads.filter((pad) => pad.childId === target.childId).length <= 1
+    )
+      return;
     deleteMediaFiles(drawingsByPad[id] ?? []);
     const nextPads = pads.filter((p) => p.id !== id);
     const nextByPad = { ...drawingsByPad };
     delete nextByPad[id];
-    const nextActive = activePadId === id
-      ? (nextPads.find((pad) => pad.childId === target.childId)?.id ?? nextPads[0].id)
-      : activePadId;
+    const nextActive =
+      activePadId === id
+        ? (nextPads.find((pad) => pad.childId === target.childId)?.id ??
+          nextPads[0].id)
+        : activePadId;
     set({ pads: nextPads, drawingsByPad: nextByPad, activePadId: nextActive });
-    persist({ activePadId: nextActive, pads: nextPads, drawingsByPad: nextByPad });
+    persist({
+      activePadId: nextActive,
+      pads: nextPads,
+      drawingsByPad: nextByPad,
+    });
   },
 
   setActivePad: (id) => {
@@ -795,6 +959,19 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
     if (id === activePadId || !pads.some((p) => p.id === id)) return;
     set({ activePadId: id, pending: null });
     persist({ activePadId: id, pads, drawingsByPad });
+  },
+
+  rememberViewedUnit: (padId, unit) => {
+    const { pads, viewedUnitsByPad } = get();
+    if (
+      !pads.some((pad) => pad.id === padId) ||
+      !Number.isSafeInteger(unit) ||
+      unit < 0 ||
+      viewedUnitsByPad[padId] === unit
+    )
+      return;
+    set({ viewedUnitsByPad: { ...viewedUnitsByPad, [padId]: unit } });
+    enqueueSketchpadViewedUnit(padId, unit);
   },
 
   setActiveChild: (childId) => {
@@ -808,13 +985,26 @@ export const useDrawings = create<DrawingsState>((set, get) => ({
   removeChildContent: (childId) => {
     const { pads, drawingsByPad, activePadId } = get();
     const removedPads = pads.filter((pad) => pad.childId === childId);
-    for (const pad of removedPads) deleteMediaFiles(drawingsByPad[pad.id] ?? []);
+    for (const pad of removedPads)
+      deleteMediaFiles(drawingsByPad[pad.id] ?? []);
     const removedIds = new Set(removedPads.map((pad) => pad.id));
     const nextPads = pads.filter((pad) => !removedIds.has(pad.id));
     const nextByPad = { ...drawingsByPad };
     for (const id of removedIds) delete nextByPad[id];
-    const nextActive = removedIds.has(activePadId) ? (nextPads[0]?.id ?? "") : activePadId;
-    set({ pads: nextPads, drawingsByPad: nextByPad, activePadId: nextActive, pending: null });
-    if (nextActive) persist({ activePadId: nextActive, pads: nextPads, drawingsByPad: nextByPad });
+    const nextActive = removedIds.has(activePadId)
+      ? (nextPads[0]?.id ?? "")
+      : activePadId;
+    set({
+      pads: nextPads,
+      drawingsByPad: nextByPad,
+      activePadId: nextActive,
+      pending: null,
+    });
+    if (nextActive)
+      persist({
+        activePadId: nextActive,
+        pads: nextPads,
+        drawingsByPad: nextByPad,
+      });
   },
 }));

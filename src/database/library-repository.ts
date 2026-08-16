@@ -41,6 +41,7 @@ interface SketchpadRow {
   page_color: string | null;
   border: string;
   decoration: string;
+  icon: string;
   created_at: number;
 }
 
@@ -235,7 +236,7 @@ async function assertLibraryAccountIsolation(
 export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
   const ownerId = await activeLocalOwnerId(db);
   const pads = await db.getAllAsync<SketchpadRow>(
-    `SELECT id, child_id, name, style, design, cover_color, page_color, border, decoration, created_at
+    `SELECT id, child_id, name, style, design, cover_color, page_color, border, decoration, icon, created_at
      FROM sketchpads
      WHERE deleted_at IS NULL AND ((? IS NULL AND owner_id IS NULL) OR owner_id = ?)
      ORDER BY sort_order, created_at`,
@@ -304,6 +305,7 @@ export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
         design: pad.design,
         border: pad.border,
         decoration: pad.decoration,
+        icon: pad.icon,
         coverColor: pad.cover_color,
         pageColor: pad.page_color ?? undefined,
         createdAt: pad.created_at,
@@ -419,8 +421,8 @@ export async function saveLibrary(
       await tx.runAsync(
         `INSERT INTO sketchpads (
           id, owner_id, child_id, name, style, design, cover_color, page_color, border, decoration,
-          sort_order, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          icon, sort_order, created_at, updated_at, deleted_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         ON CONFLICT(id) DO UPDATE SET
           child_id = excluded.child_id,
           name = excluded.name,
@@ -430,6 +432,7 @@ export async function saveLibrary(
           page_color = excluded.page_color,
           border = excluded.border,
           decoration = excluded.decoration,
+          icon = excluded.icon,
           sort_order = excluded.sort_order,
           updated_at = excluded.updated_at,
           deleted_at = NULL`,
@@ -443,6 +446,7 @@ export async function saveLibrary(
         pad.pageColor ?? null,
         pad.border,
         pad.decoration,
+        pad.icon ?? "cover",
         sortOrder,
         pad.createdAt,
         now,

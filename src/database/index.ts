@@ -9,6 +9,7 @@ import { migrateDatabaseSchema } from "./schema";
 import {
   activateLocalAccount,
   clearActiveLocalAccount,
+  getActiveLocalAdultProfile,
   getLocalAdultProfile,
   updateLocalAdultProfile,
 } from "./account-repository";
@@ -27,7 +28,9 @@ import {
 import {
   getBooleanPreference,
   getLocalUsage,
+  getSketchpadViewedUnits,
   setBooleanPreference,
+  setSketchpadViewedUnit,
 } from "./settings-repository";
 import {
   loadLocalEntitlementSnapshot,
@@ -71,6 +74,7 @@ export { BUKI_DATABASE_NAME };
 
 let activeDatabase: SQLiteDatabase | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
+let viewedUnitWriteQueue: Promise<void> = Promise.resolve();
 
 export async function initializeBukiDatabase(db: SQLiteDatabase): Promise<void> {
   activeDatabase = db;
@@ -95,6 +99,10 @@ export function clearBukiAccount(): Promise<void> {
 
 export function loadAdultProfile(ownerId: string) {
   return getLocalAdultProfile(requireBukiDatabase(), ownerId);
+}
+
+export function loadActiveAdultProfile() {
+  return getActiveLocalAdultProfile(requireBukiDatabase());
 }
 
 export function editAdultProfile(
@@ -163,6 +171,18 @@ export function saveBooleanPreference(name: string, value: boolean) {
   return setBooleanPreference(requireBukiDatabase(), name, value);
 }
 
+export function loadSketchpadViewedUnits() {
+  return getSketchpadViewedUnits(requireBukiDatabase());
+}
+
+export function enqueueSketchpadViewedUnit(padId: string, unit: number): void {
+  viewedUnitWriteQueue = viewedUnitWriteQueue
+    .then(() => setSketchpadViewedUnit(requireBukiDatabase(), padId, unit))
+    .catch((error) => {
+      console.warn("Failed to persist Buki page position", error);
+    });
+}
+
 export function loadBukiUsage() {
   return getLocalUsage(requireBukiDatabase());
 }
@@ -194,7 +214,7 @@ export function enqueueLibrarySnapshot(
 }
 
 export async function flushLibraryWrites(): Promise<void> {
-  await writeQueue;
+  await Promise.all([writeQueue, viewedUnitWriteQueue]);
 }
 
 export async function importBukiLibraryArchive(

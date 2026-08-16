@@ -154,7 +154,7 @@ export async function completeLocalOnboarding(
         `INSERT INTO sketchpads (
           id, owner_id, child_id, name, style, design, cover_color, page_color,
           sort_order, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, 'My Book', 'spread', 'sunshine', ?, ?, 0, ?, ?, NULL)`,
+        ) VALUES (?, ?, ?, 'My Book', 'vertical', 'sunshine', ?, ?, 0, ?, ?, NULL)`,
         activePadId,
         ownerId,
         childId,
@@ -229,7 +229,7 @@ export async function createLocalChild(
       `INSERT INTO sketchpads (
         id, owner_id, child_id, name, style, design, cover_color, page_color,
         sort_order, created_at, updated_at, deleted_at
-      ) VALUES (?, ?, ?, 'My Book', 'spread', 'sunshine', ?, ?, 0, ?, ?, NULL)`,
+      ) VALUES (?, ?, ?, 'My Book', 'vertical', 'sunshine', ?, ?, 0, ?, ?, NULL)`,
       defaultPadId,
       ownerId,
       child.id,
