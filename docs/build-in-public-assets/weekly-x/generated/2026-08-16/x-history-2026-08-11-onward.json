@@ -1,0 +1,50 @@
+[
+  {
+    "id": "x-2026-08-15",
+    "text": "An app I found on X inspired part of Buki: scan a paper drawing, clean the background, then place it in a little animated sketchbook. Buki has been through several App Store review rounds. Which part needs better UX: scan, cutout, or page landing? #Shipaton #BuildInPublic",
+    "hook": "An app I found on X inspired part of Buki",
+    "question": "Which part needs better UX: scan, cutout, or page landing?",
+    "hashtags": [
+      "#Shipaton",
+      "#BuildInPublic"
+    ],
+    "topic": "scan to sketchbook",
+    "angle": "ask which step needs better UX"
+  },
+  {
+    "id": "x-2026-08-13",
+    "text": "I wanted the AI part to save time without deciding what belongs in your wardrobe. Samosi turns one outfit photo into separate pieces. Nothing is saved until you review them. Which should appear first: tops, bottoms, shoes, or accessories? #Shipaton #BuildInPublic",
+    "hook": "I wanted the AI part to save time",
+    "question": "Which should appear first: tops, bottoms, shoes, or accessories?",
+    "hashtags": [
+      "#Shipaton",
+      "#BuildInPublic"
+    ],
+    "topic": "Samosi extraction",
+    "angle": "review before saving"
+  },
+  {
+    "id": "x-2026-08-12",
+    "text": "Adding clothes one by one is where wardrobe apps start feeling like work. With Samosi, choose a photo, review the extracted pieces, save them, then use them in Plan a Look. What is hardest about maintaining a digital wardrobe? #Shipaton #BuildInPublic",
+    "hook": "Adding clothes one by one is where wardrobe apps start feeling like work",
+    "question": "What is hardest about maintaining a digital wardrobe?",
+    "hashtags": [
+      "#Shipaton",
+      "#BuildInPublic"
+    ],
+    "topic": "digital wardrobe maintenance",
+    "angle": "reduce manual entry"
+  },
+  {
+    "id": "x-2026-08-11",
+    "text": "Someone asked if Samosi can use photos on your phone. Yes. Choose a photo, review the clothes it extracts, save them to your wardrobe, then use them in Plan a Look. What should I show next: outfits or packing? #Shipaton #BuildInPublic",
+    "hook": "Someone asked if Samosi can use photos on your phone",
+    "question": "What should I show next: outfits or packing?",
+    "hashtags": [
+      "#Shipaton",
+      "#BuildInPublic"
+    ],
+    "topic": "phone photo import",
+    "angle": "show import flow"
+  }
+]

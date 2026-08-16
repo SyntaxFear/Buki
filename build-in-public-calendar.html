@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Buki — 30-day Build in Public calendar</title>
+  <style>
+    :root { color-scheme: light; --ink:#3d291d; --muted:#7b6250; --paper:#fffaf1; --cream:#fff1d5; --orange:#e87747; --green:#5c7a62; --line:#ead4ad; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:linear-gradient(145deg,#fffaf1,#ffe8b4); color:var(--ink); font:16px/1.45 ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; min-height:100vh; }
+    header { max-width:1280px; margin:auto; padding:64px 28px 30px; }
+    .eyebrow { color:#a6673f; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+    h1 { margin:.25em 0 .15em; font-size:clamp(42px,7vw,88px); line-height:.95; letter-spacing:-.055em; max-width:920px; }
+    header p { color:var(--muted); font-size:19px; max-width:760px; }
+    .legend { display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; }
+    .legend span { border:1px solid var(--line); background:rgba(255,255,255,.68); border-radius:999px; padding:8px 13px; font-size:14px; }
+    main { max-width:1280px; margin:auto; padding:16px 28px 72px; display:grid; grid-template-columns:repeat(auto-fit,minmax(285px,1fr)); gap:18px; }
+    .day { position:relative; min-height:285px; border:1px solid rgba(202,164,107,.56); border-radius:28px; padding:24px; background:rgba(255,255,255,.78); box-shadow:0 16px 45px rgba(95,58,25,.08); overflow:hidden; }
+    .day::after { content:""; position:absolute; width:110px; height:110px; right:-42px; bottom:-48px; border-radius:50%; background:#f4c96f; opacity:.22; }
+    .day.today { outline:4px solid var(--orange); background:#fff; transform:translateY(-3px); }
+    .day.today::before { content:"TODAY"; position:absolute; top:0; right:0; padding:7px 14px; border-radius:0 24px 0 18px; background:var(--orange); color:#fff; font-size:12px; font-weight:900; letter-spacing:.12em; }
+    .day-top { display:flex; align-items:center; justify-content:space-between; color:var(--muted); }
+    .day-top strong { color:#fff; background:var(--green); border-radius:999px; padding:6px 11px; letter-spacing:.06em; }
+    h2 { margin:20px 0 6px; font-size:25px; line-height:1.12; letter-spacing:-.025em; }
+    .format { color:#a65f39; font-weight:750; margin:0 0 14px; }
+    .platforms { display:flex; flex-wrap:wrap; gap:7px; }
+    .platforms span { border:1px solid var(--line); border-radius:999px; padding:5px 9px; background:var(--paper); font-size:13px; }
+    .question { margin:18px 0 0; color:var(--muted); }
+    footer { padding:0 28px 64px; text-align:center; color:var(--muted); }
+    code { color:var(--ink); background:rgba(255,255,255,.72); border:1px solid var(--line); border-radius:8px; padding:4px 7px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Buki • Build in Public</div>
+    <h1>Thirty days of showing the real work.</h1>
+    <p>August 11–September 9, 2026 · Asia/Tbilisi. Each day has one focused story, one useful feedback question, and a source or evidence rule.</p>
+    <div class="legend"><span>No TikTok</span><span>No Instagram</span><span>No automatic publishing</span><span>Evidence-gated claims</span><span>Short videos where useful</span></div>
+  </header>
+  <main><article class="day" data-date="2026-08-11">
+      <div class="day-top"><strong>D01</strong><time datetime="2026-08-11">2026-08-11</time></div>
+      <h2>Why children’s drawings disappear</h2>
+      <p class="format">4:5 image</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> What happens to the drawings in your home after they leave the fridge?</p>
+    </article>
+<article class="day" data-date="2026-08-12">
+      <div class="day-top"><strong>D02</strong><time datetime="2026-08-12">2026-08-12</time></div>
+      <h2>Paper drawing to animated book</h2>
+      <p class="format">15–25 second video</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Which moment should feel more magical: the cutout or the page landing?</p>
+    </article>
+<article class="day" data-date="2026-08-13">
+      <div class="day-top"><strong>D03</strong><time datetime="2026-08-13">2026-08-13</time></div>
+      <h2>Ask Shipaton builders for feedback</h2>
+      <p class="format">text + D02 clip</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> If you have shipped a family app, what trust detail mattered most?</p>
+    </article>
+<article class="day" data-date="2026-08-14">
+      <div class="day-top"><strong>D04</strong><time datetime="2026-08-14">2026-08-14</time></div>
+      <h2>The origin of Buki</h2>
+      <p class="format">4:5 image</p>
+      <div class="platforms"><span>X</span></div>
+      <p class="question"><b>Ask:</b> What childhood object do you wish your family had preserved?</p>
+    </article>
+<article class="day" data-date="2026-08-15">
+      <div class="day-top"><strong>D05</strong><time datetime="2026-08-15">2026-08-15</time></div>
+      <h2>Show source photo versus clean artwork</h2>
+      <p class="format">before/after image</p>
+      <div class="platforms"><span>X</span><span>LinkedIn</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Should Buki preserve the paper texture, or make every drawing clean and transparent?</p>
+    </article>
+<article class="day" data-date="2026-08-16">
+      <div class="day-top"><strong>D06</strong><time datetime="2026-08-16">2026-08-16</time></div>
+      <h2>Contribute to other builders</h2>
+      <p class="format">three thoughtful replies</p>
+      <div class="platforms"><span>X</span><span>LinkedIn</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Which Shipaton project should Buki learn from this week?</p>
+    </article>
+<article class="day" data-date="2026-08-17">
+      <div class="day-top"><strong>D07</strong><time datetime="2026-08-17">2026-08-17</time></div>
+      <h2>Week-one feedback loop</h2>
+      <p class="format">feedback summary card</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Which suggestion should move to the top of the Buki list?</p>
+    </article>
+<article class="day" data-date="2026-08-18">
+      <div class="day-top"><strong>D08</strong><time datetime="2026-08-18">2026-08-18</time></div>
+      <h2>Physical sketchpad design direction</h2>
+      <p class="format">design reference image</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Should the library feel like a real shelf of sketchbooks or a cleaner photo grid?</p>
+    </article>
+<article class="day" data-date="2026-08-19">
+      <div class="day-top"><strong>D09</strong><time datetime="2026-08-19">2026-08-19</time></div>
+      <h2>Page curl interaction</h2>
+      <p class="format">10–18 second video</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Does the page curl add delight, or slow you down?</p>
+    </article>
+<article class="day" data-date="2026-08-20">
+      <div class="day-top"><strong>D10</strong><time datetime="2026-08-20">2026-08-20</time></div>
+      <h2>Ask camera-capture builders</h2>
+      <p class="format">technical question</p>
+      <div class="platforms"><span>X</span><span>Reddit</span></div>
+      <p class="question"><b>Ask:</b> What capture failure should a drawing scanner handle first?</p>
+    </article>
+<article class="day" data-date="2026-08-21">
+      <div class="day-top"><strong>D11</strong><time datetime="2026-08-21">2026-08-21</time></div>
+      <h2>Explain the image pipeline</h2>
+      <p class="format">4:5 diagram</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Which pipeline step would you like to see measured next?</p>
+    </article>
+<article class="day" data-date="2026-08-22">
+      <div class="day-top"><strong>D12</strong><time datetime="2026-08-22">2026-08-22</time></div>
+      <h2>Real-device camera proof</h2>
+      <p class="format">15–25 second phone capture</p>
+      <div class="platforms"><span>X</span><span>LinkedIn</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Is the capture guidance understandable without narration?</p>
+    </article>
+<article class="day" data-date="2026-08-23">
+      <div class="day-top"><strong>D13</strong><time datetime="2026-08-23">2026-08-23</time></div>
+      <h2>Synthesize feedback</h2>
+      <p class="format">three-point summary</p>
+      <div class="platforms"><span>X</span><span>LinkedIn</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Did I interpret this feedback correctly?</p>
+    </article>
+<article class="day" data-date="2026-08-24">
+      <div class="day-top"><strong>D14</strong><time datetime="2026-08-24">2026-08-24</time></div>
+      <h2>Show what feedback changed</h2>
+      <p class="format">before/after or decision note</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Would you have made the same product decision?</p>
+    </article>
+<article class="day" data-date="2026-08-25">
+      <div class="day-top"><strong>D15</strong><time datetime="2026-08-25">2026-08-25</time></div>
+      <h2>Private by design</h2>
+      <p class="format">4:5 trust diagram</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> What would you need to trust a family artwork app?</p>
+    </article>
+<article class="day" data-date="2026-08-26">
+      <div class="day-top"><strong>D16</strong><time datetime="2026-08-26">2026-08-26</time></div>
+      <h2>Write the privacy and processing story</h2>
+      <p class="format">technical article</p>
+      <div class="platforms"><span>X</span><span>Dev.to</span></div>
+      <p class="question"><b>Ask:</b> Which part needs a deeper technical follow-up?</p>
+    </article>
+<article class="day" data-date="2026-08-27">
+      <div class="day-top"><strong>D17</strong><time datetime="2026-08-27">2026-08-27</time></div>
+      <h2>Explain the Free and Pro boundary</h2>
+      <p class="format">paywall screenshot + text</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Does the free version feel genuinely useful before Pro appears?</p>
+    </article>
+<article class="day" data-date="2026-08-28">
+      <div class="day-top"><strong>D18</strong><time datetime="2026-08-28">2026-08-28</time></div>
+      <h2>Monetization without deleting art</h2>
+      <p class="format">4:5 principle card</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> What is a fair paid boundary for a family keepsake app?</p>
+    </article>
+<article class="day" data-date="2026-08-29">
+      <div class="day-top"><strong>D19</strong><time datetime="2026-08-29">2026-08-29</time></div>
+      <h2>Tour the free core</h2>
+      <p class="format">15–25 second video</p>
+      <div class="platforms"><span>X</span><span>LinkedIn</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Where would you expect the first paid boundary?</p>
+    </article>
+<article class="day" data-date="2026-08-30">
+      <div class="day-top"><strong>D20</strong><time datetime="2026-08-30">2026-08-30</time></div>
+      <h2>Ask about packaging</h2>
+      <p class="format">pricing discussion</p>
+      <div class="platforms"><span>X</span><span>LinkedIn</span><span>Reddit</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Monthly, yearly, lifetime — which choice best fits a family archive?</p>
+    </article>
+<article class="day" data-date="2026-08-31">
+      <div class="day-top"><strong>D21</strong><time datetime="2026-08-31">2026-08-31</time></div>
+      <h2>Trust and monetization recap</h2>
+      <p class="format">decision summary</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Which trust promise should be visible directly on the paywall?</p>
+    </article>
+<article class="day" data-date="2026-09-01">
+      <div class="day-top"><strong>D22</strong><time datetime="2026-09-01">2026-09-01</time></div>
+      <h2>Dynamic Type proof</h2>
+      <p class="format">two-screen comparison</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Which screen becomes hardest to use at the largest text size?</p>
+    </article>
+<article class="day" data-date="2026-09-02">
+      <div class="day-top"><strong>D23</strong><time datetime="2026-09-02">2026-09-02</time></div>
+      <h2>Accessibility walkthrough</h2>
+      <p class="format">15–25 second video</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> What accessibility check should I add before release?</p>
+    </article>
+<article class="day" data-date="2026-09-03">
+      <div class="day-top"><strong>D24</strong><time datetime="2026-09-03">2026-09-03</time></div>
+      <h2>App Store first-frame test</h2>
+      <p class="format">three-frame contact sheet</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Which first screenshot explains Buki fastest?</p>
+    </article>
+<article class="day" data-date="2026-09-04">
+      <div class="day-top"><strong>D25</strong><time datetime="2026-09-04">2026-09-04</time></div>
+      <h2>Accessibility lesson</h2>
+      <p class="format">short lesson</p>
+      <div class="platforms"><span>X</span></div>
+      <p class="question"><b>Ask:</b> What is one accessibility detail small apps often miss?</p>
+    </article>
+<article class="day" data-date="2026-09-05">
+      <div class="day-top"><strong>D26</strong><time datetime="2026-09-05">2026-09-05</time></div>
+      <h2>Prepare a public launch page</h2>
+      <p class="format">Product Hunt draft</p>
+      <div class="platforms"><span>X</span><span>LinkedIn</span><span>Product Hunt</span></div>
+      <p class="question"><b>Ask:</b> Is Buki’s one-line promise clear to someone seeing it for the first time?</p>
+    </article>
+<article class="day" data-date="2026-09-06">
+      <div class="day-top"><strong>D27</strong><time datetime="2026-09-06">2026-09-06</time></div>
+      <h2>Invite testers and compare messages</h2>
+      <p class="format">tester invite + A/B copy</p>
+      <div class="platforms"><span>X</span><span>LinkedIn</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Which line makes you more likely to test: ‘save every drawing’ or ‘build their little art book’?</p>
+    </article>
+<article class="day" data-date="2026-09-07">
+      <div class="day-top"><strong>D28</strong><time datetime="2026-09-07">2026-09-07</time></div>
+      <h2>Explain export and archive safety</h2>
+      <p class="format">diagram + article</p>
+      <div class="platforms"><span>X</span><span>Dev.to</span></div>
+      <p class="question"><b>Ask:</b> Which export format would your family actually use?</p>
+    </article>
+<article class="day" data-date="2026-09-08">
+      <div class="day-top"><strong>D29</strong><time datetime="2026-09-08">2026-09-08</time></div>
+      <h2>Evidence-based retrospective</h2>
+      <p class="format">metrics + lessons</p>
+      <div class="platforms"><span>X</span><span>Discord</span></div>
+      <p class="question"><b>Ask:</b> Which Buki thread should continue after Shipaton?</p>
+    </article>
+<article class="day" data-date="2026-09-09">
+      <div class="day-top"><strong>D30</strong><time datetime="2026-09-09">2026-09-09</time></div>
+      <h2>Shipaton campaign retrospective</h2>
+      <p class="format">video or carousel + Devpost update</p>
+      <div class="platforms"><span>X</span><span>Discord</span><span>Devpost</span></div>
+      <p class="question"><b>Ask:</b> What should Buki build next?</p>
+    </article></main>
+  <footer>Generated from <code>scripts/build-in-public-plan.mjs</code>. Run <code>npm run build-in-public:today</code> for today’s verified handoff.</footer>
+  <script>
+    const parts = new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tbilisi',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+    const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    const today = value.year + '-' + value.month + '-' + value.day;
+    const card = document.querySelector('[data-date="' + today + '"]');
+    if (card) { card.classList.add('today'); card.scrollIntoView({block:'center'}); }
+  </script>
+</body>
+</html>

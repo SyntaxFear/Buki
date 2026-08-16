@@ -1,0 +1,448 @@
+{
+  "schemaVersion": 1,
+  "campaign": {
+    "product": "Buki",
+    "account": "@Parastashvilii",
+    "timezone": "Asia/Tbilisi",
+    "landingPage": "https://buki.expo.app/",
+    "firstWeekStart": "2026-08-16",
+    "finalWeekStart": "2026-10-25",
+    "endDate": "2026-10-31",
+    "plannerWeekday": "Saturday",
+    "plannerTime": "09:00",
+    "verifierTime": "19:15",
+    "transport": "brave-extension"
+  },
+  "weekStart": "2026-08-16",
+  "weekEnd": "2026-08-22",
+  "generatedAt": "2026-08-15T09:36:25.236Z",
+  "approvalRequired": true,
+  "categoryQuotas": {
+    "product-demo": 4,
+    "technical-lesson": 3,
+    "testing": 2,
+    "builder-process": 2,
+    "app-store-process": 1,
+    "user-problem": 1,
+    "weekly-reflection": 1
+  },
+  "mediaTargets": {
+    "minimumVideos": 4,
+    "minimumScreenshots": 6,
+    "maximumCards": 4,
+    "total": 14
+  },
+  "requiredQuestionCount": 10,
+  "requiredLinkRange": {
+    "minimum": 2,
+    "maximum": 3
+  },
+  "posts": [
+    {
+      "id": "2026-08-16-early",
+      "date": "2026-08-16",
+      "slot": "early",
+      "scheduledLocalTime": "13:23",
+      "category": "product-demo",
+      "topic": "sketchbook browsing",
+      "angle": "paper drawings feel like a book instead of a camera roll",
+      "hook": "Paper drawings feel different when they live in a book.",
+      "text": "Paper drawings feel different when they live in a book instead of a camera roll. This is Buki turning three synthetic drawings into a swipeable sketchbook. Which page style feels most natural? https://buki.expo.app/ #Shipaton #BuildInPublic #IndieDev",
+      "question": "Which page style feels most natural?",
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#IndieDev"
+      ],
+      "link": "https://buki.expo.app/",
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/12-album-pages.mp4",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "video",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/12-album-pages.mp4",
+        "sourceType": "fresh synthetic simulator recording",
+        "sha256": "b3c316f6e7a16011e1f1d10403aff9cf49b6021df8ccedbfbba4e72fe822e1cb"
+      }
+    },
+    {
+      "id": "2026-08-16-late",
+      "date": "2026-08-16",
+      "slot": "late",
+      "scheduledLocalTime": "18:54",
+      "category": "technical-lesson",
+      "topic": "page position persistence",
+      "angle": "the final empty page must look intentional after reopening",
+      "hook": "One small page-flip rule caused a lot of edge cases.",
+      "text": "One small page-flip rule caused a lot of edge cases: the final empty page still has to feel intentional, not broken. I now treat page position as saved state. Where should a reopened book land? #Shipaton #BuildInPublic #ReactNative",
+      "question": "Where should a reopened book land?",
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#ReactNative"
+      ],
+      "link": null,
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/01-empty-page.jpg",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "screenshot",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/01-empty-page.jpg",
+        "sourceType": "fresh synthetic simulator screenshot",
+        "sha256": "e2cb348f2edbcf19a09d4e95798e2a2c6111499cff0c44e21c5dff0518ab9851"
+      }
+    },
+    {
+      "id": "2026-08-17-early",
+      "date": "2026-08-17",
+      "slot": "early",
+      "scheduledLocalTime": "13:03",
+      "category": "testing",
+      "topic": "deterministic simulator captures",
+      "angle": "reset only Buki data and replay the same synthetic flow",
+      "hook": "I reset only Buki's data on one disposable simulator.",
+      "text": "I reset only Buki's data on one disposable simulator, load synthetic drawings, then capture the same flow again. It makes visual bugs easier to reproduce. What part of a demo should always be deterministic? #Shipaton #BuildInPublic #iOSDev",
+      "question": "What part of a demo should always be deterministic?",
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#iOSDev"
+      ],
+      "link": null,
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/02-first-sketchbook-page-1.jpg",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "screenshot",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/02-first-sketchbook-page-1.jpg",
+        "sourceType": "fresh synthetic simulator screenshot",
+        "sha256": "8225f300a25dba52d53cb3a32c76ec130c20bf964176e9d20ad591e15104228a"
+      }
+    },
+    {
+      "id": "2026-08-17-late",
+      "date": "2026-08-17",
+      "slot": "late",
+      "scheduledLocalTime": "18:34",
+      "category": "product-demo",
+      "topic": "sketchpad layouts",
+      "angle": "same archive browsed as a book grid or album",
+      "hook": "The content stays put while the way you browse changes.",
+      "text": "Buki can show the same little archive as a vertical book, photo grid, or album. The content stays put; only the way you browse changes. Which view would you use most? #Shipaton #BuildInPublic #ProductDesign",
+      "question": "Which view would you use most?",
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#ProductDesign"
+      ],
+      "link": null,
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/13-switch-sketchpad.mp4",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "video",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/13-switch-sketchpad.mp4",
+        "sourceType": "fresh synthetic simulator recording",
+        "sha256": "bf2663921d903b8a7410bf10b8a96d25cda29e262d3de5d6942f81673404a604"
+      }
+    },
+    {
+      "id": "2026-08-18-early",
+      "date": "2026-08-18",
+      "slot": "early",
+      "scheduledLocalTime": "13:14",
+      "category": "builder-process",
+      "topic": "repeatable demo preparation",
+      "angle": "clean seed data makes weekly publishing dependable",
+      "hook": "Today's unglamorous work was making the demo repeatable.",
+      "text": "Today's unglamorous work: a clean demo account, fixed seed data, and a capture run that can be repeated next Saturday. Good build-in-public posts need boring preparation behind them. #Shipaton #BuildInPublic #FounderJourney",
+      "question": null,
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#FounderJourney"
+      ],
+      "link": null,
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/05-sketchpad-drawer.jpg",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "screenshot",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/05-sketchpad-drawer.jpg",
+        "sourceType": "fresh synthetic simulator screenshot",
+        "sha256": "625963bd82d0315c08ee44b5c0a48d73702068a832b2f5838ff37a5f00429e5b"
+      }
+    },
+    {
+      "id": "2026-08-18-late",
+      "date": "2026-08-18",
+      "slot": "late",
+      "scheduledLocalTime": "18:45",
+      "category": "technical-lesson",
+      "topic": "local file URI rebasing",
+      "angle": "replace seed placeholders inside each new simulator container",
+      "hook": "Local file paths change when an iOS app is reinstalled.",
+      "text": "Local file paths change when an iOS app is reinstalled. The seed stores a placeholder path, then rewrites it inside the new app container. Have you hit this kind of simulator-only bug? #Shipaton #BuildInPublic #Expo",
+      "question": "Have you hit this kind of simulator-only bug?",
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#Expo"
+      ],
+      "link": null,
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/06-grid-sketchpad.jpg",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "screenshot",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/06-grid-sketchpad.jpg",
+        "sourceType": "fresh synthetic simulator screenshot",
+        "sha256": "4d8044c1dc37bce06aee16bd88412cedc71d58b7df22ec964d16c2fc8f5e0b3e"
+      }
+    },
+    {
+      "id": "2026-08-19-early",
+      "date": "2026-08-19",
+      "slot": "early",
+      "scheduledLocalTime": "13:25",
+      "category": "user-problem",
+      "topic": "keeping children's drawings",
+      "angle": "loose paper and forgotten photos need one home",
+      "hook": "Children's drawings often end up as loose paper or forgotten photos.",
+      "text": "Children's drawings often end up as loose paper or forgotten photos. Buki is my attempt to make them easy to keep and revisit. What usually happens to drawings in your home? https://buki.expo.app/ #Shipaton #BuildInPublic #ParentingTech",
+      "question": "What usually happens to drawings in your home?",
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#ParentingTech"
+      ],
+      "link": "https://buki.expo.app/",
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/07-album-sketchpad.jpg",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "screenshot",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/07-album-sketchpad.jpg",
+        "sourceType": "fresh synthetic simulator screenshot",
+        "sha256": "2334720155dee30a775a611d83b79b7fb14986ce19f3d7f5fa4f77c08856f6c9"
+      }
+    },
+    {
+      "id": "2026-08-19-late",
+      "date": "2026-08-19",
+      "slot": "late",
+      "scheduledLocalTime": "18:56",
+      "category": "product-demo",
+      "topic": "art library organization",
+      "angle": "titles notes favorites and tags stay close to each image",
+      "hook": "The art library keeps the useful context beside each drawing.",
+      "text": "The art library groups drawings by sketchbook and keeps titles, notes, favorites, and tags close to the image. Would filters or search help you more first? #Shipaton #BuildInPublic #UXDesign",
+      "question": "Would filters or search help you more first?",
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#UXDesign"
+      ],
+      "link": null,
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/08-art-library.jpg",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "screenshot",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/08-art-library.jpg",
+        "sourceType": "fresh synthetic simulator screenshot",
+        "sha256": "3f932ebc8f25230879534c8321e058bc49f808e31eb118d15d5948396421c7ec"
+      }
+    },
+    {
+      "id": "2026-08-20-early",
+      "date": "2026-08-20",
+      "slot": "early",
+      "scheduledLocalTime": "13:05",
+      "category": "testing",
+      "topic": "privacy-safe capture build",
+      "angle": "synthetic identity with cloud sync and analytics disabled",
+      "hook": "The capture build never touches a real family account.",
+      "text": "The capture build never touches a real family account. It uses an obvious demo identity and synthetic artwork, with cloud sync and analytics left off. That boundary matters more than a polished clip. #Shipaton #BuildInPublic #SoftwareTesting",
+      "question": null,
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#SoftwareTesting"
+      ],
+      "link": null,
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/11-account-scroll.mp4",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "video",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/11-account-scroll.mp4",
+        "sourceType": "fresh synthetic simulator recording",
+        "sha256": "ef6441d33620c247344bdadc60947226d164321b0e4b2c3f221f95c6f6ded4d1"
+      }
+    },
+    {
+      "id": "2026-08-20-late",
+      "date": "2026-08-20",
+      "slot": "late",
+      "scheduledLocalTime": "18:36",
+      "category": "builder-process",
+      "topic": "fail-closed browser automation",
+      "angle": "stop on ambiguity instead of risking duplicate posts",
+      "hook": "I found a useful rule for browser automation.",
+      "text": "I found a useful rule for automation: stop when the browser result is ambiguous. A missed post is visible; a duplicate post looks careless. Where would you rather automation stop and ask? #Shipaton #BuildInPublic #MakerJourney",
+      "question": "Where would you rather automation stop and ask?",
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#MakerJourney"
+      ],
+      "link": null,
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/10-account-settings.jpg",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "screenshot",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/10-account-settings.jpg",
+        "sourceType": "fresh synthetic simulator screenshot",
+        "sha256": "9d1d04d94a89cc1a4e4d456d9279bfd21a6daa29b9d99aebdf22015a9dcb1589"
+      }
+    },
+    {
+      "id": "2026-08-21-early",
+      "date": "2026-08-21",
+      "slot": "early",
+      "scheduledLocalTime": "13:16",
+      "category": "app-store-process",
+      "topic": "App Store release workflow",
+      "angle": "report the process without guessing at review status",
+      "hook": "App Store work is mostly a release process.",
+      "text": "App Store work is mostly a release process: build, validate, upload, wait, read the result, then fix the next concrete issue. I am keeping Buki posts about that process, not guessing at review status. #Shipaton #BuildInPublic #AppStore",
+      "question": null,
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#AppStore"
+      ],
+      "link": null,
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/09-artwork-detail.jpg",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "screenshot",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/09-artwork-detail.jpg",
+        "sourceType": "fresh synthetic simulator screenshot",
+        "sha256": "d3c449d5e9faffa89a642b28aad52ce18607c2251ea1eea798d06ad13c5b71eb"
+      }
+    },
+    {
+      "id": "2026-08-21-late",
+      "date": "2026-08-21",
+      "slot": "late",
+      "scheduledLocalTime": "18:47",
+      "category": "technical-lesson",
+      "topic": "bounded image cache",
+      "angle": "keep nearby pages warm without retaining every decoded image",
+      "hook": "Image-heavy pages need a small cache that knows when to let go.",
+      "text": "Image-heavy pages need a small cache, but the cache cannot grow forever. Buki keeps nearby artwork warm and evicts older decoded images. Which matters more here: instant page turns or lower memory use? #Shipaton #BuildInPublic #MobileDev",
+      "question": "Which matters more here: instant page turns or lower memory use?",
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#MobileDev"
+      ],
+      "link": null,
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/03-first-sketchbook-page-2.jpg",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "screenshot",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/03-first-sketchbook-page-2.jpg",
+        "sourceType": "fresh synthetic simulator screenshot",
+        "sha256": "ca985dd1c410d0bb5de83dd838c212f5f41c7bbe4a8cb7da401ccabc978f840a"
+      }
+    },
+    {
+      "id": "2026-08-22-early",
+      "date": "2026-08-22",
+      "slot": "early",
+      "scheduledLocalTime": "13:27",
+      "category": "product-demo",
+      "topic": "drawing metadata",
+      "angle": "keep the original photo and notes with the saved artwork",
+      "hook": "A saved drawing is more useful when its context stays attached.",
+      "text": "A drawing can move from a sketchbook page into the art library without losing its original photo or notes. What would you want attached to each drawing? https://buki.expo.app/ #Shipaton #BuildInPublic #KidsArt",
+      "question": "What would you want attached to each drawing?",
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#KidsArt"
+      ],
+      "link": "https://buki.expo.app/",
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/04-first-sketchbook-page-3.jpg",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "screenshot",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/04-first-sketchbook-page-3.jpg",
+        "sourceType": "fresh synthetic simulator screenshot",
+        "sha256": "aa3f5018f56337169a73ab227779e914294434811f2503df048a5255775cdd89"
+      }
+    },
+    {
+      "id": "2026-08-22-late",
+      "date": "2026-08-22",
+      "slot": "late",
+      "scheduledLocalTime": "18:58",
+      "category": "weekly-reflection",
+      "topic": "weekly automation foundation",
+      "angle": "repeatability and approval mattered more than another shiny feature",
+      "hook": "This week was about making the work repeatable.",
+      "text": "This week was less about adding a shiny feature and more about making the work repeatable: clean data, honest media, duplicate checks, and one approval before scheduling. Next week starts from a better base. #Shipaton #BuildInPublic #WeeklyReview",
+      "question": null,
+      "hashtags": [
+        "#Shipaton",
+        "#BuildInPublic",
+        "#WeeklyReview"
+      ],
+      "link": null,
+      "freshEvidence": true,
+      "evidenceSources": [
+        "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/14-library-tour.mp4",
+        "docs/build-in-public-assets/weekly-x/simulator-reset-latest.json"
+      ],
+      "media": {
+        "kind": "video",
+        "path": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/media/raw/14-library-tour.mp4",
+        "sourceType": "fresh synthetic simulator recording",
+        "sha256": "2d5a44e8d1211341236c46a2ae9d23795e22e24d0167a93819422d8c7e5d0bf6"
+      }
+    }
+  ]
+}

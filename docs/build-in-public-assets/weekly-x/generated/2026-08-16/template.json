@@ -1,0 +1,350 @@
+{
+  "schemaVersion": 1,
+  "campaign": {
+    "product": "Buki",
+    "account": "@Parastashvilii",
+    "timezone": "Asia/Tbilisi",
+    "landingPage": "https://buki.expo.app/",
+    "firstWeekStart": "2026-08-16",
+    "finalWeekStart": "2026-10-25",
+    "endDate": "2026-10-31",
+    "plannerWeekday": "Saturday",
+    "plannerTime": "09:00",
+    "verifierTime": "19:15",
+    "transport": "brave-extension"
+  },
+  "weekStart": "2026-08-16",
+  "weekEnd": "2026-08-22",
+  "generatedAt": "2026-08-15T09:36:25.236Z",
+  "approvalRequired": true,
+  "categoryQuotas": {
+    "product-demo": 4,
+    "technical-lesson": 3,
+    "testing": 2,
+    "builder-process": 2,
+    "app-store-process": 1,
+    "user-problem": 1,
+    "weekly-reflection": 1
+  },
+  "mediaTargets": {
+    "minimumVideos": 4,
+    "minimumScreenshots": 6,
+    "maximumCards": 4,
+    "total": 14
+  },
+  "requiredQuestionCount": 10,
+  "requiredLinkRange": {
+    "minimum": 2,
+    "maximum": 3
+  },
+  "posts": [
+    {
+      "id": "2026-08-16-early",
+      "date": "2026-08-16",
+      "slot": "early",
+      "scheduledLocalTime": "13:23",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-16-late",
+      "date": "2026-08-16",
+      "slot": "late",
+      "scheduledLocalTime": "18:54",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-17-early",
+      "date": "2026-08-17",
+      "slot": "early",
+      "scheduledLocalTime": "13:03",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-17-late",
+      "date": "2026-08-17",
+      "slot": "late",
+      "scheduledLocalTime": "18:34",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-18-early",
+      "date": "2026-08-18",
+      "slot": "early",
+      "scheduledLocalTime": "13:14",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-18-late",
+      "date": "2026-08-18",
+      "slot": "late",
+      "scheduledLocalTime": "18:45",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-19-early",
+      "date": "2026-08-19",
+      "slot": "early",
+      "scheduledLocalTime": "13:25",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-19-late",
+      "date": "2026-08-19",
+      "slot": "late",
+      "scheduledLocalTime": "18:56",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-20-early",
+      "date": "2026-08-20",
+      "slot": "early",
+      "scheduledLocalTime": "13:05",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-20-late",
+      "date": "2026-08-20",
+      "slot": "late",
+      "scheduledLocalTime": "18:36",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-21-early",
+      "date": "2026-08-21",
+      "slot": "early",
+      "scheduledLocalTime": "13:16",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-21-late",
+      "date": "2026-08-21",
+      "slot": "late",
+      "scheduledLocalTime": "18:47",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-22-early",
+      "date": "2026-08-22",
+      "slot": "early",
+      "scheduledLocalTime": "13:27",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    },
+    {
+      "id": "2026-08-22-late",
+      "date": "2026-08-22",
+      "slot": "late",
+      "scheduledLocalTime": "18:58",
+      "category": "",
+      "topic": "",
+      "angle": "",
+      "hook": "",
+      "text": "",
+      "question": null,
+      "hashtags": [],
+      "link": null,
+      "freshEvidence": false,
+      "evidenceSources": [],
+      "media": {
+        "kind": "",
+        "path": "",
+        "sha256": "",
+        "sourceType": ""
+      }
+    }
+  ]
+}

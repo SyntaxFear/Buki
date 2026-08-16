@@ -1,0 +1,631 @@
+{
+  "campaign": {
+    "product": "Buki",
+    "timezone": "Asia/Tbilisi",
+    "startDate": "2026-08-11",
+    "endDate": "2026-09-09",
+    "excludedPlatforms": [
+      "TikTok",
+      "Instagram"
+    ],
+    "defaultPlatforms": [
+      "X"
+    ]
+  },
+  "days": [
+    {
+      "id": "D01",
+      "date": "2026-08-11",
+      "title": "Why children’s drawings disappear",
+      "strategy": "story-card",
+      "format": "4:5 image",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "What happens to the drawings in your home after they leave the fridge?",
+      "partnerMentions": [
+        "Expo",
+        "RevenueCat",
+        "Shipaton"
+      ],
+      "sources": [
+        "README.md",
+        "assets/images/buki-bear.png",
+        "assets/samples/sample-house.jpg"
+      ],
+      "evidence": [],
+      "headline": "Kids make hundreds of drawings. Most quietly disappear.",
+      "body": "I’m building Buki: a private little book that turns paper drawings into an animated keepsake."
+    },
+    {
+      "id": "D02",
+      "date": "2026-08-12",
+      "title": "Paper drawing to animated book",
+      "strategy": "simulator-video",
+      "format": "15–25 second video",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "Which moment should feel more magical: the cutout or the page landing?",
+      "partnerMentions": [],
+      "sources": [
+        "assets/samples/sample-cat.jpg",
+        ".maestro/build-in-public/scan-to-book.yaml"
+      ],
+      "evidence": [],
+      "headline": "From paper to Buki in one scan"
+    },
+    {
+      "id": "D03",
+      "date": "2026-08-13",
+      "title": "Ask Shipaton builders for feedback",
+      "strategy": "brief-only",
+      "format": "text + D02 clip",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "If you have shipped a family app, what trust detail mattered most?",
+      "partnerMentions": [
+        "RevenueCat",
+        "Shipaton"
+      ],
+      "sources": [],
+      "evidence": [],
+      "headline": "Building a private home for children’s drawings",
+      "reuseDay": "D02"
+    },
+    {
+      "id": "D04",
+      "date": "2026-08-14",
+      "title": "The origin of Buki",
+      "strategy": "story-card",
+      "format": "4:5 image",
+      "platforms": [
+        "X"
+      ],
+      "feedbackQuestion": "What childhood object do you wish your family had preserved?",
+      "partnerMentions": [],
+      "sources": [
+        "README.md",
+        "assets/images/buki-bear.png",
+        "assets/samples/sample-boat.jpg"
+      ],
+      "evidence": [],
+      "headline": "Buki means ‘little book’",
+      "body": "The product began with a simple question: can a phone make a paper sketch feel worth keeping?"
+    },
+    {
+      "id": "D05",
+      "date": "2026-08-15",
+      "title": "Show source photo versus clean artwork",
+      "strategy": "verified-source",
+      "format": "before/after image",
+      "platforms": [
+        "X",
+        "LinkedIn",
+        "Discord"
+      ],
+      "feedbackQuestion": "Should Buki preserve the paper texture, or make every drawing clean and transparent?",
+      "partnerMentions": [],
+      "sources": [
+        "assets/samples/sample-house.jpg"
+      ],
+      "evidence": [
+        "A current output captured from Buki using the same source image"
+      ],
+      "headline": "The extraction choice: faithful paper or clean cutout?",
+      "contactSheet": true
+    },
+    {
+      "id": "D06",
+      "date": "2026-08-16",
+      "title": "Contribute to other builders",
+      "strategy": "brief-only",
+      "format": "three thoughtful replies",
+      "platforms": [
+        "X",
+        "LinkedIn",
+        "Discord"
+      ],
+      "feedbackQuestion": "Which Shipaton project should Buki learn from this week?",
+      "partnerMentions": [
+        "Shipaton"
+      ],
+      "sources": [],
+      "evidence": [],
+      "headline": "No standalone post today — useful feedback for other builders"
+    },
+    {
+      "id": "D07",
+      "date": "2026-08-17",
+      "title": "Week-one feedback loop",
+      "strategy": "feedback-gated",
+      "format": "feedback summary card",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "Which suggestion should move to the top of the Buki list?",
+      "partnerMentions": [],
+      "sources": [],
+      "evidence": [
+        "Links or screenshots of genuine comments received during D01–D06"
+      ],
+      "headline": "What I heard in Buki’s first public week"
+    },
+    {
+      "id": "D08",
+      "date": "2026-08-18",
+      "title": "Physical sketchpad design direction",
+      "strategy": "verified-source",
+      "format": "design reference image",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "Should the library feel like a real shelf of sketchbooks or a cleaner photo grid?",
+      "partnerMentions": [],
+      "sources": [
+        "assets/design/implementation-2026-08-08/sketchpad-library.png"
+      ],
+      "evidence": [],
+      "headline": "Should a digital art library still feel physical?",
+      "sourceLabel": "Design reference — verify against the current app before calling it shipped"
+    },
+    {
+      "id": "D09",
+      "date": "2026-08-19",
+      "title": "Page curl interaction",
+      "strategy": "simulator-video",
+      "format": "10–18 second video",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "Does the page curl add delight, or slow you down?",
+      "partnerMentions": [],
+      "sources": [
+        ".maestro/build-in-public/page-curl-tour.yaml"
+      ],
+      "evidence": [],
+      "headline": "A real page curl for a digital sketchbook"
+    },
+    {
+      "id": "D10",
+      "date": "2026-08-20",
+      "title": "Ask camera-capture builders",
+      "strategy": "brief-only",
+      "format": "technical question",
+      "platforms": [
+        "X",
+        "Reddit"
+      ],
+      "feedbackQuestion": "What capture failure should a drawing scanner handle first?",
+      "partnerMentions": [],
+      "sources": [],
+      "evidence": [],
+      "headline": "How forgiving should a children’s drawing scanner be?",
+      "subreddit": "Choose a relevant community only after checking its current rules"
+    },
+    {
+      "id": "D11",
+      "date": "2026-08-21",
+      "title": "Explain the image pipeline",
+      "strategy": "diagram-card",
+      "format": "4:5 diagram",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "Which pipeline step would you like to see measured next?",
+      "partnerMentions": [],
+      "sources": [
+        "README.md",
+        "src/utils/cutout.ts"
+      ],
+      "evidence": [],
+      "headline": "How Buki turns a photo into artwork",
+      "steps": [
+        "Find the paper",
+        "Straighten the page",
+        "Remove the background",
+        "Place it in the book"
+      ]
+    },
+    {
+      "id": "D12",
+      "date": "2026-08-22",
+      "title": "Real-device camera proof",
+      "strategy": "evidence-gated",
+      "format": "15–25 second phone capture",
+      "platforms": [
+        "X",
+        "LinkedIn",
+        "Discord"
+      ],
+      "feedbackQuestion": "Is the capture guidance understandable without narration?",
+      "partnerMentions": [],
+      "sources": [],
+      "evidence": [
+        "A fresh real-device recording showing capture, processing, and the saved artwork"
+      ],
+      "headline": "The real camera flow, not a simulator shortcut"
+    },
+    {
+      "id": "D13",
+      "date": "2026-08-23",
+      "title": "Synthesize feedback",
+      "strategy": "feedback-gated",
+      "format": "three-point summary",
+      "platforms": [
+        "X",
+        "LinkedIn",
+        "Discord"
+      ],
+      "feedbackQuestion": "Did I interpret this feedback correctly?",
+      "partnerMentions": [],
+      "sources": [],
+      "evidence": [
+        "At least three genuine comments or one clear recurring theme"
+      ],
+      "headline": "Three things early viewers keep asking about Buki"
+    },
+    {
+      "id": "D14",
+      "date": "2026-08-24",
+      "title": "Show what feedback changed",
+      "strategy": "evidence-gated",
+      "format": "before/after or decision note",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "Would you have made the same product decision?",
+      "partnerMentions": [],
+      "sources": [],
+      "evidence": [
+        "A linked feedback item and current implementation, issue, or documented decision it affected"
+      ],
+      "headline": "A community question changed this Buki decision"
+    },
+    {
+      "id": "D15",
+      "date": "2026-08-25",
+      "title": "Private by design",
+      "strategy": "diagram-card",
+      "format": "4:5 trust diagram",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "What would you need to trust a family artwork app?",
+      "partnerMentions": [],
+      "sources": [
+        "CONTEXT.md",
+        "docs/Buki-Pro-Implementation-Progress.md"
+      ],
+      "evidence": [],
+      "headline": "Children’s art should be private by default",
+      "steps": [
+        "Adult account",
+        "Private child profiles",
+        "Local-first library",
+        "Cloud features with clear controls"
+      ]
+    },
+    {
+      "id": "D16",
+      "date": "2026-08-26",
+      "title": "Write the privacy and processing story",
+      "strategy": "brief-only",
+      "format": "technical article",
+      "platforms": [
+        "X",
+        "Dev.to"
+      ],
+      "feedbackQuestion": "Which part needs a deeper technical follow-up?",
+      "partnerMentions": [],
+      "sources": [
+        "README.md",
+        "CONTEXT.md",
+        "src/utils/cutout.ts"
+      ],
+      "evidence": [],
+      "headline": "Building a private drawing scanner for families"
+    },
+    {
+      "id": "D17",
+      "date": "2026-08-27",
+      "title": "Explain the Free and Pro boundary",
+      "strategy": "evidence-gated",
+      "format": "paywall screenshot + text",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "Does the free version feel genuinely useful before Pro appears?",
+      "partnerMentions": [
+        "RevenueCat",
+        "Shipaton"
+      ],
+      "sources": [],
+      "evidence": [
+        "Fresh current paywall screenshots and verified entitlement/product state"
+      ],
+      "headline": "Buki’s rule: never hold a child’s existing art hostage"
+    },
+    {
+      "id": "D18",
+      "date": "2026-08-28",
+      "title": "Monetization without deleting art",
+      "strategy": "diagram-card",
+      "format": "4:5 principle card",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "What is a fair paid boundary for a family keepsake app?",
+      "partnerMentions": [
+        "RevenueCat",
+        "Shipaton"
+      ],
+      "sources": [
+        "CONTEXT.md"
+      ],
+      "evidence": [],
+      "headline": "If a family stops paying, their art should not vanish",
+      "steps": [
+        "Keep existing artwork",
+        "Pause paid creation limits",
+        "Explain retention clearly",
+        "Offer a portable export"
+      ]
+    },
+    {
+      "id": "D19",
+      "date": "2026-08-29",
+      "title": "Tour the free core",
+      "strategy": "simulator-video",
+      "format": "15–25 second video",
+      "platforms": [
+        "X",
+        "LinkedIn",
+        "Discord"
+      ],
+      "feedbackQuestion": "Where would you expect the first paid boundary?",
+      "partnerMentions": [
+        "RevenueCat",
+        "Shipaton"
+      ],
+      "sources": [
+        ".maestro/build-in-public/free-core-tour.yaml"
+      ],
+      "evidence": [],
+      "headline": "What you can do in Buki before paying"
+    },
+    {
+      "id": "D20",
+      "date": "2026-08-30",
+      "title": "Ask about packaging",
+      "strategy": "brief-only",
+      "format": "pricing discussion",
+      "platforms": [
+        "X",
+        "LinkedIn",
+        "Reddit",
+        "Discord"
+      ],
+      "feedbackQuestion": "Monthly, yearly, lifetime — which choice best fits a family archive?",
+      "partnerMentions": [
+        "RevenueCat",
+        "Shipaton"
+      ],
+      "sources": [],
+      "evidence": [],
+      "headline": "How would you price a private family art archive?"
+    },
+    {
+      "id": "D21",
+      "date": "2026-08-31",
+      "title": "Trust and monetization recap",
+      "strategy": "feedback-gated",
+      "format": "decision summary",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "Which trust promise should be visible directly on the paywall?",
+      "partnerMentions": [
+        "RevenueCat",
+        "Shipaton"
+      ],
+      "sources": [],
+      "evidence": [
+        "Genuine replies or test feedback from D17–D20"
+      ],
+      "headline": "What Buki’s monetization feedback changed"
+    },
+    {
+      "id": "D22",
+      "date": "2026-09-01",
+      "title": "Dynamic Type proof",
+      "strategy": "evidence-gated",
+      "format": "two-screen comparison",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "Which screen becomes hardest to use at the largest text size?",
+      "partnerMentions": [],
+      "sources": [],
+      "evidence": [
+        "Fresh screenshots at default and an accessibility text size from the same current build"
+      ],
+      "headline": "Family apps need to work for more than one generation",
+      "contactSheet": true
+    },
+    {
+      "id": "D23",
+      "date": "2026-09-02",
+      "title": "Accessibility walkthrough",
+      "strategy": "simulator-video",
+      "format": "15–25 second video",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "What accessibility check should I add before release?",
+      "partnerMentions": [],
+      "sources": [
+        ".maestro/build-in-public/accessibility-home.yaml"
+      ],
+      "evidence": [],
+      "headline": "A quick accessibility pass through Buki"
+    },
+    {
+      "id": "D24",
+      "date": "2026-09-03",
+      "title": "App Store first-frame test",
+      "strategy": "evidence-gated",
+      "format": "three-frame contact sheet",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "Which first screenshot explains Buki fastest?",
+      "partnerMentions": [],
+      "sources": [],
+      "evidence": [
+        "Three current App Store screenshot candidates from the same verified build"
+      ],
+      "headline": "You get one screenshot to explain Buki. Which one wins?",
+      "contactSheet": true
+    },
+    {
+      "id": "D25",
+      "date": "2026-09-04",
+      "title": "Accessibility lesson",
+      "strategy": "brief-only",
+      "format": "short lesson",
+      "platforms": [
+        "X"
+      ],
+      "feedbackQuestion": "What is one accessibility detail small apps often miss?",
+      "partnerMentions": [],
+      "sources": [],
+      "evidence": [],
+      "headline": "The accessibility detail that changed how I see Buki",
+      "reuseDays": [
+        "D22",
+        "D23"
+      ]
+    },
+    {
+      "id": "D26",
+      "date": "2026-09-05",
+      "title": "Prepare a public launch page",
+      "strategy": "release-gated",
+      "format": "Product Hunt draft",
+      "platforms": [
+        "X",
+        "LinkedIn",
+        "Product Hunt"
+      ],
+      "feedbackQuestion": "Is Buki’s one-line promise clear to someone seeing it for the first time?",
+      "partnerMentions": [],
+      "sources": [],
+      "evidence": [
+        "Verified public App Store availability and a working public product URL"
+      ],
+      "headline": "Buki — turn paper drawings into a private animated keepsake"
+    },
+    {
+      "id": "D27",
+      "date": "2026-09-06",
+      "title": "Invite testers and compare messages",
+      "strategy": "feedback-gated",
+      "format": "tester invite + A/B copy",
+      "platforms": [
+        "X",
+        "LinkedIn",
+        "Discord"
+      ],
+      "feedbackQuestion": "Which line makes you more likely to test: ‘save every drawing’ or ‘build their little art book’?",
+      "partnerMentions": [],
+      "sources": [],
+      "evidence": [
+        "A current TestFlight public link or a documented manual-invite process with available capacity"
+      ],
+      "headline": "Looking for a few thoughtful Buki testers"
+    },
+    {
+      "id": "D28",
+      "date": "2026-09-07",
+      "title": "Explain export and archive safety",
+      "strategy": "diagram-card",
+      "format": "diagram + article",
+      "platforms": [
+        "X",
+        "Dev.to"
+      ],
+      "feedbackQuestion": "Which export format would your family actually use?",
+      "partnerMentions": [],
+      "sources": [
+        "CONTEXT.md",
+        "docs/Buki-Pro-Implementation-Progress.md"
+      ],
+      "evidence": [],
+      "headline": "A keepsake app needs an exit door",
+      "steps": [
+        "Export artwork",
+        "Create a family archive",
+        "Restore safely",
+        "Keep a portable copy"
+      ]
+    },
+    {
+      "id": "D29",
+      "date": "2026-09-08",
+      "title": "Evidence-based retrospective",
+      "strategy": "retrospective-gated",
+      "format": "metrics + lessons",
+      "platforms": [
+        "X",
+        "Discord"
+      ],
+      "feedbackQuestion": "Which Buki thread should continue after Shipaton?",
+      "partnerMentions": [],
+      "sources": [],
+      "evidence": [
+        "Current platform analytics, feedback count, tester count, and shipped-change evidence"
+      ],
+      "headline": "29 days of building Buki in public — what actually worked"
+    },
+    {
+      "id": "D30",
+      "date": "2026-09-09",
+      "title": "Shipaton campaign retrospective",
+      "strategy": "retrospective-gated",
+      "format": "video or carousel + Devpost update",
+      "platforms": [
+        "X",
+        "Discord",
+        "Devpost"
+      ],
+      "feedbackQuestion": "What should Buki build next?",
+      "partnerMentions": [
+        "Expo",
+        "RevenueCat",
+        "Shipaton"
+      ],
+      "sources": [],
+      "evidence": [
+        "Verified campaign artifacts, current release status, feedback outcomes, and accurate Devpost project state"
+      ],
+      "headline": "What Buki became after 30 days in public"
+    }
+  ]
+}

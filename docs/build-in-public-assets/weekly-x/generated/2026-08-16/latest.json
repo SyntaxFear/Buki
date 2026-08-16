@@ -1,0 +1,7 @@
+{
+  "weekStart": "2026-08-16",
+  "status": "approval_required",
+  "batchSha256": "9c657865d82cddab849c23610bbe4caac1ae2a8d53ff961ab907d7fb3f7ad0c6",
+  "manifest": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/20260815T100458-118Z/weekly-manifest.json",
+  "approval": "docs/build-in-public-assets/weekly-x/generated/2026-08-16/20260815T100458-118Z/approval.md"
+}
