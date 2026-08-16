@@ -1,7 +1,6 @@
 import { Image } from "expo-image";
-import { SymbolView } from "expo-symbols";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
@@ -14,14 +13,16 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Glass } from "@/components/glass";
+import { HapticPressable as Pressable } from "@/components/haptic-pressable";
+import { NativeDrawingModePicker } from "@/components/native-drawing-mode-picker";
+import { NativeToolbarButton } from "@/components/native-toolbar-button";
 import type { Drawing } from "@/store/drawings";
-import { colors } from "@/theme";
 import { fitRect, type Rect } from "@/utils/book-layout";
 import {
   clampViewerTransform,
   getDoubleTapViewerTarget,
 } from "@/utils/image-viewer-transform";
+import { Haptics, impactHaptic } from "@/utils/haptics";
 
 const TRANSFORM_MS = 200;
 const SETTLE_MS = 160;
@@ -32,6 +33,7 @@ interface Props {
   originRect: Rect;
   onClose: () => void;
   onOpenDetails: () => void;
+  onDelete: () => void;
 }
 
 /**
@@ -39,7 +41,13 @@ interface Props {
  * pinch-zoomed and panned, and — when the original photo was preserved —
  * flipped between the cutout and the real photograph.
  */
-export function DrawingViewer({ drawing, originRect, onClose, onOpenDetails }: Props) {
+export function DrawingViewer({
+  drawing,
+  originRect,
+  onClose,
+  onOpenDetails,
+  onDelete,
+}: Props) {
   const { width: W, height: H } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
@@ -61,7 +69,10 @@ export function DrawingViewer({ drawing, originRect, onClose, onOpenDetails }: P
   const photoFade = useSharedValue(0);
 
   useEffect(() => {
-    open.value = withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) });
+    open.value = withTiming(1, {
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+    });
   }, [open]);
 
   useEffect(() => {
@@ -83,9 +94,13 @@ export function DrawingViewer({ drawing, originRect, onClose, onOpenDetails }: P
     scale.value = withTiming(1, config);
     tx.value = withTiming(0, config);
     ty.value = withTiming(0, config);
-    open.value = withTiming(0, { duration: 280, easing: Easing.in(Easing.cubic) }, (finished) => {
-      if (finished) runOnJS(onClose)();
-    });
+    open.value = withTiming(
+      0,
+      { duration: 280, easing: Easing.in(Easing.cubic) },
+      (finished) => {
+        if (finished) runOnJS(onClose)();
+      },
+    );
   };
 
   const settleToBounds = () => {
@@ -160,10 +175,14 @@ export function DrawingViewer({ drawing, originRect, onClose, onOpenDetails }: P
         { x: e.x, y: e.y },
         { width: destRect.width, height: destRect.height },
       );
-      const config = { duration: TRANSFORM_MS, easing: Easing.out(Easing.cubic) };
+      const config = {
+        duration: TRANSFORM_MS,
+        easing: Easing.out(Easing.cubic),
+      };
       scale.value = withTiming(target.scale, config);
       tx.value = withTiming(target.x, config);
       ty.value = withTiming(target.y, config);
+      runOnJS(impactHaptic)(Haptics.ImpactFeedbackStyle.Light);
     });
 
   const gestures = Gesture.Simultaneous(pinch, pan, doubleTap);
@@ -173,11 +192,20 @@ export function DrawingViewer({ drawing, originRect, onClose, onOpenDetails }: P
   const imageStyle = useAnimatedStyle(() => {
     const x = interpolate(open.value, [0, 1], [originRect.x, destRect.x]);
     const y = interpolate(open.value, [0, 1], [originRect.y, destRect.y]);
-    const w = interpolate(open.value, [0, 1], [originRect.width, destRect.width]);
-    const h = interpolate(open.value, [0, 1], [originRect.height, destRect.height]);
+    const w = interpolate(
+      open.value,
+      [0, 1],
+      [originRect.width, destRect.width],
+    );
+    const h = interpolate(
+      open.value,
+      [0, 1],
+      [originRect.height, destRect.height],
+    );
     const rot = interpolate(open.value, [0, 1], [drawing.rotation, 0]);
     return {
       position: "absolute" as const,
+      zIndex: 10,
       left: x + tx.value,
       top: y + ty.value,
       width: w,
@@ -186,21 +214,31 @@ export function DrawingViewer({ drawing, originRect, onClose, onOpenDetails }: P
     };
   });
 
-  const drawingOpacity = useAnimatedStyle(() => ({ opacity: 1 - photoFade.value }));
+  const drawingOpacity = useAnimatedStyle(() => ({
+    opacity: 1 - photoFade.value,
+  }));
   const photoOpacity = useAnimatedStyle(() => ({ opacity: photoFade.value }));
   const chromeStyle = useAnimatedStyle(() => ({
     opacity: interpolate(open.value, [0, 0.7, 1], [0, 0, 1]),
   }));
 
   return (
-    <View style={StyleSheet.absoluteFill}>
-      <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, scrimStyle]}>
+    <View style={[StyleSheet.absoluteFill, styles.root]}>
+      <Animated.View
+        style={[StyleSheet.absoluteFill, styles.scrim, scrimStyle]}
+      >
         <Pressable style={StyleSheet.absoluteFill} onPress={close} />
       </Animated.View>
 
       <GestureDetector gesture={gestures}>
         <Animated.View style={imageStyle}>
-          <Animated.View style={[StyleSheet.absoluteFill, styles.drawingCard, drawingOpacity]}>
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              styles.drawingCard,
+              drawingOpacity,
+            ]}
+          >
             <Image
               source={{ uri: drawing.uri }}
               style={styles.img}
@@ -210,7 +248,9 @@ export function DrawingViewer({ drawing, originRect, onClose, onOpenDetails }: P
             />
           </Animated.View>
           {drawing.photoUri ? (
-            <Animated.View style={[StyleSheet.absoluteFill, styles.photoCard, photoOpacity]}>
+            <Animated.View
+              style={[StyleSheet.absoluteFill, styles.photoCard, photoOpacity]}
+            >
               <Image
                 source={{ uri: drawing.photoUri }}
                 style={styles.img}
@@ -223,54 +263,55 @@ export function DrawingViewer({ drawing, originRect, onClose, onOpenDetails }: P
         </Animated.View>
       </GestureDetector>
 
-      <Animated.View style={[styles.topBar, { top: insets.top + 8 }, chromeStyle]}>
-        <Glass tint="#1E1A16" fallbackColor="rgba(255,247,238,0.18)" style={styles.closeBtn}>
-          <Pressable
-            onPress={onOpenDetails}
-            accessibilityRole="button"
-            accessibilityLabel="Open artwork details"
-            hitSlop={8}
-            style={({ pressed }) => [StyleSheet.absoluteFill, styles.closeBtnTouchable, pressed && { opacity: 0.8 }]}
-          >
-            <SymbolView name="info.circle" size={18} tintColor="#F5F2ED" />
-          </Pressable>
-        </Glass>
-        <Glass tint="#1E1A16" fallbackColor="rgba(255,247,238,0.18)" style={styles.closeBtn}>
-          <Pressable
-            onPress={close}
-            accessibilityRole="button"
-            accessibilityLabel="Close image viewer"
-            hitSlop={8}
-            style={({ pressed }) => [StyleSheet.absoluteFill, styles.closeBtnTouchable, pressed && { opacity: 0.8 }]}
-          >
-            <SymbolView name="xmark" size={17} tintColor="#F5F2ED" />
-          </Pressable>
-        </Glass>
+      <Animated.View
+        style={[styles.topBar, { top: insets.top + 8 }, chromeStyle]}
+      >
+        <NativeToolbarButton
+          onPress={onOpenDetails}
+          label="Open artwork details"
+          icon="info.circle"
+          variant="prominent"
+          size="large"
+          tintColor="#48C6B7"
+          foregroundColor="#F2FBF9"
+          fallbackColor="rgba(72,198,183,0.84)"
+          testID="viewer-details-button"
+        />
+        <NativeToolbarButton
+          onPress={onDelete}
+          haptic={false}
+          label="Delete artwork"
+          hint="Requires grown-up confirmation"
+          icon="trash.fill"
+          variant="destructive"
+          size="large"
+          tintColor="#9F352E"
+          foregroundColor="#FFF1ED"
+          fallbackColor="rgba(159,53,46,0.84)"
+          testID="viewer-delete-button"
+        />
+        <NativeToolbarButton
+          onPress={close}
+          label="Close image viewer"
+          icon="xmark"
+          variant="prominent"
+          size="large"
+          tintColor="#28221C"
+          foregroundColor="#F5F2ED"
+          fallbackColor="rgba(40,34,28,0.65)"
+          testID="viewer-close-button"
+        />
       </Animated.View>
 
       {drawing.photoUri ? (
-        <Animated.View style={[styles.togglePillWrap, { bottom: insets.bottom + 30 }, chromeStyle]}>
-          <Glass tint="#1E1A16" fallbackColor="rgba(255,247,238,0.14)" style={styles.togglePill}>
-            {(
-              [
-                { key: "drawing", label: "Drawing" },
-                { key: "photo", label: "Photo" },
-              ] as const
-            ).map((opt) => (
-              <Pressable
-                key={opt.key}
-                onPress={() => setMode(opt.key)}
-                accessibilityRole="button"
-                accessibilityLabel={`Show ${opt.label.toLowerCase()}`}
-                accessibilityState={{ selected: mode === opt.key }}
-                style={[styles.toggleOpt, mode === opt.key && styles.toggleOptActive]}
-              >
-                <Text style={[styles.toggleText, mode === opt.key && styles.toggleTextActive]}>
-                  {opt.label}
-                </Text>
-              </Pressable>
-            ))}
-          </Glass>
+        <Animated.View
+          style={[
+            styles.togglePillWrap,
+            { bottom: insets.bottom + 30 },
+            chromeStyle,
+          ]}
+        >
+          <NativeDrawingModePicker value={mode} onChange={setMode} />
         </Animated.View>
       ) : null}
     </View>
@@ -278,7 +319,12 @@ export function DrawingViewer({ drawing, originRect, onClose, onOpenDetails }: P
 }
 
 const styles = StyleSheet.create({
+  root: {
+    zIndex: 100,
+    elevation: 100,
+  },
   scrim: {
+    zIndex: 0,
     backgroundColor: "rgba(24,20,16,0.82)",
   },
   img: {
@@ -300,43 +346,15 @@ const styles = StyleSheet.create({
   topBar: {
     position: "absolute",
     right: 16,
+    zIndex: 30,
+    elevation: 30,
     flexDirection: "row",
     gap: 9,
-  },
-  closeBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-  },
-  closeBtnTouchable: {
-    alignItems: "center",
-    justifyContent: "center",
   },
   togglePillWrap: {
     position: "absolute",
     alignSelf: "center",
-  },
-  togglePill: {
-    flexDirection: "row",
-    borderRadius: 22,
-    padding: 4,
-    gap: 4,
-  },
-  toggleOpt: {
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 18,
-  },
-  toggleOptActive: {
-    backgroundColor: colors.fab,
-  },
-  toggleText: {
-    color: "rgba(245,242,237,0.75)",
-    fontSize: 14.5,
-    fontWeight: "600",
-  },
-  toggleTextActive: {
-    color: "#FFF7EE",
-    fontWeight: "700",
+    zIndex: 30,
+    elevation: 30,
   },
 });

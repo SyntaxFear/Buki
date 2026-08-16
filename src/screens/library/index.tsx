@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -21,11 +20,16 @@ import {
   selectedVisibleArtworkIds,
   type ArtworkListItem,
 } from "@/organization/artwork-organizer";
+import { Glass } from "@/components/glass";
+import { HapticPressable as Pressable } from "@/components/haptic-pressable";
+import { NativeDoneHeader } from "@/components/native-navigation-header";
+import { NativeToolbarButton } from "@/components/native-toolbar-button";
 import { useDrawings } from "@/store/drawings";
 import { useMembership } from "@/store/membership";
 import { confirmAdult } from "@/store/parental-gate";
 import { useProfiles } from "@/store/profiles";
 import { colors } from "@/theme";
+import { dismissKeyboard, keyboardDismissMode } from "@/utils/keyboard";
 
 function shortDate(value: number): string {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(
@@ -192,6 +196,8 @@ export function ArtLibrary() {
             placeholder="Search titles, notes, tags, and sketchpads"
             placeholderTextColor="#9E9588"
             returnKeyType="search"
+            submitBehavior="blurAndSubmit"
+            onSubmitEditing={dismissKeyboard}
             accessibilityLabel="Search artwork"
             style={styles.searchInput}
           />
@@ -295,26 +301,20 @@ export function ArtLibrary() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.navigation, { paddingTop: insets.top + 8 }]}>
-        <View>
-          <Text style={styles.eyebrow}>BUKI LIBRARY</Text>
-          <Text style={styles.navigationTitle}>All Artwork</Text>
-        </View>
-        <Pressable
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Close art library"
-          style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.doneLabel}>Done</Text>
-        </Pressable>
-      </View>
+      <NativeDoneHeader
+        title="All Artwork"
+        eyebrow="BUKI LIBRARY"
+        accessibilityLabel="Close art library"
+        onPress={() => router.back()}
+      />
 
       <FlatList
         data={visibleItems}
         keyExtractor={(item) => item.drawing.id}
         numColumns={2}
         contentInsetAdjustmentBehavior="automatic"
+        keyboardDismissMode={keyboardDismissMode}
+        keyboardShouldPersistTaps="handled"
         columnWrapperStyle={styles.column}
         contentContainerStyle={[
           styles.listContent,
@@ -378,7 +378,11 @@ export function ArtLibrary() {
       />
 
       {hasSelection ? (
-        <View style={[styles.bulkBar, { bottom: insets.bottom + 10 }]}>
+        <Glass
+          tint={colors.surface}
+          fallbackColor={colors.surface}
+          style={[styles.bulkBar, { bottom: insets.bottom + 10 }]}
+        >
           <BulkAction
             icon="heart.fill"
             label={selectedItems.every((item) => item.drawing.favorite) ? "Unfavorite" : "Favorite"}
@@ -390,7 +394,7 @@ export function ArtLibrary() {
           <BulkAction icon="tag.fill" label="Tag" onPress={addBulkTag} />
           <BulkAction icon="folder.fill" label="Move" onPress={chooseMoveTarget} />
           <BulkAction icon="trash.fill" label="Delete" destructive onPress={() => void confirmBulkDelete()} />
-        </View>
+        </Glass>
       ) : null}
     </View>
   );
@@ -409,6 +413,7 @@ function FilterChip({
 }) {
   return (
     <Pressable
+      haptic={selected && !locked ? false : "selection"}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${label}${locked ? ". Pro locked" : ""}`}
@@ -433,26 +438,25 @@ function BulkAction({
   onPress: () => void;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${label} selected artwork`}
-      accessibilityHint={destructive ? "Permanently deletes selected artwork after confirmation" : undefined}
-      style={({ pressed }) => [styles.bulkAction, pressed && styles.pressed]}
-    >
-      <SymbolView name={icon} size={17} tintColor={destructive ? "#C54A4A" : colors.titleTeal} />
+    <View style={styles.bulkAction}>
+      <NativeToolbarButton
+        onPress={onPress}
+        label={`${label} selected artwork`}
+        hint={destructive ? "Permanently deletes selected artwork after confirmation" : undefined}
+        icon={icon}
+        size="compact"
+        variant={destructive ? "destructive" : "glass"}
+        tintColor={destructive ? "#A43D35" : colors.titleTeal}
+        foregroundColor={destructive ? "#FFFFFF" : colors.titleTeal}
+        fallbackColor={destructive ? "#FCE8E3" : colors.surfaceAlt}
+      />
       <Text style={[styles.bulkActionText, destructive && styles.bulkActionDestructive]}>{label}</Text>
-    </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.backgroundDeep },
-  navigation: { minHeight: 78, paddingHorizontal: 20, paddingBottom: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
-  eyebrow: { fontSize: 10.5, fontWeight: "900", letterSpacing: 1.1, color: colors.titleCoral },
-  navigationTitle: { fontSize: 25, lineHeight: 30, fontWeight: "900", color: colors.ink },
-  doneButton: { minWidth: 62, minHeight: 40, paddingHorizontal: 14, borderRadius: 20, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceAlt },
-  doneLabel: { fontSize: 16, fontWeight: "800", color: colors.titleTeal },
   listContent: { padding: 16, gap: 12 },
   listHeader: { gap: 12, paddingBottom: 4 },
   searchBox: { minHeight: 50, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 9, borderRadius: 17, borderCurve: "continuous", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
@@ -485,7 +489,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 21, fontWeight: "900", color: colors.ink },
   emptyBody: { maxWidth: 280, fontSize: 13.5, lineHeight: 19, color: colors.mutedText, textAlign: "center" },
   bulkBar: { position: "absolute", left: 12, right: 12, minHeight: 76, padding: 8, flexDirection: "row", justifyContent: "space-around", borderRadius: 24, borderCurve: "continuous", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, boxShadow: "0 8px 24px rgba(40,67,90,0.20)" },
-  bulkAction: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", gap: 5, borderRadius: 16 },
+  bulkAction: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", gap: 1 },
   bulkActionText: { fontSize: 10.5, fontWeight: "900", color: colors.titleTeal },
   bulkActionDestructive: { color: "#C54A4A" },
   pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },

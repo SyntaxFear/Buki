@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,11 +13,13 @@ import {
 } from "react-native";
 import ViewShot, { captureRef, releaseCapture, type ViewShotRef } from "react-native-view-shot";
 
+import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import {
   artworkExportFilename,
   copyArtworkExport,
   type ArtworkImageExport,
 } from "@/export/artwork-export";
+import { NativeToolbarButton } from "@/components/native-toolbar-button";
 import { requireExportAccess } from "@/export/export-access";
 import { deleteLocalFile } from "@/export/file-cleanup";
 import type { Drawing } from "@/store/drawings";
@@ -26,6 +27,10 @@ import { confirmAdult } from "@/store/parental-gate";
 import { colors } from "@/theme";
 import { useAuth } from "@/store/auth";
 import { trackAnalyticsEvent } from "@/analytics/client";
+import {
+  Haptics,
+  notificationHaptic,
+} from "@/utils/haptics";
 
 interface Props {
   visible: boolean;
@@ -133,6 +138,7 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
       }
       preparedUri = await prepareFile();
       await MediaLibrary.Asset.create(preparedUri);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
       void trackAnalyticsEvent(ownerId, {
         name: "export_used",
         source: "save_to_photos",
@@ -159,14 +165,12 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
             <Text style={styles.eyebrow}>BUKI PRO EXPORT</Text>
             <Text style={styles.title}>Export artwork</Text>
           </View>
-          <Pressable
+          <NativeToolbarButton
             onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel="Close artwork export"
-            style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.doneLabel}>Done</Text>
-          </Pressable>
+            label="Close artwork export"
+            title="Done"
+            testID="artwork-export-done-button"
+          />
         </View>
 
         <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
@@ -174,6 +178,7 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
             {(Object.keys(FORMAT_LABELS) as ArtworkImageExport[]).map((item) => (
               <Pressable
                 key={item}
+                haptic={format === item ? false : "selection"}
                 onPress={() => setFormat(item)}
                 accessibilityRole="button"
                 accessibilityLabel={`${FORMAT_LABELS[item].title}, ${FORMAT_LABELS[item].detail}`}
@@ -282,8 +287,6 @@ const styles = StyleSheet.create({
   navigation: { minHeight: 78, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
   eyebrow: { fontSize: 10.5, fontWeight: "900", letterSpacing: 1.1, color: colors.titleCoral },
   title: { fontSize: 25, lineHeight: 30, fontWeight: "900", color: colors.ink },
-  doneButton: { minWidth: 62, minHeight: 40, paddingHorizontal: 14, borderRadius: 20, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceAlt },
-  doneLabel: { fontSize: 16, fontWeight: "800", color: colors.titleTeal },
   content: { padding: 16, paddingBottom: 44, gap: 15 },
   formatRow: { flexDirection: "row", gap: 8 },
   formatCard: { flex: 1, minWidth: 0, minHeight: 72, padding: 10, borderRadius: 16, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
