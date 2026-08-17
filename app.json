@@ -12,10 +12,6 @@
       "buildNumber": "31",
       "supportsTablet": false,
       "usesAppleSignIn": true,
-      "icon": {
-        "light": "./assets/images/icon-light.png",
-        "dark": "./assets/images/icon-dark.png"
-      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UTExportedTypeDeclarations": [
