@@ -37,10 +37,10 @@ const CHILD_COLORS = [
   "#A98BE6",
 ] as const;
 
-const AUTH_BUTTON_HEIGHT = 52;
-const AUTH_BUTTON_RADIUS = AUTH_BUTTON_HEIGHT / 2;
-const SOCIAL_AUTH_ICON_SIZE = 20;
-const SOCIAL_AUTH_CONTENT_GAP = 10;
+const SOCIAL_AUTH_BUTTON_HEIGHT = 44;
+const SOCIAL_AUTH_BUTTON_RADIUS = SOCIAL_AUTH_BUTTON_HEIGHT / 2;
+const SOCIAL_AUTH_ICON_SIZE = 15;
+const SOCIAL_AUTH_CONTENT_GAP = 6;
 
 async function openExternal(url: string) {
   if (!(await confirmAdult("This link opens outside Buki."))) return;
@@ -257,7 +257,7 @@ export function OnboardingScreen() {
               buttonStyle={
                 AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
               }
-              cornerRadius={AUTH_BUTTON_RADIUS}
+              cornerRadius={SOCIAL_AUTH_BUTTON_RADIUS}
               pointerEvents={busy ? "none" : "auto"}
               style={[styles.appleButton, busy && styles.disabled]}
               onPress={() => {
@@ -490,17 +490,17 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: colors.ink,
   },
-  appleButton: { width: "100%", height: AUTH_BUTTON_HEIGHT },
+  appleButton: { width: "100%", height: SOCIAL_AUTH_BUTTON_HEIGHT },
   googleButton: {
-    height: AUTH_BUTTON_HEIGHT,
-    borderRadius: AUTH_BUTTON_RADIUS,
+    height: SOCIAL_AUTH_BUTTON_HEIGHT,
+    borderRadius: SOCIAL_AUTH_BUTTON_RADIUS,
     borderCurve: "continuous",
     borderWidth: 1,
     borderColor: "#8E918F",
     backgroundColor: "#131314",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
   },
   socialAuthContent: {
     flexDirection: "row",
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
     color: "#E3E3E3",
     fontSize: 17,
     lineHeight: 21,
-    fontWeight: "700",
+    fontWeight: "600",
     textAlign: "center",
   },
   socialAuthPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
@@ -544,15 +544,15 @@ const styles = StyleSheet.create({
   },
   emailForm: { gap: 12 },
   primaryButton: {
-    minHeight: AUTH_BUTTON_HEIGHT,
-    borderRadius: AUTH_BUTTON_RADIUS,
+    minHeight: 52,
+    borderRadius: 15,
     borderCurve: "continuous",
     backgroundColor: colors.titleTeal,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 18,
   },
-  primaryLabel: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
+  primaryLabel: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
   pressed: { opacity: 0.78, transform: [{ scale: 0.99 }] },
   disabled: { opacity: 0.55 },
   avatarRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
