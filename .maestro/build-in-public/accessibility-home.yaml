@@ -1,0 +1,19 @@
+appId: com.parastashvili.bloombook
+---
+# Requires a disposable, already signed-in simulator containing synthetic data only.
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Scan a drawing"
+    timeout: 20000
+- assertVisible: "Choose sketchpad.*"
+- tapOn: "Choose sketchpad.*"
+- extendedWaitUntil:
+    visible: "Open Adult Account"
+    timeout: 10000
+- tapOn: "Open Adult Account"
+- extendedWaitUntil:
+    visible: "Close account center"
+    timeout: 10000
+- tapOn: "Close account center"
+- assertVisible: "Scan a drawing"

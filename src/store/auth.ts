@@ -11,6 +11,7 @@ import {
   deleteBukiLocalAccount,
   editAdultProfile,
   flushLibraryWrites,
+  loadActiveAdultProfile,
   loadAdultProfile,
 } from "@/database";
 import { getSupabaseClient } from "@/auth/supabase";
@@ -59,14 +60,144 @@ interface AuthState {
 }
 
 const redirectTo = makeRedirectUri({ scheme: "buki", path: "auth/callback" });
+const BUILD_IN_PUBLIC_OWNER_ID = "00000000-0000-4000-8000-000000000001";
 let initialization: Promise<void> | null = null;
 let initializationSucceeded = false;
 let listenerInstalled = false;
 let lastAppliedUserId: string | null | undefined;
 let sessionApplication: Promise<void> = Promise.resolve();
+let remoteSessionRefresh: Promise<void> | null = null;
+
+const AUTH_STARTUP_TIMEOUT_MS = 1_500;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong. Please try again.";
+}
+
+function localUser(profile: AdultProfile): User {
+  return {
+    id: profile.id,
+    aud: "authenticated",
+    role: "authenticated",
+    email: profile.email ?? undefined,
+    created_at: "1970-01-01T00:00:00.000Z",
+    app_metadata: { provider: "cached-local" },
+    user_metadata: {
+      full_name: profile.displayName,
+      ...(profile.avatarUri ? { avatar_url: profile.avatarUri } : {}),
+    },
+  };
+}
+
+async function waitForStartupWindow(operation: Promise<void>): Promise<void> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    await Promise.race([
+      operation,
+      new Promise<void>((resolve) => {
+        timeout = setTimeout(resolve, AUTH_STARTUP_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+function buildInPublicSyntheticMode(): boolean {
+  return __DEV__ && process.env.EXPO_PUBLIC_BIP_SYNTHETIC_MODE === "1";
+}
+
+function buildInPublicSession(): Session {
+  const timestamp = "2026-08-15T00:00:00.000Z";
+  const user: User = {
+    id: BUILD_IN_PUBLIC_OWNER_ID,
+    aud: "authenticated",
+    role: "authenticated",
+    email: "parent@buki.invalid",
+    email_confirmed_at: timestamp,
+    phone: "",
+    confirmed_at: timestamp,
+    last_sign_in_at: timestamp,
+    app_metadata: { provider: "synthetic", providers: ["synthetic"] },
+    user_metadata: { full_name: "Buki Parent" },
+    identities: [],
+    created_at: timestamp,
+    updated_at: timestamp,
+    is_anonymous: false,
+  };
+  return {
+    access_token: "synthetic-build-in-public-token",
+    refresh_token: "synthetic-build-in-public-refresh-token",
+    expires_in: 31_536_000,
+    expires_at: 4_102_444_800,
+    token_type: "bearer",
+    user,
+  };
+}
+
+async function applyBuildInPublicSession(): Promise<void> {
+  const session = buildInPublicSession();
+  await activateBukiAccount(session.user);
+  const profile = await loadAdultProfile(session.user.id);
+  useMembership.getState().resetMembership();
+  useMembership.setState({ ownerId: session.user.id, hydrated: true, loading: false });
+  useAuth.setState({
+    hydrated: true,
+    busy: false,
+    status: "signedIn",
+    session,
+    user: session.user,
+    profile,
+    otpEmail: null,
+    error: null,
+  });
+  await useDrawings.getState().reloadForAccount();
+  await useProfiles.getState().reloadForAccount();
+  usePreferences.getState().resetForAccountSwitch();
+  await usePreferences.getState().hydrate();
+  lastAppliedUserId = session.user.id;
+}
+
+async function hydrateCachedLocalAccount(): Promise<boolean> {
+  const profile = await loadActiveAdultProfile();
+  if (!profile) {
+    useMembership.getState().resetMembership();
+    useAuth.setState({
+      hydrated: true,
+      busy: false,
+      status: "signedOut",
+      session: null,
+      user: null,
+      profile: null,
+      otpEmail: null,
+      error: null,
+    });
+    lastAppliedUserId = null;
+    return false;
+  }
+
+  const user = localUser(profile);
+  useAuth.setState({
+    hydrated: true,
+    busy: false,
+    status: "signedIn",
+    session: null,
+    user,
+    profile,
+    otpEmail: null,
+    error: null,
+  });
+  initializeAnalytics(profile.id);
+  await useMembership.getState().initializeForUser(profile.id);
+  await useDrawings.getState().reloadForAccount();
+  await useProfiles.getState().reloadForAccount();
+  usePreferences.getState().resetForAccountSwitch();
+  await usePreferences.getState().hydrate();
+  lastAppliedUserId = profile.id;
+  void useCloudSync.getState().initializeForUser(profile.id).catch((error) => {
+    console.warn("Could not initialize Buki cloud sync", error);
+  });
+  return true;
 }
 
 async function resetAccountState(hydrateSignedOut: boolean): Promise<unknown> {
@@ -184,7 +315,9 @@ async function applySessionNow(session: Session | null): Promise<void> {
   await useProfiles.getState().reloadForAccount();
   usePreferences.getState().resetForAccountSwitch();
   await usePreferences.getState().hydrate();
-  await useCloudSync.getState().initializeForUser(session.user.id);
+  void useCloudSync.getState().initializeForUser(session.user.id).catch((error) => {
+    console.warn("Could not initialize Buki cloud sync", error);
+  });
 }
 
 async function applySession(session: Session | null): Promise<void> {
@@ -240,13 +373,39 @@ export const useAuth = create<AuthState>((set, get) => ({
   error: null,
 
   initialize: async () => {
-    if (get().hydrated && initializationSucceeded) return;
+    if (get().hydrated && initializationSucceeded && listenerInstalled) return;
     if (!initialization) {
       const attempt = (async () => {
-        try {
-          const client = getSupabaseClient();
-          if (!listenerInstalled) {
+        if (buildInPublicSyntheticMode()) {
+          await applyBuildInPublicSession();
+          initializationSucceeded = true;
+          return;
+        }
+
+        let hasCachedAccount = get().hydrated && get().status === "signedIn";
+        if (!get().hydrated) {
+          try {
+            hasCachedAccount = await hydrateCachedLocalAccount();
+          } catch (error) {
+            useMembership.getState().resetMembership();
+            set({
+              hydrated: true,
+              busy: false,
+              status: "signedOut",
+              session: null,
+              user: null,
+              profile: null,
+              otpEmail: null,
+              error: errorMessage(error),
+            });
+          }
+        }
+
+        const client = getSupabaseClient();
+        if (!listenerInstalled) {
+          try {
             client.auth.onAuthStateChange((_event, nextSession) => {
+              if (!nextSession) return;
               void applySession(nextSession)
                 .then(() => {
                   initializationSucceeded = true;
@@ -256,27 +415,38 @@ export const useAuth = create<AuthState>((set, get) => ({
                 });
             });
             listenerInstalled = true;
+          } catch (error) {
+            initializationSucceeded = false;
+            set({ error: errorMessage(error) });
           }
-          const { data, error } = await client.auth.getSession();
-          if (error) throw error;
-          await applySession(data.session);
-          initializationSucceeded = true;
-        } catch (error) {
-          initializationSucceeded = false;
-          lastAppliedUserId = null;
-          const cleanupError = await resetAccountState(true);
-          set({
-            hydrated: true,
-            busy: false,
-            status: "signedOut",
-            session: null,
-            user: null,
-            profile: null,
-            otpEmail: null,
-            error: cleanupError
-              ? `${errorMessage(error)} Buki also could not fully clear the previous local account state.`
-              : errorMessage(error),
+        }
+
+        if (!remoteSessionRefresh) {
+          const refresh = (async () => {
+            try {
+              const { data, error } = await client.auth.getSession();
+              if (error) throw error;
+              if (data.session) await applySession(data.session);
+              initializationSucceeded = listenerInstalled;
+              if (!data.session && useAuth.getState().status === "signedOut") {
+                useAuth.setState({ error: null });
+              }
+            } catch (error) {
+              initializationSucceeded = false;
+              useAuth.setState({
+                hydrated: true,
+                busy: false,
+                error: errorMessage(error),
+              });
+            }
+          })().finally(() => {
+            if (remoteSessionRefresh === refresh) remoteSessionRefresh = null;
           });
+          remoteSessionRefresh = refresh;
+        }
+
+        if (!hasCachedAccount && remoteSessionRefresh) {
+          await waitForStartupWindow(remoteSessionRefresh);
         }
       })();
       initialization = attempt;
@@ -534,6 +704,7 @@ export function resetAuthStateForTests(): void {
   listenerInstalled = false;
   lastAppliedUserId = undefined;
   sessionApplication = Promise.resolve();
+  remoteSessionRefresh = null;
   useAuth.setState({
     hydrated: false,
     busy: false,

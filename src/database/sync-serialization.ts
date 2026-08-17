@@ -100,13 +100,14 @@ export async function enqueueCurrentSketchpad(
     design: string;
     border: string;
     decoration: string;
+    icon: string;
     cover_color: string;
     page_color: string | null;
     sort_order: number;
     created_at: number;
     updated_at: number;
   }>(
-    `SELECT id, child_id, name, style, design, border, decoration, cover_color,
+    `SELECT id, child_id, name, style, design, border, decoration, icon, cover_color,
             page_color, sort_order, created_at, updated_at
      FROM sketchpads WHERE owner_id = ? AND id = ? AND deleted_at IS NULL`,
     ownerId,
@@ -127,6 +128,7 @@ export async function enqueueCurrentSketchpad(
       design: row.design,
       border: row.border,
       decoration: row.decoration,
+      icon: row.icon,
       cover_color: row.cover_color,
       page_color: row.page_color,
       sort_order: row.sort_order,

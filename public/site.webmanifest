@@ -1,0 +1,23 @@
+{
+  "name": "Buki — Family Art Archive",
+  "short_name": "Buki",
+  "description": "Capture children’s artwork and preserve it in beautiful private digital sketchpads.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFF5E5",
+  "theme_color": "#FFF5E5",
+  "categories": ["lifestyle", "photo", "family"],
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

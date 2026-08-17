@@ -8,6 +8,7 @@ import {
   type PadDecorationId,
 } from "@/pad-visuals";
 import { PAD_STYLES, type PadStyle } from "@/store/migrate";
+import { isPadIconId, type PadIconId } from "@/pad-icons";
 
 export const BUKI_ARCHIVE_FORMAT = "buki-library-archive";
 export const BUKI_ARCHIVE_VERSION = 1;
@@ -58,6 +59,7 @@ const padStyleSchema = z.custom<PadStyle>(
 const padDesignSchema = z.custom<PadDesignId>(isPadDesignId, "Unsupported sketchpad design");
 const padBorderSchema = z.custom<PadBorderId>(isPadBorderId, "Unsupported sketchpad border");
 const padDecorationSchema = z.custom<PadDecorationId>(isPadDecorationId, "Unsupported sketchpad decoration");
+const padIconSchema = z.custom<PadIconId>(isPadIconId, "Unsupported sketchpad icon");
 
 const sketchpadSchema = z.strictObject({
   id: idSchema,
@@ -67,6 +69,7 @@ const sketchpadSchema = z.strictObject({
   design: padDesignSchema,
   border: padBorderSchema,
   decoration: padDecorationSchema,
+  icon: padIconSchema.optional(),
   coverColor: z.string().regex(/^#[a-fA-F0-9]{6}$/),
   pageColor: z.string().regex(/^#[a-fA-F0-9]{6}$/).nullable(),
   createdAt: timestampSchema,

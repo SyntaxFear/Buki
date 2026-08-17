@@ -6,44 +6,24 @@ import {
   type SkImage,
 } from "@shopify/react-native-skia";
 import { Asset } from "expo-asset";
-import { Directory, File, Paths } from "expo-file-system";
+import { File } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
-import { extractDrawing, type Box } from "@/utils/cutout";
 import {
-  inspectSafeImage,
-  MAX_SAFE_IMAGE_BYTES,
-} from "@/utils/image-safety";
+  createReviewMediaFiles,
+  discardReviewCutout,
+  type ReviewCutout,
+} from "@/utils/capture-review-media";
+import { extractDrawing } from "@/utils/cutout";
+import { inspectSafeImage, MAX_SAFE_IMAGE_BYTES } from "@/utils/image-safety";
 
 const MAX_DECODE_EDGE = 1000;
 const SAVED_PHOTO_EDGE = 2048;
 
-export interface ProcessedCutout {
-  /** file:// URI of the saved transparent PNG */
-  uri: string;
-  width: number;
-  height: number;
-  /** where the ink sits inside the downscaled source photo */
-  inkBox: Box;
-  paperBox: Box;
-  /** downscaled source photo dimensions the boxes refer to */
-  sourceWidth: number;
-  sourceHeight: number;
-  /** file:// URI of the preserved original photo (undefined if saving failed) */
-  photoUri?: string;
-}
-
-function drawingsDir(): Directory {
-  const dir = new Directory(Paths.document, "drawings");
-  if (!dir.exists) dir.create({ intermediates: true });
-  return dir;
-}
-
-function photosDir(): Directory {
-  const dir = new Directory(Paths.document, "photos");
-  if (!dir.exists) dir.create({ intermediates: true });
-  return dir;
-}
+export type {
+  ProcessedCutout,
+  ReviewCutout,
+} from "@/utils/capture-review-media";
 
 export function readUriBytes(uri: string): Uint8Array {
   return new File(uri).bytesSync();
@@ -69,7 +49,10 @@ export function imageToPixels(image: SkImage): {
   width: number;
   height: number;
 } {
-  const scale = Math.min(1, MAX_DECODE_EDGE / Math.max(image.width(), image.height()));
+  const scale = Math.min(
+    1,
+    MAX_DECODE_EDGE / Math.max(image.width(), image.height()),
+  );
   const width = Math.max(1, Math.round(image.width() * scale));
   const height = Math.max(1, Math.round(image.height() * scale));
 
@@ -93,9 +76,18 @@ export function imageToPixels(image: SkImage): {
   return { pixels: new Uint8Array(pixels.buffer ?? pixels), width, height };
 }
 
-export function pixelsToImage(pixels: Uint8Array, width: number, height: number): SkImage {
+export function pixelsToImage(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+): SkImage {
   const image = Skia.Image.MakeImage(
-    { width, height, colorType: ColorType.RGBA_8888, alphaType: AlphaType.Unpremul },
+    {
+      width,
+      height,
+      colorType: ColorType.RGBA_8888,
+      alphaType: AlphaType.Unpremul,
+    },
     Skia.Data.fromBytes(pixels),
     width * 4,
   );
@@ -110,13 +102,20 @@ async function sanitizedImage(
   compress: number,
 ): Promise<File> {
   const source = new File(sourceUri);
-  if (!source.exists || source.size <= 0 || source.size > MAX_SAFE_IMAGE_BYTES) {
+  if (
+    !source.exists ||
+    source.size <= 0 ||
+    source.size > MAX_SAFE_IMAGE_BYTES
+  ) {
     throw new Error("The image file is too large.");
   }
   const metadata = inspectSafeImage(source.bytesSync());
   let resize: { width?: number; height?: number } | null = null;
   if (Math.max(metadata.width, metadata.height) > maxEdge) {
-    resize = metadata.width >= metadata.height ? { width: maxEdge } : { height: maxEdge };
+    resize =
+      metadata.width >= metadata.height
+        ? { width: maxEdge }
+        : { height: maxEdge };
   }
 
   const output = ImageManipulator.manipulate(sourceUri);
@@ -133,11 +132,19 @@ async function sanitizedImage(
 }
 
 /**
- * Full pipeline: photo URI -> transparent PNG cutout on disk.
+ * Review pipeline: photo URI -> temporary transparent PNG cutout on disk.
  * Returns null when no drawing was found in the photo.
  */
-export async function processPhotoToCutout(photoUri: string): Promise<ProcessedCutout | null> {
-  const prepared = await sanitizedImage(photoUri, MAX_DECODE_EDGE, SaveFormat.PNG, 1);
+export async function processPhotoForReview(
+  photoUri: string,
+): Promise<ReviewCutout | null> {
+  const prepared = await sanitizedImage(
+    photoUri,
+    MAX_DECODE_EDGE,
+    SaveFormat.PNG,
+    1,
+  );
+  let review: ReviewCutout | null = null;
   try {
     const image = decodeImage(readUriBytes(prepared.uri));
     const { pixels, width, height } = imageToPixels(image);
@@ -145,39 +152,56 @@ export async function processPhotoToCutout(photoUri: string): Promise<ProcessedC
     const result = extractDrawing(pixels, width, height);
     if (!result) return null;
 
-    const cutoutImage = pixelsToImage(result.pixels, result.width, result.height);
+    const cutoutImage = pixelsToImage(
+      result.pixels,
+      result.width,
+      result.height,
+    );
     const png = cutoutImage.encodeToBytes(ImageFormat.PNG, 100);
     if (!png) throw new Error("Could not encode cutout PNG");
 
-    const stamp = Date.now();
-    const file = new File(drawingsDir(), `drawing-${stamp}.png`);
-    file.write(png);
+    const reviewFiles = createReviewMediaFiles();
+    reviewFiles.cutout.write(png);
 
-    let savedPhotoUri: string | undefined;
-    try {
-      const sanitizedPhoto = await sanitizedImage(photoUri, SAVED_PHOTO_EDGE, SaveFormat.JPEG, 0.85);
-      try {
-        const photoFile = new File(photosDir(), `photo-${stamp}.jpg`);
-        sanitizedPhoto.copy(photoFile);
-        savedPhotoUri = photoFile.uri;
-      } finally {
-        try { if (sanitizedPhoto.exists) sanitizedPhoto.delete(); } catch {}
-      }
-    } catch (error) {
-      console.warn("Could not preserve original photo", error);
-    }
-
-    return {
-      uri: file.uri,
+    review = {
+      storage: "review",
+      uri: reviewFiles.cutout.uri,
       width: result.width,
       height: result.height,
       inkBox: result.inkBox,
       paperBox: result.paperBox,
       sourceWidth: width,
       sourceHeight: height,
-      photoUri: savedPhotoUri,
     };
+
+    let savedPhotoUri: string | undefined;
+    try {
+      const sanitizedPhoto = await sanitizedImage(
+        photoUri,
+        SAVED_PHOTO_EDGE,
+        SaveFormat.JPEG,
+        0.85,
+      );
+      try {
+        sanitizedPhoto.copy(reviewFiles.photo);
+        savedPhotoUri = reviewFiles.photo.uri;
+        review.photoUri = savedPhotoUri;
+      } finally {
+        try {
+          if (sanitizedPhoto.exists) sanitizedPhoto.delete();
+        } catch {}
+      }
+    } catch (error) {
+      console.warn("Could not preserve original photo", error);
+    }
+
+    return review;
+  } catch (error) {
+    discardReviewCutout(review);
+    throw error;
   } finally {
-    try { if (prepared.exists) prepared.delete(); } catch {}
+    try {
+      if (prepared.exists) prepared.delete();
+    } catch {}
   }
 }

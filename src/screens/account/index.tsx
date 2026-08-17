@@ -3,13 +3,12 @@ import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import * as StoreReview from "expo-store-review";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
+  InteractionManager,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -17,9 +16,13 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getPublicAppConfig } from "@/config/env";
+import { HapticPressable as Pressable } from "@/components/haptic-pressable";
+import { NativeDoneHeader } from "@/components/native-navigation-header";
+import { NativeToolbarButton } from "@/components/native-toolbar-button";
 import { loadBukiUsage } from "@/database";
 import { removeBukiCloudCopies } from "@/privacy/account-data";
 import { useAuth } from "@/store/auth";
@@ -37,6 +40,11 @@ import {
   PURCHASE_SIGN_IN_REQUIRED,
 } from "@/subscription/purchase-account";
 import { colors } from "@/theme";
+import {
+  dismissKeyboard,
+  keyboardDismissMode,
+  keyboardInputBottomOffset,
+} from "@/utils/keyboard";
 
 const ADULT_AVATARS = ["🌻", "🦊", "🐻", "🌈", "⭐️"] as const;
 const CHILD_COLORS = ["#FFD65A", "#70D0BD", "#86B8EA", "#FFA7B9", "#A98BE6"] as const;
@@ -446,23 +454,15 @@ export function AccountCenter() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.navigation, { paddingTop: insets.top + 8 }]}>
-        <View>
-          <Text style={styles.navigationEyebrow}>BUKI ACCOUNT</Text>
-          <Text style={styles.navigationTitle}>Profile & Settings</Text>
-        </View>
-        <Pressable
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Close account center"
-          style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.doneLabel}>Done</Text>
-        </Pressable>
-      </View>
+      <NativeDoneHeader
+        title="Profile & Settings"
+        eyebrow="BUKI ACCOUNT"
+        accessibilityLabel="Close account center"
+        onPress={() => router.back()}
+      />
 
       <ScrollView
-        contentInsetAdjustmentBehavior="never"
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 44 }]}
       >
         <View style={styles.profileHero}>
@@ -480,9 +480,10 @@ export function AccountCenter() {
               {providers.length ? `Linked: ${providers.join(", ")}` : "Secure Buki account"}
             </Text>
           </View>
-          <Pressable onPress={() => setAdultEditorOpen(true)} style={({ pressed }) => [styles.smallButton, pressed && styles.pressed]}>
-            <Text style={styles.smallButtonLabel}>Edit</Text>
-          </Pressable>
+          <NativeGlassEditButton
+            accessibilityLabel="Edit adult profile"
+            onPress={() => setAdultEditorOpen(true)}
+          />
         </View>
 
         {(authError || profileError) ? (
@@ -493,7 +494,10 @@ export function AccountCenter() {
           {children.map((child, index) => (
             <View key={child.id} style={styles.childRow}>
               <Pressable
-                onPress={() => void setActiveChild(child.id)}
+                haptic={child.id === activeChildId ? false : "selection"}
+                onPress={() => {
+                  void setActiveChild(child.id);
+                }}
                 accessibilityRole="radio"
                 accessibilityLabel={`${child.name}${child.id === activeChildId ? ", current child" : ", make current child"}`}
                 accessibilityState={{ selected: child.id === activeChildId }}
@@ -513,7 +517,11 @@ export function AccountCenter() {
               <View style={styles.compactActions}>
                 <MiniAction label="↑" accessibilityLabel={`Move ${child.name} up`} disabled={index === 0} onPress={() => void moveChild(child.id, -1)} />
                 <MiniAction label="↓" accessibilityLabel={`Move ${child.name} down`} disabled={index === children.length - 1} onPress={() => void moveChild(child.id, 1)} />
-                <MiniAction label="Edit" accessibilityLabel={`Edit ${child.name}`} onPress={() => beginEditChild(child)} />
+                <NativeGlassEditButton
+                  compact
+                  accessibilityLabel={`Edit ${child.name}`}
+                  onPress={() => beginEditChild(child)}
+                />
                 <MiniAction label="Remove" accessibilityLabel={`Remove ${child.name}`} destructive disabled={children.length === 1} onPress={() => void confirmDeleteChild(child)} />
               </View>
             </View>
@@ -605,15 +613,17 @@ export function AccountCenter() {
               <Switch
                 value={automaticBackup && capabilities.cloudBackup && cloudUploadsEnabled}
                 accessibilityLabel="Automatic backup"
+                accessibilityHint={
+                  capabilities.cloudBackup
+                    ? "Turns automatic cloud backup on or off"
+                    : "Requires Buki Pro"
+                }
                 onValueChange={(value) => {
                   if (capabilities.cloudBackup) void changeAutomaticBackup(value);
                   else void introducePro("cloudBackup", "account_backup_toggle");
                 }}
               />
             }
-            onPress={!capabilities.cloudBackup
-              ? () => void introducePro("cloudBackup", "account_backup_toggle")
-              : undefined}
           />
           <SettingRow
             title="Sync now"
@@ -678,7 +688,7 @@ export function AccountCenter() {
         <Section title="Preferences">
           <SettingRow
             title="Haptics"
-            detail="Gentle feedback for page turns and capture"
+            detail="Feedback for buttons, selections, capture, and page turns"
             right={<Switch value={hapticsEnabled} onValueChange={(value) => void setHapticsEnabled(value)} />}
           />
           <SettingRow
@@ -687,7 +697,15 @@ export function AccountCenter() {
             onPress={() => {
               Alert.alert("Replay onboarding?", "Your existing profiles and artwork stay in place.", [
                 { text: "Cancel", style: "cancel" },
-                { text: "Replay", onPress: () => void replayOnboarding().then(() => router.dismissTo("/")) },
+                {
+                  text: "Replay",
+                  onPress: () => {
+                    router.dismissTo("/");
+                    InteractionManager.runAfterInteractions(() => {
+                      void replayOnboarding();
+                    });
+                  },
+                },
               ]);
             }}
           />
@@ -808,22 +826,45 @@ function Metric({ value, label }: { value: string; label: string }) {
 
 function ActionButton({ title, onPress, prominent, destructive, busy, disabled }: { title: string; onPress: () => void; prominent?: boolean; destructive?: boolean; busy?: boolean; disabled?: boolean }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy || disabled), busy: Boolean(busy) }} disabled={busy || disabled} onPress={onPress} style={({ pressed }) => [styles.actionButton, prominent && styles.actionProminent, destructive && styles.actionDestructive, disabled && styles.disabled, pressed && styles.pressed]}>
+    <Pressable haptic={destructive ? "warning" : prominent ? "medium" : "light"} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy || disabled), busy: Boolean(busy) }} disabled={busy || disabled} onPress={onPress} style={({ pressed }) => [styles.actionButton, prominent && styles.actionProminent, destructive && styles.actionDestructive, disabled && styles.disabled, pressed && styles.pressed]}>
       {busy ? <ActivityIndicator color={destructive ? "#B43C3C" : prominent ? "#FFFFFF" : colors.titleTeal} /> : <Text style={[styles.actionLabel, prominent && styles.actionProminentLabel, destructive && styles.dangerText]}>{title}</Text>}
     </Pressable>
   );
 }
 
 function MiniAction({ label, accessibilityLabel, onPress, disabled, destructive }: { label: string; accessibilityLabel?: string; onPress: () => void; disabled?: boolean; destructive?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.miniAction, disabled && styles.disabled, pressed && styles.pressed]}><Text style={[styles.miniActionLabel, destructive && styles.dangerText]}>{label}</Text></Pressable>;
+  return <Pressable haptic={destructive ? "warning" : "light"} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.miniAction, disabled && styles.disabled, pressed && styles.pressed]}><Text style={[styles.miniActionLabel, destructive && styles.dangerText]}>{label}</Text></Pressable>;
+}
+
+function NativeGlassEditButton({
+  accessibilityLabel,
+  onPress,
+  compact = false,
+}: {
+  accessibilityLabel: string;
+  onPress: () => void;
+  compact?: boolean;
+}) {
+  return (
+    <NativeToolbarButton
+      label={accessibilityLabel}
+      title="Edit"
+      onPress={onPress}
+      variant="prominent"
+      size="compact"
+      tintColor={colors.titleTeal}
+      foregroundColor="#FFFFFF"
+      style={compact ? styles.compactGlassEdit : styles.profileGlassEdit}
+    />
+  );
 }
 
 function DangerButton({ title, onPress, busy }: { title: string; onPress: () => void; busy?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy), busy: Boolean(busy) }} disabled={busy} onPress={onPress} style={({ pressed }) => [styles.dangerButton, busy && styles.disabled, pressed && styles.rowPressed]}><Text style={styles.dangerText}>{title}</Text>{busy ? <ActivityIndicator color="#B43C3C" /> : <Text style={styles.dangerChevron}>›</Text>}</Pressable>;
+  return <Pressable haptic="warning" accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy), busy: Boolean(busy) }} disabled={busy} onPress={onPress} style={({ pressed }) => [styles.dangerButton, busy && styles.disabled, pressed && styles.rowPressed]}><Text style={styles.dangerText}>{title}</Text>{busy ? <ActivityIndicator color="#B43C3C" /> : <Text style={styles.dangerChevron}>›</Text>}</Pressable>;
 }
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  return <Pressable onPress={onPress} style={[styles.chip, selected && styles.chipSelected]}><Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>{label}</Text></Pressable>;
+  return <Pressable haptic={selected ? false : "selection"} onPress={onPress} style={[styles.chip, selected && styles.chipSelected]}><Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>{label}</Text></Pressable>;
 }
 
 function AdultEditor({ visible, busy, profileName, profileAvatar, onCancel, onSave }: { visible: boolean; busy: boolean; profileName: string; profileAvatar: string | null; onCancel: () => void; onSave: (name: string, avatarUri: string | null) => Promise<void> }) {
@@ -833,55 +874,68 @@ function AdultEditor({ visible, busy, profileName, profileAvatar, onCancel, onSa
   useEffect(() => { if (visible) { setName(profileName); setAvatar(current); } }, [current, profileName, visible]);
   return (
     <EditorShell visible={visible} title="Edit adult profile" busy={busy} canSave={Boolean(name.trim())} onCancel={onCancel} onSave={() => onSave(name, `emoji:${avatar}`)}>
-      <TextInput accessibilityLabel="Adult display name" value={name} onChangeText={setName} placeholder="Display name" autoCapitalize="words" style={styles.editorInput} />
-      <View accessibilityRole="radiogroup" style={styles.avatarChoices}>{ADULT_AVATARS.map((item) => <Pressable key={item} accessibilityRole="radio" accessibilityLabel={`${ADULT_AVATAR_LABELS[item]} adult avatar`} accessibilityState={{ selected: avatar === item }} onPress={() => setAvatar(item)} style={[styles.avatarChoice, avatar === item && styles.avatarChoiceSelected]}><Text style={styles.avatarChoiceText}>{item}</Text></Pressable>)}</View>
+      <TextInput accessibilityLabel="Adult display name" value={name} onChangeText={setName} placeholder="Display name" autoCapitalize="words" returnKeyType="done" submitBehavior="blurAndSubmit" onSubmitEditing={dismissKeyboard} style={styles.editorInput} />
+      <View accessibilityRole="radiogroup" style={styles.avatarChoices}>{ADULT_AVATARS.map((item) => <Pressable key={item} haptic={avatar === item ? false : "selection"} accessibilityRole="radio" accessibilityLabel={`${ADULT_AVATAR_LABELS[item]} adult avatar`} accessibilityState={{ selected: avatar === item }} onPress={() => setAvatar(item)} style={[styles.avatarChoice, avatar === item && styles.avatarChoiceSelected]}><Text style={styles.avatarChoiceText}>{item}</Text></Pressable>)}</View>
     </EditorShell>
   );
 }
 
 function ChildEditor({ draft, busy, onCancel, onSave }: { draft: ChildDraft | null; busy: boolean; onCancel: () => void; onSave: (draft: ChildDraft) => Promise<void> }) {
   const [value, setValue] = useState<ChildDraft | null>(draft);
+  const monthInputRef = useRef<TextInput>(null);
+  const yearInputRef = useRef<TextInput>(null);
   useEffect(() => setValue(draft), [draft]);
   if (!value) return null;
   return (
     <EditorShell visible title={value.id ? "Edit child profile" : "Add child profile"} busy={busy} canSave={Boolean(value.name.trim())} onCancel={onCancel} onSave={() => onSave(value)}>
-      <TextInput accessibilityLabel="Child nickname or first name" value={value.name} onChangeText={(name) => setValue({ ...value, name })} placeholder="Nickname or first name" autoCapitalize="words" style={styles.editorInput} />
+      <TextInput accessibilityLabel="Child nickname or first name" value={value.name} onChangeText={(name) => setValue({ ...value, name })} placeholder="Nickname or first name" autoCapitalize="words" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => monthInputRef.current?.focus()} style={styles.editorInput} />
       <Text style={styles.editorLabel}>Profile color</Text>
-      <View accessibilityRole="radiogroup" style={styles.avatarChoices}>{CHILD_COLORS.map((color) => <Pressable key={color} accessibilityRole="radio" accessibilityLabel={`${CHILD_COLOR_LABELS[color]} profile color`} accessibilityState={{ selected: value.avatarColor === color }} onPress={() => setValue({ ...value, avatarColor: color })} style={[styles.colorChoice, { backgroundColor: color }, value.avatarColor === color && styles.colorChoiceSelected]} />)}</View>
+      <View accessibilityRole="radiogroup" style={styles.avatarChoices}>{CHILD_COLORS.map((color) => <Pressable key={color} haptic={value.avatarColor === color ? false : "selection"} accessibilityRole="radio" accessibilityLabel={`${CHILD_COLOR_LABELS[color]} profile color`} accessibilityState={{ selected: value.avatarColor === color }} onPress={() => setValue({ ...value, avatarColor: color })} style={[styles.colorChoice, { backgroundColor: color }, value.avatarColor === color && styles.colorChoiceSelected]} />)}</View>
       <Text style={styles.editorLabel}>Birth month and year (optional)</Text>
       <View style={styles.birthRow}>
-        <TextInput accessibilityLabel="Birth month" value={value.birthMonth} onChangeText={(birthMonth) => setValue({ ...value, birthMonth })} placeholder="Month" keyboardType="number-pad" maxLength={2} style={[styles.editorInput, styles.birthInput]} />
-        <TextInput accessibilityLabel="Birth year" value={value.birthYear} onChangeText={(birthYear) => setValue({ ...value, birthYear })} placeholder="Year" keyboardType="number-pad" maxLength={4} style={[styles.editorInput, styles.birthInput]} />
+        <TextInput ref={monthInputRef} accessibilityLabel="Birth month" value={value.birthMonth} onChangeText={(birthMonth) => setValue({ ...value, birthMonth })} placeholder="Month" keyboardType="number-pad" returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => yearInputRef.current?.focus()} maxLength={2} style={[styles.editorInput, styles.birthInput]} />
+        <TextInput ref={yearInputRef} accessibilityLabel="Birth year" value={value.birthYear} onChangeText={(birthYear) => setValue({ ...value, birthYear })} placeholder="Year" keyboardType="number-pad" returnKeyType="done" submitBehavior="blurAndSubmit" onSubmitEditing={dismissKeyboard} maxLength={4} style={[styles.editorInput, styles.birthInput]} />
       </View>
     </EditorShell>
   );
 }
 
 function EditorShell({ visible, title, busy, canSave, onCancel, onSave, children }: { visible: boolean; title: string; busy: boolean; canSave: boolean; onCancel: () => void; onSave: () => void; children: ReactNode }) {
+  const cancel = () => {
+    dismissKeyboard();
+    onCancel();
+  };
+  const save = () => {
+    dismissKeyboard();
+    onSave();
+  };
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <KeyboardAvoidingView behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined} style={styles.editorBackdrop}>
-        <View style={styles.editorCard}>
-          <Text style={styles.editorTitle}>{title}</Text>
-          {children}
-          <View style={styles.editorActions}>
-            <ActionButton title="Cancel" onPress={onCancel} />
-            <ActionButton title="Save" prominent busy={busy} disabled={!canSave} onPress={onSave} />
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={cancel}>
+      <View style={styles.editorModalRoot}>
+        <KeyboardAwareScrollView
+          style={styles.editorScroll}
+          contentContainerStyle={styles.editorBackdropContent}
+          bottomOffset={keyboardInputBottomOffset}
+          keyboardDismissMode={keyboardDismissMode}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.editorCard}>
+            <Text style={styles.editorTitle}>{title}</Text>
+            {children}
+            <View style={styles.editorActions}>
+              <ActionButton title="Cancel" onPress={cancel} />
+              <ActionButton title="Save" prominent busy={busy} disabled={!canSave} onPress={save} />
+            </View>
+            {!canSave ? <Text style={styles.editorHint}>A name is required.</Text> : null}
           </View>
-          {!canSave ? <Text style={styles.editorHint}>A name is required.</Text> : null}
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.backgroundDeep },
-  navigation: { backgroundColor: colors.surface, paddingHorizontal: 20, paddingBottom: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: colors.border },
-  navigationEyebrow: { fontSize: 11, fontWeight: "900", letterSpacing: 1.2, color: colors.titleCoral },
-  navigationTitle: { fontSize: 25, lineHeight: 30, fontWeight: "900", color: colors.ink },
-  doneButton: { minWidth: 62, minHeight: 40, paddingHorizontal: 14, borderRadius: 20, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceAlt },
-  doneLabel: { fontSize: 16, fontWeight: "800", color: colors.titleTeal },
   content: { padding: 16, gap: 20 },
   profileHero: { flexDirection: "row", alignItems: "center", gap: 13, padding: 17, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 24, borderCurve: "continuous" },
   adultAvatar: { width: 58, height: 58, borderRadius: 20, borderCurve: "continuous", backgroundColor: "#E5F4F1", alignItems: "center", justifyContent: "center", overflow: "hidden" },
@@ -891,8 +945,8 @@ const styles = StyleSheet.create({
   profileName: { fontSize: 20, fontWeight: "900", color: colors.ink },
   profileEmail: { fontSize: 13, color: colors.mutedText, marginTop: 2 },
   profileProviders: { fontSize: 12, color: colors.titleTeal, marginTop: 4, fontWeight: "700" },
-  smallButton: { minHeight: 36, paddingHorizontal: 12, borderRadius: 18, justifyContent: "center", backgroundColor: colors.surfaceAlt },
-  smallButtonLabel: { color: colors.titleTeal, fontWeight: "800" },
+  profileGlassEdit: { flexShrink: 0 },
+  compactGlassEdit: { flexShrink: 0 },
   errorText: { color: "#A93232", fontSize: 13, lineHeight: 19, paddingHorizontal: 4 },
   sectionWrap: { gap: 7 },
   sectionTitle: { marginLeft: 4, fontSize: 13, fontWeight: "900", letterSpacing: 0.7, textTransform: "uppercase", color: colors.titleTeal },
@@ -946,7 +1000,9 @@ const styles = StyleSheet.create({
   dangerText: { color: "#B43C3C", fontWeight: "800" },
   dangerChevron: { fontSize: 25, color: "#C98D8D" },
   pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
-  editorBackdrop: { flex: 1, backgroundColor: "rgba(28,38,43,0.48)", alignItems: "center", justifyContent: "center", padding: 20 },
+  editorModalRoot: { flex: 1 },
+  editorScroll: { flex: 1, backgroundColor: "rgba(28,38,43,0.48)" },
+  editorBackdropContent: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 20 },
   editorCard: { width: "100%", maxWidth: 430, padding: 20, gap: 13, backgroundColor: colors.surface, borderRadius: 25, borderCurve: "continuous" },
   editorTitle: { fontSize: 22, fontWeight: "900", color: colors.ink },
   editorInput: { minHeight: 50, borderRadius: 14, borderCurve: "continuous", borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 14, backgroundColor: colors.page, fontSize: 16, color: colors.ink },

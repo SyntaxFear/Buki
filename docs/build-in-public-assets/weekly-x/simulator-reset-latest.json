@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "resetAt": "2026-08-15T10:34:48.246Z",
+  "simulator": {
+    "udid": "83382C8C-B573-44BB-8DB6-CBFD6E24E608",
+    "name": "Buki-PageFlip-Debug-Disposable-20260813"
+  },
+  "bundleId": "com.parastashvili.bloombook",
+  "appPath": "/Volumes/Personal/Projects/Buki/artifacts/weekly-x/DerivedData/Build/Products/Debug-iphonesimulator/Buki.app",
+  "seedContainer": "/Users/bitcoin/.codex/artifacts/buki-build-in-public/synthetic-seed/2026-08-15-v2",
+  "seedId": "buki-synthetic-2026-08-15-v2",
+  "syntheticOnly": true,
+  "scope": "Buki app data only"
+}

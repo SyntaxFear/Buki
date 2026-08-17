@@ -31,6 +31,7 @@ export interface RemoteSketchpad {
   design: string;
   border: string;
   decoration: string;
+  icon?: string | null;
   cover_color: string;
   page_color: string | null;
   sort_order: number;

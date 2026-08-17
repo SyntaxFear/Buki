@@ -2,6 +2,7 @@ import { File } from "expo-file-system";
 import type { SQLiteDatabase } from "expo-sqlite";
 
 import type { CloudRestoreResult, RemoteCloudSnapshot } from "@/sync/cloud-types";
+import { DEFAULT_PAD_ICON_ID, isPadIconId } from "@/pad-icons";
 import { activePadPreferenceKey } from "./account-repository";
 import { enqueueLocalSyncOperation } from "./sync-repository";
 import { artworkTagEntityId } from "./sync-serialization";
@@ -458,8 +459,8 @@ export async function applyRemoteCloudSnapshot(
       await tx.runAsync(
         `INSERT INTO sketchpads (
           id, owner_id, child_id, name, style, design, cover_color, page_color,
-          border, decoration, sort_order, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+          border, decoration, icon, sort_order, created_at, updated_at, deleted_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         ON CONFLICT(id) DO UPDATE SET
           owner_id = excluded.owner_id,
           child_id = excluded.child_id,
@@ -470,6 +471,7 @@ export async function applyRemoteCloudSnapshot(
           page_color = excluded.page_color,
           border = excluded.border,
           decoration = excluded.decoration,
+          icon = excluded.icon,
           sort_order = excluded.sort_order,
           updated_at = excluded.updated_at,
           deleted_at = NULL`,
@@ -483,6 +485,7 @@ export async function applyRemoteCloudSnapshot(
         pad.page_color,
         pad.border,
         pad.decoration,
+        isPadIconId(pad.icon) ? pad.icon : DEFAULT_PAD_ICON_ID,
         pad.sort_order,
         timestamp(pad.created_at),
         timestamp(pad.updated_at),

@@ -1,4 +1,4 @@
-import { PAD_DESIGNS } from "./pad-designs";
+import { PAD_DESIGNS, PAD_GEOMETRY } from "./pad-designs";
 import {
   PAD_BORDERS,
   PAD_DECORATIONS,
@@ -10,6 +10,13 @@ import {
 } from "./pad-visuals";
 
 describe("premium sketchpad visuals", () => {
+  it("keeps side-tab glyphs fully padded inside the exposed tab area", () => {
+    const hiddenTabWidth = PAD_GEOMETRY.tabWidth - PAD_GEOMETRY.tabProtrusion;
+
+    expect(PAD_GEOMETRY.tabProtrusion).toBeGreaterThanOrEqual(20);
+    expect(hiddenTabWidth).toBeGreaterThanOrEqual(20);
+  });
+
   it("keeps the original themes and clean page free", () => {
     expect(hasPremiumPadVisual({ design: "sunshine", border: "none", decoration: "none" })).toBe(false);
   });

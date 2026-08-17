@@ -41,3 +41,9 @@ example
 # generated native folders
 /ios
 /android
+
+# local archives, IPAs, dSYMs, and DerivedData
+/artifacts/
+
+# local build-in-public generated output link
+/docs/build-in-public-assets/30-day/generated

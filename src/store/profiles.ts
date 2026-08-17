@@ -252,8 +252,15 @@ export const useProfiles = create<ProfilesState>((set, get) => ({
   },
 
   replayOnboarding: async () => {
-    await replayBukiOnboarding();
-    set({ onboardingComplete: false });
+    set({ busy: true, error: null });
+    try {
+      await replayBukiOnboarding();
+      set({ onboardingComplete: false });
+    } catch (error) {
+      set({ error: message(error) });
+    } finally {
+      set({ busy: false });
+    }
   },
 
   clearError: () => set({ error: null }),

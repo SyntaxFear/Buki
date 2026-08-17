@@ -1,0 +1,20 @@
+# Buki
+
+> Buki is a private, parent-facing family art archive for capturing children’s artwork, arranging it in beautiful digital sketchpads, and preserving the stories around it.
+
+Buki is designed for adult parents and guardians. Children do not create separate accounts. Artwork is stored locally first, and optional Pro features include private cloud backup, exports, premium sketchpad visuals, and advanced organization.
+
+## Product
+
+- [Buki overview](https://buki.expo.app/): Product experience, sketchpad previews, features, and plan comparison.
+- [Support](https://buki.expo.app/support): Help with accounts, purchases, backup, restoration, privacy, and deletion.
+
+## Policies
+
+- [Privacy Policy](https://buki.expo.app/privacy): What Buki handles, why it is needed, and how adults control it.
+- [Terms of Use](https://buki.expo.app/terms): Rules for the app, account, cloud backup, exports, and Pro membership.
+- [Delete an account](https://buki.expo.app/delete-account): Steps for permanently deleting a Buki account and associated cloud content.
+
+## Additional context
+
+- [Full product summary](https://buki.expo.app/llms-full.txt): A compact, plain-text reference for Buki’s audience, capabilities, plans, privacy model, and canonical URLs.

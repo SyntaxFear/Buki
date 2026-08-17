@@ -1,10 +1,13 @@
 const mockAuthListener = jest.fn();
 const mockGetSession = jest.fn();
 const mockSignInWithIdToken = jest.fn();
+const mockSignInWithOAuth = jest.fn();
+const mockExchangeCodeForSession = jest.fn();
 const mockVerifyOtp = jest.fn();
 const mockSignInWithOtp = jest.fn();
 const mockSignOut = jest.fn();
 const mockAppleSignIn = jest.fn();
+const mockOpenAuthSession = jest.fn();
 const mockRandomUUID = jest.fn();
 
 const mockDatabase = {
@@ -13,6 +16,7 @@ const mockDatabase = {
   deleteBukiLocalAccount: jest.fn(),
   editAdultProfile: jest.fn(),
   flushLibraryWrites: jest.fn(),
+  loadActiveAdultProfile: jest.fn(),
   loadAdultProfile: jest.fn(),
 };
 
@@ -60,7 +64,7 @@ jest.mock("expo-crypto", () => ({
 
 jest.mock("expo-web-browser", () => ({
   maybeCompleteAuthSession: jest.fn(),
-  openAuthSessionAsync: jest.fn(),
+  openAuthSessionAsync: (...args: unknown[]) => mockOpenAuthSession(...args),
 }));
 
 jest.mock("@/database", () => ({
@@ -69,6 +73,7 @@ jest.mock("@/database", () => ({
   deleteBukiLocalAccount: (...args: unknown[]) => mockDatabase.deleteBukiLocalAccount(...args),
   editAdultProfile: (...args: unknown[]) => mockDatabase.editAdultProfile(...args),
   flushLibraryWrites: (...args: unknown[]) => mockDatabase.flushLibraryWrites(...args),
+  loadActiveAdultProfile: (...args: unknown[]) => mockDatabase.loadActiveAdultProfile(...args),
   loadAdultProfile: (...args: unknown[]) => mockDatabase.loadAdultProfile(...args),
 }));
 jest.mock("@/store/membership", () => ({
@@ -95,8 +100,8 @@ const mockSupabaseClient = {
     signInWithOtp: (...args: unknown[]) => mockSignInWithOtp(...args),
     signOut: (...args: unknown[]) => mockSignOut(...args),
     updateUser: jest.fn(async () => ({ error: null })),
-    signInWithOAuth: jest.fn(),
-    exchangeCodeForSession: jest.fn(),
+    signInWithOAuth: (...args: unknown[]) => mockSignInWithOAuth(...args),
+    exchangeCodeForSession: (...args: unknown[]) => mockExchangeCodeForSession(...args),
     setSession: jest.fn(),
   },
 };
@@ -134,10 +139,13 @@ describe("authentication state boundaries", () => {
       mockAuthListener,
       mockGetSession,
       mockSignInWithIdToken,
+      mockSignInWithOAuth,
+      mockExchangeCodeForSession,
       mockVerifyOtp,
       mockSignInWithOtp,
       mockSignOut,
       mockAppleSignIn,
+      mockOpenAuthSession,
       mockRandomUUID,
       ...Object.values(mockDatabase),
       ...Object.values(mockMembershipState),
@@ -152,6 +160,7 @@ describe("authentication state boundaries", () => {
     mockDatabase.activateBukiAccount.mockResolvedValue(undefined);
     mockDatabase.clearBukiAccount.mockResolvedValue(undefined);
     mockDatabase.flushLibraryWrites.mockResolvedValue(undefined);
+    mockDatabase.loadActiveAdultProfile.mockResolvedValue(null);
     mockDatabase.loadAdultProfile.mockImplementation(async (id: string) => ({
       id,
       displayName: id,
@@ -186,66 +195,62 @@ describe("authentication state boundaries", () => {
     expect(useAuth.getState()).toMatchObject({ status: "signedIn", session: next });
   });
 
-  it("fails closed and clears account-scoped state when session initialization fails", async () => {
-    const previous = session("adult-a", "token-a");
-    useAuth.setState({
-      hydrated: false,
-      status: "signedIn",
-      session: previous,
-      user: previous.user,
-      profile: {
-        id: previous.user.id,
-        displayName: "Adult A",
-        email: previous.user.email ?? null,
-        avatarUri: null,
-      },
-      otpEmail: "adult-a@example.com",
+  it("keeps the cached local account when session initialization fails offline", async () => {
+    mockDatabase.loadActiveAdultProfile.mockResolvedValue({
+      id: "adult-a",
+      displayName: "Adult A",
+      email: "adult-a@example.com",
+      avatarUri: "emoji:🌻",
     });
     mockGetSession.mockResolvedValue({ data: { session: null }, error: new Error("offline") });
 
     await useAuth.getState().initialize();
+    await flushAuthApplications();
 
-    expect(mockSyncState.disconnectUser).toHaveBeenCalledTimes(1);
-    expect(mockMembershipState.disconnectUser).toHaveBeenCalledTimes(1);
-    expect(mockMembershipState.resetMembership).toHaveBeenCalledTimes(1);
-    expect(mockDatabase.clearBukiAccount).toHaveBeenCalledTimes(1);
-    expect(mockDrawingsState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
-    expect(mockProfilesState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
-    expect(mockPreferencesState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
-    expect(mockDrawingsState.hydrate).toHaveBeenCalledTimes(1);
-    expect(mockProfilesState.hydrate).toHaveBeenCalledTimes(1);
-    expect(mockPreferencesState.hydrate).toHaveBeenCalledTimes(1);
+    expect(mockDatabase.clearBukiAccount).not.toHaveBeenCalled();
+    expect(mockMembershipState.disconnectUser).not.toHaveBeenCalled();
+    expect(mockDrawingsState.resetForAccountSwitch).not.toHaveBeenCalled();
+    expect(mockProfilesState.resetForAccountSwitch).not.toHaveBeenCalled();
+    expect(mockMembershipState.initializeForUser).toHaveBeenCalledWith("adult-a");
     expect(useAuth.getState()).toMatchObject({
       hydrated: true,
       busy: false,
-      status: "signedOut",
+      status: "signedIn",
       session: null,
-      user: null,
-      profile: null,
+      user: { id: "adult-a", email: "adult-a@example.com" },
+      profile: { id: "adult-a", displayName: "Adult A" },
       otpEmail: null,
       error: "offline",
     });
   });
 
-  it("does not rehydrate a previous account if clearing its local owner fails", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null }, error: new Error("offline") });
-    mockDatabase.clearBukiAccount.mockRejectedValue(new Error("database unavailable"));
+  it("finishes cached-account startup while remote session lookup is still pending", async () => {
+    mockDatabase.loadActiveAdultProfile.mockResolvedValue({
+      id: "adult-a",
+      displayName: "Adult A",
+      email: "adult-a@example.com",
+      avatarUri: null,
+    });
+    let resolveSession!: (value: { data: { session: Session | null }; error: null }) => void;
+    mockGetSession.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
 
     await useAuth.getState().initialize();
 
-    expect(mockDrawingsState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
-    expect(mockProfilesState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
-    expect(mockPreferencesState.resetForAccountSwitch).toHaveBeenCalledTimes(1);
-    expect(mockDrawingsState.hydrate).not.toHaveBeenCalled();
-    expect(mockProfilesState.hydrate).not.toHaveBeenCalled();
-    expect(mockPreferencesState.hydrate).not.toHaveBeenCalled();
     expect(useAuth.getState()).toMatchObject({
-      status: "signedOut",
+      hydrated: true,
+      status: "signedIn",
       session: null,
-      user: null,
-      profile: null,
+      user: { id: "adult-a" },
     });
-    expect(useAuth.getState().error).toContain("could not fully clear");
+
+    const refreshed = session("adult-a", "fresh-token");
+    resolveSession({ data: { session: refreshed }, error: null });
+    await flushAuthApplications();
+    expect(useAuth.getState().session?.access_token).toBe("fresh-token");
   });
 
   it("retries listener registration when the first registration throws", async () => {
@@ -261,7 +266,23 @@ describe("authentication state boundaries", () => {
 
     await useAuth.getState().initialize();
     expect(mockAuthListener).toHaveBeenCalledTimes(2);
-    expect(mockGetSession).toHaveBeenCalledTimes(1);
+    expect(mockGetSession).toHaveBeenCalledTimes(2);
+  });
+
+  it("bounds signed-out startup when remote session lookup never settles", async () => {
+    mockGetSession.mockReturnValue(new Promise(() => {}));
+
+    const startedAt = Date.now();
+    await useAuth.getState().initialize();
+
+    expect(Date.now() - startedAt).toBeLessThan(2_500);
+    expect(useAuth.getState()).toMatchObject({
+      hydrated: true,
+      status: "signedOut",
+      session: null,
+      user: null,
+    });
+    expect(mockDatabase.clearBukiAccount).not.toHaveBeenCalled();
   });
 
   it("accepts a refreshed token for the same user without reloading account data", async () => {
@@ -359,6 +380,44 @@ describe("authentication state boundaries", () => {
     );
     expect(mockSignInWithIdToken).not.toHaveBeenCalled();
     expect(useAuth.getState().error).toContain("could not be verified");
+  });
+
+  it("completes Google OAuth through the exact Buki callback", async () => {
+    const googleSession = session("adult-google", "token-google");
+    mockSignInWithOAuth.mockResolvedValue({
+      data: { url: "https://example.supabase.co/auth/v1/authorize?provider=google" },
+      error: null,
+    });
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "buki://auth/callback?code=google-code",
+    });
+    mockExchangeCodeForSession.mockResolvedValue({
+      data: { session: googleSession },
+      error: null,
+    });
+
+    const completed = await useAuth.getState().signInWithGoogle();
+
+    expect(completed).toBe(true);
+    expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      options: {
+        redirectTo: "buki://auth/callback",
+        skipBrowserRedirect: true,
+      },
+    });
+    expect(mockOpenAuthSession).toHaveBeenCalledWith(
+      "https://example.supabase.co/auth/v1/authorize?provider=google",
+      "buki://auth/callback",
+    );
+    expect(mockExchangeCodeForSession).toHaveBeenCalledWith("google-code");
+    expect(useAuth.getState()).toMatchObject({
+      status: "signedIn",
+      user: googleSession.user,
+      busy: false,
+      error: null,
+    });
   });
 
   it("clears the OTP context on sign-out", async () => {

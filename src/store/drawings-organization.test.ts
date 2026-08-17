@@ -23,7 +23,9 @@ jest.mock("expo-file-system", () => ({
 
 jest.mock("@/database", () => ({
   enqueueLibrarySnapshot: (...args: unknown[]) => mockPersist(...args),
+  enqueueSketchpadViewedUnit: jest.fn(),
   loadLibrarySnapshot: jest.fn(),
+  loadSketchpadViewedUnits: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock("@/store/membership", () => ({

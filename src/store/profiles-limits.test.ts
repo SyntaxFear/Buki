@@ -2,6 +2,7 @@ const mockAddChild = jest.fn();
 const mockLoadProfiles = jest.fn();
 const mockRequestUpgrade = jest.fn();
 const mockReloadDrawings = jest.fn();
+const mockReplayOnboarding = jest.fn();
 let mockUuid = 0;
 let mockCapabilities: import("@/subscription/access").Capabilities;
 
@@ -20,7 +21,7 @@ jest.mock("@/database", () => ({
   loadBukiProfiles: (...args: unknown[]) => mockLoadProfiles(...args),
   removeBukiChild: jest.fn(),
   reorderBukiChildren: jest.fn(),
-  replayBukiOnboarding: jest.fn(),
+  replayBukiOnboarding: (...args: unknown[]) => mockReplayOnboarding(...args),
   selectBukiChild: jest.fn(),
 }));
 
@@ -53,6 +54,7 @@ describe("child profile limits", () => {
     mockCapabilities = resolveCapabilities("free");
     mockRequestUpgrade.mockReset();
     mockReloadDrawings.mockReset().mockResolvedValue(undefined);
+    mockReplayOnboarding.mockReset().mockResolvedValue(undefined);
     mockLoadProfiles.mockImplementation(async () => ({
       ownerId: "adult-a",
       children: [...persistedChildren],
@@ -105,5 +107,17 @@ describe("child profile limits", () => {
     expect(results.filter(Boolean)).toHaveLength(2);
     expect(persistedChildren).toHaveLength(2);
     expect(mockRequestUpgrade).not.toHaveBeenCalled();
+  });
+
+  it("keeps onboarding complete and surfaces an error when replay persistence fails", async () => {
+    mockReplayOnboarding.mockRejectedValueOnce(new Error("Replay failed"));
+
+    await useProfiles.getState().replayOnboarding();
+
+    expect(useProfiles.getState()).toMatchObject({
+      busy: false,
+      onboardingComplete: true,
+      error: "Replay failed",
+    });
   });
 });

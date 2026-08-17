@@ -1,28 +1,37 @@
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ArtworkExportSheet } from "@/components/artwork-export-sheet";
+import { HapticPressable as Pressable } from "@/components/haptic-pressable";
+import { NativeDoneHeader } from "@/components/native-navigation-header";
 import { useDrawings } from "@/store/drawings";
 import { useMembership } from "@/store/membership";
-import { confirmAdult } from "@/store/parental-gate";
 import { useProfiles } from "@/store/profiles";
 import { colors } from "@/theme";
+import { requestArtworkDeletion } from "@/utils/artwork-deletion";
+import {
+  Haptics,
+  notificationHaptic,
+  selectionHaptic,
+} from "@/utils/haptics";
+import {
+  dismissKeyboard,
+  keyboardDismissMode,
+  keyboardInputBottomOffset,
+} from "@/utils/keyboard";
 
 function firstParam(value: string | string[] | undefined): string | null {
-  return Array.isArray(value) ? value[0] ?? null : value ?? null;
+  return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
 }
 
 function artworkDate(value: number): string {
@@ -41,17 +50,22 @@ export function ArtworkDetails() {
   const activeChildId = useProfiles((state) => state.activeChildId);
   const padId = useDrawings((state) =>
     id
-      ? state.pads
+      ? (state.pads
           .filter((item) => item.childId === activeChildId)
-          .find((item) => state.drawingsByPad[item.id]?.some((drawing) => drawing.id === id))
-          ?.id ?? null
+          .find((item) =>
+            state.drawingsByPad[item.id]?.some((drawing) => drawing.id === id),
+          )?.id ?? null)
       : null,
   );
   const drawing = useDrawings((state) =>
-    padId ? state.drawingsByPad[padId]?.find((item) => item.id === id) : undefined,
+    padId
+      ? state.drawingsByPad[padId]?.find((item) => item.id === id)
+      : undefined,
   );
   const pad = useDrawings((state) =>
-    state.pads.find((item) => item.id === padId && item.childId === activeChildId),
+    state.pads.find(
+      (item) => item.id === padId && item.childId === activeChildId,
+    ),
   );
   const updateMetadata = useDrawings((state) => state.updateDrawingMetadata);
   const toggleFavorite = useDrawings((state) => state.toggleDrawingFavorite);
@@ -62,12 +76,15 @@ export function ArtworkDetails() {
   );
   const exportData = useMembership((state) => state.capabilities.exportData);
   const requestUpgrade = useMembership((state) => state.requestUpgrade);
-  const child = useProfiles((state) => state.children.find((item) => item.id === activeChildId));
+  const child = useProfiles((state) =>
+    state.children.find((item) => item.id === activeChildId),
+  );
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [tagDraft, setTagDraft] = useState("");
   const [saved, setSaved] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const notesInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     setTitle(drawing?.title ?? "");
@@ -76,19 +93,36 @@ export function ArtworkDetails() {
   }, [drawing?.id, drawing?.notes, drawing?.title]);
 
   const changed = useMemo(
-    () => title.trim() !== (drawing?.title ?? "") || notes.trim() !== (drawing?.notes ?? ""),
+    () =>
+      title.trim() !== (drawing?.title ?? "") ||
+      notes.trim() !== (drawing?.notes ?? ""),
     [drawing?.notes, drawing?.title, notes, title],
   );
 
   if (!drawing) {
     return (
-      <View style={[styles.missingRoot, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
-        <Text style={styles.missingTitle}>Artwork not found</Text>
-        <Text style={styles.missingBody}>It may have been removed from this device.</Text>
-        <Pressable onPress={() => router.back()} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Close</Text>
-        </Pressable>
-      </View>
+      <>
+        <NativeDoneHeader
+          title="Artwork"
+          eyebrow="ARTWORK DETAILS"
+          accessibilityLabel="Close artwork details"
+          onPress={() => router.back()}
+        />
+        <View
+          style={[
+            styles.missingRoot,
+            { paddingTop: 24, paddingBottom: insets.bottom + 24 },
+          ]}
+        >
+          <Text style={styles.missingTitle}>Artwork not found</Text>
+          <Text style={styles.missingBody}>
+            It may have been removed from this device.
+          </Text>
+          <Pressable onPress={() => router.back()} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>Close</Text>
+          </Pressable>
+        </View>
+      </>
     );
   }
 
@@ -96,6 +130,8 @@ export function ArtworkDetails() {
 
   const save = () => {
     if (updateMetadata(drawing.id, { title, notes })) {
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
+      dismissKeyboard();
       setSaved(true);
       setTimeout(() => setSaved(false), 1_500);
     }
@@ -104,64 +140,52 @@ export function ArtworkDetails() {
   const addTag = () => {
     const next = tagDraft.trim();
     if (!next) return;
-    if (setDrawingTags(drawing.id, [...tags, next])) setTagDraft("");
+    if (setDrawingTags(drawing.id, [...tags, next])) {
+      selectionHaptic();
+      setTagDraft("");
+    }
   };
 
   const confirmDelete = async () => {
-    if (!(await confirmAdult("Deleting artwork permanently removes its local image files."))) return;
-    Alert.alert("Delete this artwork?", "This cannot be undone on this device.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          if (deleteDrawing(drawing.id)) router.back();
-        },
-      },
-    ]);
+    await requestArtworkDeletion(drawing.id, deleteDrawing, () =>
+      router.back(),
+    );
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={process.env.EXPO_OS === "ios" ? "padding" : undefined}
-      collapsable={false}
-      style={styles.root}
-    >
-      <View collapsable={false} style={[styles.navigation, { paddingTop: insets.top + 8 }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.eyebrow}>ARTWORK DETAILS</Text>
-          <Text style={styles.navigationTitle} numberOfLines={1}>
-            {drawing.title || "Untitled masterpiece"}
-          </Text>
-        </View>
-        <Pressable
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Close artwork details"
-          style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
+    <>
+      <NativeDoneHeader
+        title={drawing.title || "Untitled masterpiece"}
+        eyebrow="ARTWORK DETAILS"
+        accessibilityLabel="Close artwork details"
+        onPress={() => router.back()}
+      />
+      <View style={styles.root}>
+        <KeyboardAwareScrollView
+          bottomOffset={keyboardInputBottomOffset}
+          contentInsetAdjustmentBehavior="automatic"
+          keyboardDismissMode={keyboardDismissMode}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: insets.bottom + 40 },
+          ]}
         >
-          <Text style={styles.doneLabel}>Done</Text>
-        </Pressable>
-      </View>
-
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
-      >
-        <View style={styles.imageCard}>
-          <Image
-            source={{ uri: drawing.uri }}
-            style={styles.image}
-            contentFit="contain"
-            accessibilityLabel={drawing.title || "Scanned artwork"}
-          />
-        </View>
+          <View style={styles.imageCard}>
+            <Image
+              source={{ uri: drawing.uri }}
+              style={styles.image}
+              contentFit="contain"
+              accessibilityLabel={drawing.title || "Scanned artwork"}
+            />
+          </View>
 
         <View style={styles.metadataLine}>
           <View style={{ flex: 1 }}>
             <Text style={styles.metadataLabel}>Added</Text>
-            <Text style={styles.metadataValue}>{artworkDate(drawing.addedAt)}</Text>
+            <Text style={styles.metadataValue}>
+              {artworkDate(drawing.addedAt)}
+            </Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.metadataLabel}>Sketchpad</Text>
@@ -179,12 +203,21 @@ export function ArtworkDetails() {
           }}
           accessibilityRole="button"
           accessibilityLabel="Export artwork"
-          style={({ pressed }) => [styles.exportButton, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.exportButton,
+            pressed && styles.pressed,
+          ]}
         >
-          <SymbolView name="square.and.arrow.up" size={18} tintColor={colors.titleTeal} />
+          <SymbolView
+            name="square.and.arrow.up"
+            size={18}
+            tintColor={colors.titleTeal}
+          />
           <View style={{ flex: 1 }}>
             <Text style={styles.exportTitle}>Export artwork</Text>
-            <Text style={styles.exportDetail}>Transparent PNG, JPG, or decorated share card</Text>
+            <Text style={styles.exportDetail}>
+              Transparent PNG, JPG, or decorated share card
+            </Text>
           </View>
           {!exportData ? (
             <View style={styles.proBadge}>
@@ -205,10 +238,13 @@ export function ArtworkDetails() {
             placeholder="Give this artwork a title"
             maxLength={100}
             style={styles.input}
-            returnKeyType="done"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => notesInputRef.current?.focus()}
           />
           <Text style={styles.fieldLabel}>Notes</Text>
           <TextInput
+            ref={notesInputRef}
             value={notes}
             onChangeText={(value) => {
               setNotes(value);
@@ -221,6 +257,7 @@ export function ArtworkDetails() {
             style={[styles.input, styles.notesInput]}
           />
           <Pressable
+            haptic={false}
             disabled={!changed}
             onPress={save}
             accessibilityRole="button"
@@ -232,16 +269,22 @@ export function ArtworkDetails() {
               pressed && styles.pressed,
             ]}
           >
-            <Text style={styles.primaryButtonText}>{saved ? "Saved" : "Save details"}</Text>
+            <Text style={styles.primaryButtonText}>
+              {saved ? "Saved" : "Save details"}
+            </Text>
           </Pressable>
-          <Text style={styles.freeNote}>Title, date, and notes are available to every Buki member.</Text>
+          <Text style={styles.freeNote}>
+            Title, date, and notes are available to every Buki member.
+          </Text>
         </View>
 
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <View>
               <Text style={styles.sectionTitle}>Organize</Text>
-              <Text style={styles.sectionCaption}>Favorites and tags are included with Pro.</Text>
+              <Text style={styles.sectionCaption}>
+                Favorites and tags are included with Pro.
+              </Text>
             </View>
             <View style={styles.proBadge}>
               <Text style={styles.proBadgeText}>PRO</Text>
@@ -249,22 +292,36 @@ export function ArtworkDetails() {
           </View>
 
           <Pressable
-            onPress={() => toggleFavorite(drawing.id)}
+            haptic={advancedOrganization ? false : "selection"}
+            onPress={() => {
+              if (toggleFavorite(drawing.id)) selectionHaptic();
+            }}
             accessibilityRole="button"
-            accessibilityLabel={drawing.favorite ? "Remove from favorites" : "Add to favorites"}
-            accessibilityHint={!advancedOrganization ? "Opens Buki Pro options" : undefined}
+            accessibilityLabel={
+              drawing.favorite ? "Remove from favorites" : "Add to favorites"
+            }
+            accessibilityHint={
+              !advancedOrganization ? "Opens Buki Pro options" : undefined
+            }
             accessibilityState={{ selected: drawing.favorite === true }}
-            style={({ pressed }) => [styles.favoriteButton, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.favoriteButton,
+              pressed && styles.pressed,
+            ]}
           >
             <SymbolView
               name={drawing.favorite ? "heart.fill" : "heart"}
               size={20}
-              tintColor={drawing.favorite ? colors.titleCoral : colors.titleTeal}
+              tintColor={
+                drawing.favorite ? colors.titleCoral : colors.titleTeal
+              }
             />
             <Text style={styles.favoriteLabel}>
               {drawing.favorite ? "Favorite artwork" : "Add to favorites"}
             </Text>
-            {!advancedOrganization ? <Text style={styles.lockLabel}>Unlock</Text> : null}
+            {!advancedOrganization ? (
+              <Text style={styles.lockLabel}>Unlock</Text>
+            ) : null}
           </Pressable>
 
           {tags.length ? (
@@ -272,10 +329,18 @@ export function ArtworkDetails() {
               {tags.map((tag) => (
                 <Pressable
                   key={tag}
-                  onPress={() => setDrawingTags(drawing.id, tags.filter((item) => item !== tag))}
+                  haptic={advancedOrganization ? false : "selection"}
+                  onPress={() => {
+                    if (setDrawingTags(
+                      drawing.id,
+                      tags.filter((item) => item !== tag),
+                    )) selectionHaptic();
+                  }}
                   accessibilityRole="button"
                   accessibilityLabel={`Remove tag ${tag}${!advancedOrganization ? ". Pro locked" : ""}`}
-                  accessibilityHint={!advancedOrganization ? "Opens Buki Pro options" : undefined}
+                  accessibilityHint={
+                    !advancedOrganization ? "Opens Buki Pro options" : undefined
+                  }
                   style={styles.tag}
                 >
                   <Text style={styles.tagText}>{tag}</Text>
@@ -294,16 +359,26 @@ export function ArtworkDetails() {
               placeholder="Add a tag"
               maxLength={24}
               returnKeyType="done"
-              onSubmitEditing={addTag}
+              submitBehavior="blurAndSubmit"
+              onSubmitEditing={() => {
+                addTag();
+                dismissKeyboard();
+              }}
               accessibilityLabel="New artwork tag"
               style={[styles.input, styles.tagInput]}
             />
             <Pressable
+              haptic={advancedOrganization ? false : "selection"}
               onPress={addTag}
               accessibilityRole="button"
               accessibilityLabel={`Add artwork tag${!advancedOrganization ? ". Pro locked" : ""}`}
-              accessibilityHint={!advancedOrganization ? "Opens Buki Pro options" : undefined}
-              style={({ pressed }) => [styles.addTagButton, pressed && styles.pressed]}
+              accessibilityHint={
+                !advancedOrganization ? "Opens Buki Pro options" : undefined
+              }
+              style={({ pressed }) => [
+                styles.addTagButton,
+                pressed && styles.pressed,
+              ]}
             >
               <Text style={styles.addTagLabel}>Add</Text>
             </Pressable>
@@ -311,14 +386,18 @@ export function ArtworkDetails() {
         </View>
 
         <Pressable
+          haptic={false}
           onPress={() => void confirmDelete()}
           accessibilityRole="button"
           accessibilityLabel="Delete artwork"
-          style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.deleteButton,
+            pressed && styles.pressed,
+          ]}
         >
           <Text style={styles.deleteLabel}>Delete artwork</Text>
         </Pressable>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <ArtworkExportSheet
         visible={exportOpen}
@@ -327,36 +406,13 @@ export function ArtworkDetails() {
         childName={child?.name}
         onClose={() => setExportOpen(false)}
       />
-    </KeyboardAvoidingView>
+    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.backgroundDeep },
-  navigation: {
-    minHeight: 76,
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  eyebrow: { fontSize: 10.5, fontWeight: "900", letterSpacing: 1.1, color: colors.titleCoral },
-  navigationTitle: { fontSize: 22, lineHeight: 27, fontWeight: "900", color: colors.ink },
-  doneButton: {
-    minWidth: 62,
-    minHeight: 40,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    borderCurve: "continuous",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceAlt,
-  },
-  doneLabel: { fontSize: 16, fontWeight: "800", color: colors.titleTeal },
   content: { padding: 16, gap: 16 },
   imageCard: {
     height: 290,
@@ -369,11 +425,38 @@ const styles = StyleSheet.create({
   },
   image: { width: "100%", height: "100%" },
   metadataLine: { flexDirection: "row", gap: 12, paddingHorizontal: 4 },
-  metadataLabel: { fontSize: 11, fontWeight: "800", color: colors.mutedText, textTransform: "uppercase" },
-  metadataValue: { fontSize: 14, fontWeight: "800", color: colors.ink, marginTop: 3 },
-  exportButton: { minHeight: 64, paddingHorizontal: 15, paddingVertical: 11, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 19, borderCurve: "continuous", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  metadataLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.mutedText,
+    textTransform: "uppercase",
+  },
+  metadataValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.ink,
+    marginTop: 3,
+  },
+  exportButton: {
+    minHeight: 64,
+    paddingHorizontal: 15,
+    paddingVertical: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 19,
+    borderCurve: "continuous",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   exportTitle: { fontSize: 15, fontWeight: "900", color: colors.ink },
-  exportDetail: { fontSize: 11.5, lineHeight: 16, color: colors.mutedText, marginTop: 2 },
+  exportDetail: {
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.mutedText,
+    marginTop: 2,
+  },
   sectionCard: {
     padding: 16,
     gap: 10,
@@ -383,9 +466,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  sectionHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   sectionTitle: { fontSize: 18, fontWeight: "900", color: colors.ink },
-  sectionCaption: { fontSize: 12, lineHeight: 17, color: colors.mutedText, marginTop: 2 },
+  sectionCaption: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.mutedText,
+    marginTop: 2,
+  },
   fieldLabel: { fontSize: 12, fontWeight: "800", color: colors.mutedText },
   input: {
     minHeight: 48,
@@ -410,9 +503,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.titleTeal,
   },
   primaryButtonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" },
-  freeNote: { fontSize: 11.5, lineHeight: 16, color: colors.mutedText, textAlign: "center" },
-  proBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.bloomYellow },
-  proBadgeText: { fontSize: 10, fontWeight: "900", letterSpacing: 0.7, color: colors.ink },
+  freeNote: {
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: colors.mutedText,
+    textAlign: "center",
+  },
+  proBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: colors.bloomYellow,
+  },
+  proBadgeText: {
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+    color: colors.ink,
+  },
   favoriteButton: {
     minHeight: 50,
     paddingHorizontal: 13,
@@ -423,22 +531,58 @@ const styles = StyleSheet.create({
     borderCurve: "continuous",
     backgroundColor: colors.surfaceAlt,
   },
-  favoriteLabel: { flex: 1, fontSize: 14, fontWeight: "800", color: colors.ink },
+  favoriteLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "800",
+    color: colors.ink,
+  },
   lockLabel: { fontSize: 11, fontWeight: "900", color: colors.titleCoral },
   tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  tag: { minHeight: 34, paddingHorizontal: 11, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 17, backgroundColor: "rgba(72,198,183,0.13)" },
+  tag: {
+    minHeight: 34,
+    paddingHorizontal: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 17,
+    backgroundColor: "rgba(72,198,183,0.13)",
+  },
   tagText: { fontSize: 12.5, fontWeight: "800", color: colors.titleTeal },
   tagRemove: { fontSize: 18, lineHeight: 18, color: colors.titleTeal },
   emptyTags: { fontSize: 12, color: colors.mutedText },
   tagComposer: { flexDirection: "row", gap: 8 },
   tagInput: { flex: 1 },
-  addTagButton: { minWidth: 66, borderRadius: 14, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceAlt },
+  addTagButton: {
+    minWidth: 66,
+    borderRadius: 14,
+    borderCurve: "continuous",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceAlt,
+  },
   addTagLabel: { fontSize: 14, fontWeight: "900", color: colors.titleTeal },
-  deleteButton: { minHeight: 48, borderRadius: 16, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: "#FFF0EF", borderWidth: 1, borderColor: "rgba(180,60,60,0.18)" },
+  deleteButton: {
+    minHeight: 48,
+    borderRadius: 16,
+    borderCurve: "continuous",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF0EF",
+    borderWidth: 1,
+    borderColor: "rgba(180,60,60,0.18)",
+  },
   deleteLabel: { fontSize: 14, fontWeight: "900", color: "#B43C3C" },
   disabled: { opacity: 0.42 },
   pressed: { opacity: 0.72, transform: [{ scale: 0.99 }] },
-  missingRoot: { flex: 1, padding: 24, gap: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.backgroundDeep },
+  missingRoot: {
+    flex: 1,
+    padding: 24,
+    gap: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.backgroundDeep,
+  },
   missingTitle: { fontSize: 24, fontWeight: "900", color: colors.ink },
   missingBody: { fontSize: 14, color: colors.mutedText, textAlign: "center" },
 });

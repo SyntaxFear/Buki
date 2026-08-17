@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +13,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createBukiArchive, importBukiArchive } from "@/archive/buki-archive";
+import { HapticPressable as Pressable } from "@/components/haptic-pressable";
+import { NativeDoneHeader } from "@/components/native-navigation-header";
 import { createSketchpadPdf } from "@/export/sketchpad-pdf";
 import { createSketchpadZip } from "@/export/sketchpad-zip";
 import { deleteLocalFile } from "@/export/file-cleanup";
@@ -197,22 +198,17 @@ export function ExportsScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.navigation, { paddingTop: insets.top + 8 }]}>
-        <View>
-          <Text style={styles.eyebrow}>BUKI PRO</Text>
-          <Text style={styles.title}>Export & Backup</Text>
-        </View>
-        <Pressable
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Close export center"
-          style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.doneLabel}>Done</Text>
-        </Pressable>
-      </View>
+      <NativeDoneHeader
+        title="Export & Backup"
+        eyebrow="BUKI PRO"
+        accessibilityLabel="Close export center"
+        onPress={() => router.back()}
+      />
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 42 }]}>
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 42 }]}
+      >
         <View style={styles.introCard}>
           <Text style={styles.introMark}>↗</Text>
           <View style={styles.introCopy}>
@@ -231,6 +227,7 @@ export function ExportsScreen() {
             return (
               <Pressable
                 key={pad.id}
+                haptic={selected ? false : "selection"}
                 onPress={() => setSelectedPadId(pad.id)}
                 accessibilityRole="radio"
                 accessibilityLabel={`${pad.name}, ${STYLE_LABELS[pad.style]}, ${count} artwork${count === 1 ? "" : "s"}`}
@@ -358,21 +355,6 @@ function ExportCard({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  navigation: {
-    minHeight: 92,
-    paddingHorizontal: 22,
-    paddingBottom: 14,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  eyebrow: { color: colors.titleCoral, fontSize: 11, fontWeight: "900", letterSpacing: 1.8 },
-  title: { marginTop: 3, color: colors.ink, fontSize: 28, fontWeight: "800" },
-  doneButton: { minHeight: 38, justifyContent: "center", paddingHorizontal: 14, borderRadius: 19, backgroundColor: colors.surfaceAlt },
-  doneLabel: { color: colors.titleTeal, fontSize: 16, fontWeight: "800" },
   content: { padding: 20, gap: 18 },
   introCard: { flexDirection: "row", gap: 14, padding: 18, borderRadius: 24, backgroundColor: colors.titleTeal },
   introMark: { color: colors.bloomYellow, fontSize: 30, fontWeight: "900" },
