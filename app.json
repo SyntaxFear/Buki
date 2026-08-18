@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.parastashvili.bloombook",
-      "buildNumber": "32",
+      "buildNumber": "33",
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "infoPlist": {

@@ -12,6 +12,7 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import {
   createReviewMediaFiles,
   discardReviewCutout,
+  preserveReviewPhoto,
   type ReviewCutout,
 } from "@/utils/capture-review-media";
 import { extractDrawing } from "@/utils/cutout";
@@ -182,15 +183,9 @@ export async function processPhotoForReview(
         SaveFormat.JPEG,
         0.85,
       );
-      try {
-        sanitizedPhoto.copy(reviewFiles.photo);
-        savedPhotoUri = reviewFiles.photo.uri;
-        review.photoUri = savedPhotoUri;
-      } finally {
-        try {
-          if (sanitizedPhoto.exists) sanitizedPhoto.delete();
-        } catch {}
-      }
+      await preserveReviewPhoto(sanitizedPhoto, reviewFiles.photo);
+      savedPhotoUri = reviewFiles.photo.uri;
+      review.photoUri = savedPhotoUri;
     } catch (error) {
       console.warn("Could not preserve original photo", error);
     }

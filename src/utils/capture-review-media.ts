@@ -66,6 +66,17 @@ function deleteFile(uri: string | undefined): void {
   } catch {}
 }
 
+export async function preserveReviewPhoto(
+  source: File,
+  destination: File,
+): Promise<void> {
+  try {
+    await source.copy(destination);
+  } finally {
+    deleteFile(source.uri);
+  }
+}
+
 export function discardReviewCutout(review: ReviewCutout | null): void {
   if (!review) return;
   deleteFile(review.uri);
@@ -90,9 +101,9 @@ export async function finalizeReviewCutout(
     : null;
 
   try {
-    new File(review.uri).copy(finalCutout);
+    await new File(review.uri).copy(finalCutout);
     if (review.photoUri && finalPhoto)
-      new File(review.photoUri).copy(finalPhoto);
+      await new File(review.photoUri).copy(finalPhoto);
   } catch (error) {
     deleteFile(finalCutout.uri);
     deleteFile(finalPhoto?.uri);

@@ -280,7 +280,10 @@ export async function loadLibrary(db: SQLiteDatabase): Promise<StoreData> {
     drawings.push({
       id: artwork.id,
       uri: artwork.cutout_uri,
-      photoUri: artwork.photo_uri ?? undefined,
+      photoUri:
+        artwork.photo_uri && fileExists(artwork.photo_uri)
+          ? artwork.photo_uri
+          : undefined,
       width: artwork.width,
       height: artwork.height,
       rotation: artwork.rotation,

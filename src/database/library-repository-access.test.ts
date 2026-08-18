@@ -8,13 +8,24 @@ import { activeLocalOwnerId } from "./account-repository";
 import {
   assertLibrarySnapshotWithinCapabilities,
   CrossAccountLibraryConflictError,
+  loadLibrary,
   saveLibrary,
 } from "./library-repository";
 
+const mockMissingFiles = new Set<string>();
+
 jest.mock("expo-file-system", () => ({
   File: class MockFile {
-    readonly exists = true;
+    readonly uri: string;
     readonly size = 1;
+
+    constructor(uri: string) {
+      this.uri = uri;
+    }
+
+    get exists() {
+      return !mockMissingFiles.has(this.uri);
+    }
   },
 }));
 
@@ -111,7 +122,50 @@ function database(existingPads: ExistingPad[] = [], existingArtworks: ExistingAr
 describe("library repository capability boundary", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockMissingFiles.clear();
     activeLocalOwnerIdMock.mockResolvedValue(null);
+  });
+
+  it("hides a stale original-photo URI when its local file is missing", async () => {
+    const missingPhoto = "file:///documents/photos/missing.jpg";
+    mockMissingFiles.add(missingPhoto);
+    const db = {
+      getAllAsync: jest
+        .fn()
+        .mockResolvedValueOnce([{
+          id: "pad-a",
+          child_id: "child-a",
+          name: "My Book",
+          style: "vertical",
+          design: "sunshine",
+          cover_color: "#4A79D8",
+          page_color: "#FFFDF4",
+          border: "none",
+          decoration: "none",
+          icon: "cover",
+          created_at: 1,
+        }])
+        .mockResolvedValueOnce([{
+          id: "art-a",
+          sketchpad_id: "pad-a",
+          cutout_uri: "file:///documents/drawings/art-a.png",
+          photo_uri: missingPhoto,
+          width: 100,
+          height: 100,
+          rotation: 0,
+          title: null,
+          notes: null,
+          favorite: 0,
+          added_at: 1,
+          updated_at: 1,
+        }])
+        .mockResolvedValueOnce([]),
+      getFirstAsync: jest.fn().mockResolvedValue(null),
+    };
+
+    const loaded = await loadLibrary(db as never);
+
+    expect(loaded.drawingsByPad["pad-a"][0].photoUri).toBeUndefined();
   });
 
   it("blocks a direct Free snapshot containing a twenty-first artwork before writes", async () => {

@@ -47,7 +47,8 @@ jest.mock("expo-file-system", () => ({
       return mockFiles.has(this.uri);
     }
 
-    copy(destination: { uri: string }) {
+    async copy(destination: { uri: string }) {
+      await Promise.resolve();
       if (!mockFiles.has(this.uri)) throw new Error("source missing");
       if (mockCopyFailureSource === this.uri) throw new Error("copy failed");
       mockFiles.add(destination.uri);
@@ -62,6 +63,7 @@ jest.mock("expo-file-system", () => ({
 import {
   discardReviewCutout,
   finalizeReviewCutout,
+  preserveReviewPhoto,
   type ReviewCutout,
 } from "./capture-review-media";
 
@@ -105,6 +107,21 @@ describe("capture review media ownership", () => {
     expect(mockFiles.has(processed.photoUri!)).toBe(true);
     expect(mockFiles.has(review.uri)).toBe(false);
     expect(mockFiles.has(review.photoUri!)).toBe(false);
+  });
+
+  it("awaits a sanitized photo copy before deleting its temporary source", async () => {
+    const source = new (require("expo-file-system").File)(
+      "file:///cache/sanitized-photo.jpg",
+    );
+    const destination = new (require("expo-file-system").File)(
+      "file:///cache/buki-capture-review/photo-review.jpg",
+    );
+    mockFiles.add(source.uri);
+
+    await preserveReviewPhoto(source, destination);
+
+    expect(mockFiles.has(source.uri)).toBe(false);
+    expect(mockFiles.has(destination.uri)).toBe(true);
   });
 
   it("keeps review media retryable and removes partial permanent copies when promotion fails", async () => {
