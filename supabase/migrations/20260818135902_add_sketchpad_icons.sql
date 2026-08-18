@@ -1,3 +1,6 @@
+-- Supabase Management API applied this version to production while the
+-- original migration remained unapplied there. Keep both versions idempotent
+-- so production, existing development databases, and fresh databases converge.
 alter table public.sketchpads
   add column if not exists icon text default 'cover';
 
