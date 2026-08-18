@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(81);
+select plan(86);
 
 select has_table('public', 'adult_profiles', 'adult_profiles exists');
 select has_table('public', 'child_profiles', 'child_profiles exists');
@@ -64,6 +64,26 @@ select ok(
 );
 
 select has_function('public', 'has_cloud_access', array['uuid'], 'cloud access resolver exists');
+select ok(
+  not (select prosecdef from pg_proc where oid = 'public.has_cloud_access(uuid)'::regprocedure),
+  'cloud access resolver runs with caller privileges'
+);
+select ok(
+  not has_function_privilege('anon', 'public.reserve_media_upload(uuid,text,text,text,text,bigint,text,text)', 'EXECUTE'),
+  'anonymous clients cannot reserve media uploads directly'
+);
+select ok(
+  not has_function_privilege('authenticated', 'public.reserve_media_upload(uuid,text,text,text,text,bigint,text,text)', 'EXECUTE'),
+  'authenticated clients cannot bypass media upload Edge Functions'
+);
+select ok(
+  not has_function_privilege('authenticated', 'public.record_entitlement_verification(uuid,boolean,boolean,timestamp with time zone,timestamp with time zone)', 'EXECUTE'),
+  'authenticated clients cannot write entitlement verification directly'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.record_analytics_events(jsonb)', 'EXECUTE'),
+  'authenticated clients retain the validated analytics recorder'
+);
 select has_function(
   'public',
   'record_entitlement_verification',
