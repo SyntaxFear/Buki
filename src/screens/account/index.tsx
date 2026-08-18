@@ -2,7 +2,6 @@ import * as Application from "expo-application";
 import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import * as StoreReview from "expo-store-review";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -40,6 +39,7 @@ import {
   PURCHASE_SIGN_IN_REQUIRED,
 } from "@/subscription/purchase-account";
 import { colors } from "@/theme";
+import { openBukiStoreReview } from "@/utils/store-review";
 import {
   dismissKeyboard,
   keyboardDismissMode,
@@ -766,8 +766,14 @@ export function AccountCenter() {
           <SettingRow title="Help & contact" detail="Buki support" onPress={() => void openExternal(config.supportUrl, "Support opens Buki’s website.")} />
           <SettingRow title="Rate Buki" detail="Share feedback on the App Store" onPress={() => void (async () => {
             if (!(await confirmAdult("Rating Buki opens an Apple-controlled prompt."))) return;
-            if (await StoreReview.isAvailableAsync()) await StoreReview.requestReview();
-            else Alert.alert("Ratings unavailable", "The App Store rating prompt is not available on this build.");
+            try {
+              const action = await openBukiStoreReview();
+              if (action === "unavailable") {
+                Alert.alert("Ratings unavailable", "Buki could not open an App Store rating option on this device.");
+              }
+            } catch {
+              Alert.alert("Could not open App Store", "Please try rating Buki again in a moment.");
+            }
           })()} />
           <SettingRow title="Privacy Policy" onPress={() => void openExternal(config.privacyUrl, "The Privacy Policy opens Buki’s website.")} />
           <SettingRow title="Terms of Use" onPress={() => void openExternal(config.termsUrl, "The Terms of Use open Buki’s website.")} />
