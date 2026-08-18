@@ -47,11 +47,16 @@ export interface Quad {
 const DEWARP_SKEW_MIN = 0.035;
 
 const PAPER_INSET_FRAC = 0.025;
+const FULL_FRAME_INSET_FRAC = 0.005;
 const INK_PAD_FRAC = 0.05;
 /** Grid downscale factor for paper detection */
 const PAPER_GRID = 4;
 /** Grid downscale factor for despeckle */
 const SPECK_GRID = 2;
+const MIN_PAPER_SURFACE_LUMINANCE = 155;
+const NEUTRAL_PAPER_MIN_LUMINANCE = 180;
+const NEUTRAL_PAPER_MAX_CHROMA = 24;
+const MIN_NEUTRAL_PAPER_SAMPLES = 32;
 
 export function luminance(rgba: Uint8Array, width: number, height: number): Uint8Array {
   const out = new Uint8Array(width * height);
@@ -431,7 +436,44 @@ function insetBox(box: Box, frac: number, width: number, height: number): Box {
   };
 }
 
-/** Median RGB of bright (paper) pixels inside the box, sampled on a stride. */
+function sampledMedian(values: number[]): number {
+  values.sort((a, b) => a - b);
+  return values[values.length >> 1];
+}
+
+/**
+ * Broad median luminance of the detected bright surface. A real sheet may be
+ * shaded or drawn over, but a dim tabletop must not be accepted as paper.
+ */
+function estimatePaperSurfaceLuminance(
+  lum: Uint8Array,
+  width: number,
+  box: Box,
+  threshold: number,
+): number {
+  const values: number[] = [];
+  const stride = Math.max(1, Math.floor(Math.sqrt((box.w * box.h) / 8000)));
+  for (let y = box.y; y < box.y + box.h; y += stride) {
+    for (let x = box.x; x < box.x + box.w; x += stride) {
+      const value = lum[y * width + x];
+      if (value >= threshold) values.push(value);
+    }
+  }
+  return values.length > 0 ? sampledMedian(values) : 0;
+}
+
+function isNearFullFramePaper(box: Box, width: number, height: number): boolean {
+  const tolerance = Math.max(PAPER_GRID * 2, Math.round(Math.min(width, height) * 0.02));
+  const touches = [
+    box.x <= tolerance,
+    box.y <= tolerance,
+    box.x + box.w >= width - tolerance,
+    box.y + box.h >= height - tolerance,
+  ].filter(Boolean).length;
+  return touches >= 3 && box.w / width >= 0.9 && box.h / height >= 0.75;
+}
+
+/** Median RGB of bright neutral paper pixels inside the box, sampled on a stride. */
 export function estimatePaperColor(
   rgba: Uint8Array,
   width: number,
@@ -442,22 +484,40 @@ export function estimatePaperColor(
   const rs: number[] = [];
   const gs: number[] = [];
   const bs: number[] = [];
+  const neutralRs: number[] = [];
+  const neutralGs: number[] = [];
+  const neutralBs: number[] = [];
   const stride = Math.max(1, Math.floor(Math.sqrt((box.w * box.h) / 8000)));
   for (let y = box.y; y < box.y + box.h; y += stride) {
     for (let x = box.x; x < box.x + box.w; x += stride) {
       const i = y * width + x;
       if (lum[i] < threshold) continue;
-      rs.push(rgba[i * 4]);
-      gs.push(rgba[i * 4 + 1]);
-      bs.push(rgba[i * 4 + 2]);
+      const r = rgba[i * 4];
+      const g = rgba[i * 4 + 1];
+      const b = rgba[i * 4 + 2];
+      rs.push(r);
+      gs.push(g);
+      bs.push(b);
+      const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+      if (
+        lum[i] >= NEUTRAL_PAPER_MIN_LUMINANCE &&
+        chroma <= NEUTRAL_PAPER_MAX_CHROMA
+      ) {
+        neutralRs.push(r);
+        neutralGs.push(g);
+        neutralBs.push(b);
+      }
     }
   }
   if (rs.length === 0) return [245, 243, 238];
-  const mid = (arr: number[]) => {
-    arr.sort((a, b) => a - b);
-    return arr[arr.length >> 1];
-  };
-  return [mid(rs), mid(gs), mid(bs)];
+  const useNeutral = neutralRs.length >= MIN_NEUTRAL_PAPER_SAMPLES;
+  return useNeutral
+    ? [
+        sampledMedian(neutralRs),
+        sampledMedian(neutralGs),
+        sampledMedian(neutralBs),
+      ]
+    : [sampledMedian(rs), sampledMedian(gs), sampledMedian(bs)];
 }
 
 function smoothstepByte(low: number, high: number, v: number): number {
@@ -483,6 +543,24 @@ export function extractDrawing(
   const lum = luminance(rgba, width, height);
   const paper = detectPaper(lum, width, height);
   if (!paper) return null;
+  const detectedPaperBox = insetBox(
+    paper.box,
+    PAPER_INSET_FRAC,
+    width,
+    height,
+  );
+  if (
+    detectedPaperBox.w < 8 ||
+    detectedPaperBox.h < 8 ||
+    estimatePaperSurfaceLuminance(
+      lum,
+      width,
+      detectedPaperBox,
+      paper.threshold,
+    ) < MIN_PAPER_SURFACE_LUMINANCE
+  ) {
+    return null;
+  }
 
   // A sheet photographed at an angle: rectify it first, then run the flat
   // pipeline on the warped image (whose own quad is axis-aligned, so the
@@ -537,7 +615,13 @@ export function extractDrawing(
     }
   }
 
-  const paperBox = insetBox(paper.box, PAPER_INSET_FRAC, width, height);
+  const fullFramePaper = isNearFullFramePaper(paper.box, width, height);
+  const paperBox = insetBox(
+    fullFramePaper ? { x: 0, y: 0, w: width, h: height } : paper.box,
+    fullFramePaper ? FULL_FRAME_INSET_FRAC : PAPER_INSET_FRAC,
+    width,
+    height,
+  );
   if (paperBox.w < 8 || paperBox.h < 8) return null;
 
   const [pr, pg, pb] = estimatePaperColor(rgba, width, paperBox, lum, paper.threshold);
@@ -553,7 +637,7 @@ export function extractDrawing(
     const srcRow = srcY * width + paperBox.x;
     for (let x = 0; x < bw; x++) {
       const gx = Math.min(paper.gridW - 1, ((paperBox.x + x) / PAPER_GRID) | 0);
-      if (!paper.grid[gridRow + gx]) continue;
+      if (!fullFramePaper && !paper.grid[gridRow + gx]) continue;
       const p = (srcRow + x) * 4;
       const dr = rgba[p] - pr;
       const dg = rgba[p + 1] - pg;

@@ -131,6 +131,36 @@ describe("extractDrawing", () => {
     });
   });
 
+  it("keeps edge-touching colors on a fully shaded page", () => {
+    const w = 240;
+    const h = 180;
+    const img = makeImage(w, h, [128, 202, 232]);
+    // Leave a small neutral patch so the paper substrate can still be sampled.
+    drawRect(img, w, 102, 74, 36, 30, PAPER);
+    // Rainbow, grass, and sun deliberately touch three image edges.
+    drawRect(img, w, 0, 18, w, 14, [210, 42, 45]);
+    drawRect(img, w, 0, h - 20, w, 20, [45, 150, 58]);
+    drawRect(img, w, w - 30, 0, 30, 30, [242, 196, 35]);
+
+    const result = extractDrawing(img, w, h);
+    expect(result).not.toBeNull();
+    expect(alphaAt(result!, 120, 25)).toBeGreaterThan(180);
+    expect(alphaAt(result!, 120, h - 10)).toBeGreaterThan(180);
+    expect(alphaAt(result!, w - 15, 15)).toBeGreaterThan(150);
+    expect(alphaAt(result!, 120, 88)).toBeLessThan(40);
+  });
+
+  it("rejects a dim tabletop even when a colorful object is present", () => {
+    const w = 240;
+    const h = 180;
+    const img = makeImage(w, h, [138, 134, 125]);
+    drawRect(img, w, 70, 55, 100, 60, [50, 125, 220]);
+    drawRect(img, w, 62, 65, 18, 22, [28, 28, 28]);
+    drawRect(img, w, 160, 65, 18, 22, [28, 28, 28]);
+
+    expect(extractDrawing(img, w, h)).toBeNull();
+  });
+
   it("removes isolated speckles but keeps the real stroke", () => {
     const { img } = makePhoto();
     drawRect(img, 240, 80, 80, 70, 12, [25, 25, 25]);
