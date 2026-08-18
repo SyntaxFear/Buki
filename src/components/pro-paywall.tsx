@@ -7,7 +7,6 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,6 +18,7 @@ import type {
 
 import { getPublicAppConfig } from "@/config/env";
 import { BukiBear } from "@/components/buki-bear";
+import { BukiText as Text } from "@/components/buki-wordmark";
 import { Glass } from "@/components/glass";
 import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import { useAuth } from "@/store/auth";
@@ -453,8 +453,8 @@ export function ProPaywallHost() {
       >
         <View style={styles.hero}>
           <BukiBear style={styles.mascot} />
-          <Text style={styles.eyebrow}>{copy?.eyebrow}</Text>
-          <Text style={styles.title}>{copy?.title}</Text>
+          <Text brandBuki brandWeight="600" style={styles.eyebrow}>{copy?.eyebrow}</Text>
+          <Text brandBuki brandWeight="600" style={styles.title}>{copy?.title}</Text>
           <Text style={styles.body}>{copy?.body}</Text>
         </View>
 

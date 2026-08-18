@@ -20,6 +20,15 @@ describe("artwork export names", () => {
     ).toBe("buki-drawing-abc-123-2023-11-14.png");
   });
 
+  it("does not leak the source image extension into another export format", () => {
+    expect(
+      artworkExportFilename(
+        { id: "d-drawing-1786882978514-qt8w8c2.png", addedAt: 1_700_000_000_000 },
+        "jpg",
+      ),
+    ).toBe("buki-drawing-1786882978514-qt8w8c2-2023-11-14.jpg");
+  });
+
   it("normalizes Unicode filenames without locale-specific casing", () => {
     expect(
       artworkExportFilename(

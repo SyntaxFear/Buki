@@ -1,10 +1,10 @@
 import { Stack } from "expo-router/stack";
 import {
-  Text,
   View,
   useWindowDimensions,
 } from "react-native";
 
+import { BukiText as Text } from "@/components/buki-wordmark";
 import { colors } from "@/theme";
 import { Haptics, impactHaptic } from "@/utils/haptics";
 
@@ -38,13 +38,16 @@ function HeaderTitleText({
     >
       <Text
         accessible={false}
+        brandBuki
+        brandWeight="700"
+        minimumBrandFontSize={15}
         numberOfLines={1}
         style={{
           color: colors.titleCoral,
-          fontSize: 9.5,
-          lineHeight: 11,
+          fontSize: 11.5,
+          lineHeight: 14,
           fontWeight: "900",
-          letterSpacing: 1.05,
+          letterSpacing: 0.8,
           textAlign: "left",
         }}
       >

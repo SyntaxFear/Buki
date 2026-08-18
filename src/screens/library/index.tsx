@@ -1,10 +1,11 @@
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { SymbolView } from "expo-symbols";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
   FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -227,9 +228,11 @@ export function ArtLibrary() {
         </Pressable>
       )}
 
-      <View style={styles.filterRow}>
+      <View style={styles.primaryFilterRow}>
         <FilterChip
           label="All"
+          icon="square.grid.2x2.fill"
+          accentColor={colors.titleTeal}
           selected={!favoritesOnly && !padFilter && !tagFilter}
           locked={!advanced}
           onPress={() => {
@@ -241,16 +244,27 @@ export function ArtLibrary() {
         />
         <FilterChip
           label="Favorites"
+          icon="heart.fill"
+          accentColor={colors.titleCoral}
           selected={favoritesOnly}
           locked={!advanced}
           onPress={() => {
             if (requirePro("library_favorites_filter")) setFavoritesOnly((value) => !value);
           }}
         />
+      </View>
+
+      <FilterRail
+        label="Sketchpads"
+        icon="books.vertical.fill"
+        count={childPads.length}
+      >
         {childPads.map((pad) => (
           <FilterChip
             key={pad.id}
             label={pad.name}
+            icon="book.closed.fill"
+            accentColor={colors.titleTeal}
             selected={padFilter === pad.id}
             locked={!advanced}
             onPress={() => {
@@ -260,14 +274,17 @@ export function ArtLibrary() {
             }}
           />
         ))}
-      </View>
+      </FilterRail>
 
       {tags.length ? (
-        <View style={styles.tagFilters}>
+        <FilterRail label="Tags" icon="tag.fill" count={tags.length}>
           {tags.map((tag) => (
             <FilterChip
               key={tag}
-              label={`#${tag}`}
+              label={tag}
+              icon="tag.fill"
+              accentColor={colors.titleCoral}
+              kind="tag"
               selected={normalizeArtworkText(tagFilter ?? "") === normalizeArtworkText(tag)}
               locked={!advanced}
               onPress={() => {
@@ -277,7 +294,7 @@ export function ArtLibrary() {
               }}
             />
           ))}
-        </View>
+        </FilterRail>
       ) : null}
 
       <View style={styles.resultLine}>
@@ -402,11 +419,17 @@ export function ArtLibrary() {
 
 function FilterChip({
   label,
+  icon,
+  accentColor,
+  kind = "sketchpad",
   selected,
   locked,
   onPress,
 }: {
   label: string;
+  icon: "square.grid.2x2.fill" | "heart.fill" | "book.closed.fill" | "tag.fill";
+  accentColor: string;
+  kind?: "sketchpad" | "tag";
   selected: boolean;
   locked: boolean;
   onPress: () => void;
@@ -419,10 +442,52 @@ function FilterChip({
       accessibilityLabel={`${label}${locked ? ". Pro locked" : ""}`}
       accessibilityHint={locked ? "Opens Buki Pro options" : `Filters artwork by ${label}`}
       accessibilityState={{ selected }}
-      style={({ pressed }) => [styles.filterChip, selected && styles.filterChipSelected, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.filterChip,
+        kind === "tag" && styles.tagChip,
+        selected && { backgroundColor: accentColor, borderColor: accentColor },
+        pressed && styles.pressed,
+      ]}
     >
+      <SymbolView
+        name={icon}
+        size={12}
+        tintColor={selected ? "#FFFFFF" : accentColor}
+        weight="semibold"
+      />
       <Text style={[styles.filterChipText, selected && styles.filterChipTextSelected]}>{label}</Text>
     </Pressable>
+  );
+}
+
+function FilterRail({
+  label,
+  icon,
+  count,
+  children,
+}: {
+  label: string;
+  icon: "books.vertical.fill" | "tag.fill";
+  count: number;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.filterSection}>
+      <View style={styles.filterSectionHeading}>
+        <SymbolView name={icon} size={13} tintColor={colors.mutedText} />
+        <Text style={styles.filterSectionTitle}>{label}</Text>
+        <Text style={styles.filterSectionCount}>{count}</Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRailContent}
+        style={styles.filterRailScroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        {children}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -464,10 +529,15 @@ const styles = StyleSheet.create({
   lockedSearch: { flex: 1, fontSize: 14, fontWeight: "700", color: colors.mutedText },
   proBadge: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 999, backgroundColor: colors.bloomYellow },
   proBadgeText: { fontSize: 9, fontWeight: "900", letterSpacing: 0.6, color: colors.ink },
-  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  tagFilters: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  filterChip: { minHeight: 34, paddingHorizontal: 12, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  filterChipSelected: { backgroundColor: colors.titleTeal, borderColor: colors.titleTeal },
+  primaryFilterRow: { flexDirection: "row", gap: 8 },
+  filterSection: { gap: 7 },
+  filterSectionHeading: { minHeight: 18, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 2 },
+  filterSectionTitle: { fontSize: 11, lineHeight: 14, fontWeight: "900", letterSpacing: 0.65, textTransform: "uppercase", color: colors.mutedText },
+  filterSectionCount: { minWidth: 20, height: 18, paddingHorizontal: 6, borderRadius: 9, overflow: "hidden", backgroundColor: colors.surfaceAlt, fontSize: 10, lineHeight: 18, fontWeight: "900", textAlign: "center", color: colors.mutedText },
+  filterRailScroll: { marginHorizontal: -16 },
+  filterRailContent: { paddingHorizontal: 16, gap: 7 },
+  filterChip: { minHeight: 36, paddingHorizontal: 12, borderRadius: 18, flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  tagChip: { backgroundColor: "rgba(255,118,94,0.06)", borderColor: "rgba(255,118,94,0.18)" },
   filterChipText: { fontSize: 12.5, fontWeight: "800", color: colors.ink },
   filterChipTextSelected: { color: "#FFFFFF" },
   resultLine: { minHeight: 24, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },

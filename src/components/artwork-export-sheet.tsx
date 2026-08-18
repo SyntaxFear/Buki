@@ -8,11 +8,11 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import ViewShot, { captureRef, releaseCapture, type ViewShotRef } from "react-native-view-shot";
 
+import { BukiText as Text } from "@/components/buki-wordmark";
 import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import {
   artworkExportFilename,
@@ -162,7 +162,7 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
       <View style={styles.root}>
         <View style={styles.navigation}>
           <View>
-            <Text style={styles.eyebrow}>BUKI PRO EXPORT</Text>
+            <Text brandBuki brandWeight="600" style={styles.eyebrow}>BUKI PRO EXPORT</Text>
             <Text style={styles.title}>Export artwork</Text>
           </View>
           <NativeToolbarButton
@@ -222,7 +222,7 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
                     <View style={styles.cardBlobOne} />
                     <View style={styles.cardBlobTwo} />
                     <View style={styles.cardWordmarkRow}>
-                      <Text style={styles.cardWordmark}>Buki</Text>
+                      <Text brandBuki style={styles.cardWordmark}>Buki</Text>
                       <Text style={styles.cardDate}>{displayDate(drawing.addedAt)}</Text>
                     </View>
                     <View style={styles.cardArtworkMat}>

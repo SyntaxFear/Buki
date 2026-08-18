@@ -1,6 +1,7 @@
 import type { ComponentProps, ComponentType } from "react";
 import { Image, Text, View } from "react-native";
 
+import { BukiText } from "@/components/buki-wordmark";
 import {
   PUBLIC_SITE_MAX_WIDTH,
   PublicSectionHeading,
@@ -731,7 +732,10 @@ function PricingPanel({
         gap: 17,
       }}
     >
-      <Text
+      <BukiText
+        brandBuki
+        brandWeight="600"
+        minimumBrandFontSize={30}
         accessibilityRole="header"
         aria-level={3}
         style={{
@@ -743,7 +747,7 @@ function PricingPanel({
         }}
       >
         {title}
-      </Text>
+      </BukiText>
       <Text
         style={{
           color: pro ? "#FFFFFF" : palette.muted,

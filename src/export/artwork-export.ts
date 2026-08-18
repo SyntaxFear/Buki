@@ -17,7 +17,12 @@ export function artworkExportBaseName(drawing: Pick<Drawing, "id" | "title" | "a
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
-  const fallback = drawing.id.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(-24);
+  const fallback = drawing.id
+    .replace(/\.(?:png|jpe?g|heic|heif|webp)$/i, "")
+    .replace(/^d-(?=drawing(?:[-_:]|$))/i, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
   const date = new Date(drawing.addedAt).toISOString().slice(0, 10);
   return `buki-${title || fallback || "artwork"}-${date}`;
 }

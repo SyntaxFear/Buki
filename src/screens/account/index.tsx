@@ -12,7 +12,6 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
   TextInput,
   View,
 } from "react-native";
@@ -20,6 +19,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getPublicAppConfig } from "@/config/env";
+import { BukiText as Text } from "@/components/buki-wordmark";
 import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import { NativeDoneHeader } from "@/components/native-navigation-header";
 import { NativeToolbarButton } from "@/components/native-toolbar-button";
@@ -474,9 +474,11 @@ export function AccountCenter() {
             )}
           </View>
           <View style={styles.profileHeroCopy}>
-            <Text style={styles.profileName}>{profile?.displayName ?? "Buki Parent"}</Text>
-            <Text style={styles.profileEmail}>{profile?.email ?? user?.email ?? "Signed in adult"}</Text>
-            <Text style={styles.profileProviders}>
+            <Text brandBuki style={styles.profileName}>{profile?.displayName ?? "Buki Parent"}</Text>
+            <Text brandBuki colorizeBuki={false} brandWholeText style={styles.profileEmail}>
+              {profile?.email ?? user?.email ?? "Signed in adult"}
+            </Text>
+            <Text brandBuki colorizeBuki={false} brandWholeText style={styles.profileProviders}>
               {providers.length ? `Linked: ${providers.join(", ")}` : "Secure Buki account"}
             </Text>
           </View>
@@ -515,14 +517,30 @@ export function AccountCenter() {
                 </View>
               </Pressable>
               <View style={styles.compactActions}>
-                <MiniAction label="↑" accessibilityLabel={`Move ${child.name} up`} disabled={index === 0} onPress={() => void moveChild(child.id, -1)} />
-                <MiniAction label="↓" accessibilityLabel={`Move ${child.name} down`} disabled={index === children.length - 1} onPress={() => void moveChild(child.id, 1)} />
-                <NativeGlassEditButton
-                  compact
-                  accessibilityLabel={`Edit ${child.name}`}
+                <ChildArrowAction
+                  direction="up"
+                  label={`Move ${child.name} up`}
+                  disabled={index === 0}
+                  onPress={() => void moveChild(child.id, -1)}
+                />
+                <ChildArrowAction
+                  direction="down"
+                  label={`Move ${child.name} down`}
+                  disabled={index === children.length - 1}
+                  onPress={() => void moveChild(child.id, 1)}
+                />
+                <ChildTextAction
+                  title="Edit"
+                  label={`Edit ${child.name}`}
                   onPress={() => beginEditChild(child)}
                 />
-                <MiniAction label="Remove" accessibilityLabel={`Remove ${child.name}`} destructive disabled={children.length === 1} onPress={() => void confirmDeleteChild(child)} />
+                <ChildTextAction
+                  title="Remove"
+                  label={`Remove ${child.name}`}
+                  destructive
+                  disabled={children.length === 1}
+                  onPress={() => void confirmDeleteChild(child)}
+                />
               </View>
             </View>
           ))}
@@ -533,7 +551,14 @@ export function AccountCenter() {
           <View style={styles.membershipCard}>
             <View style={styles.membershipHeader}>
               <View>
-                <Text style={styles.membershipName}>{tier === "pro" ? "Buki Pro" : "Buki Free"}</Text>
+                <Text
+                  brandBuki
+                  brandWeight="600"
+                  minimumBrandFontSize={23}
+                  style={styles.membershipName}
+                >
+                  {tier === "pro" ? "Buki Pro" : "Buki Free"}
+                </Text>
                 <Text style={styles.membershipDetail}>
                   {membershipLoading
                     ? "Checking App Store access…"
@@ -547,7 +572,7 @@ export function AccountCenter() {
               </View>
             </View>
             {tier === "pro" ? (
-              <Text style={styles.membershipFootnote}>
+              <Text brandBuki={false} style={styles.membershipFootnote}>
                 {entitlement.status === "grace"
                   ? "Billing grace period · your existing library remains available"
                   : renewalDate
@@ -557,11 +582,11 @@ export function AccountCenter() {
             ) : (
               <>
                 {inactiveMembership.history ? (
-                  <Text style={styles.membershipFootnote}>{inactiveMembership.history}</Text>
+                  <Text brandBuki={false} style={styles.membershipFootnote}>{inactiveMembership.history}</Text>
                 ) : null}
                 <ActionButton title="Discover Buki Pro" prominent onPress={() => void introducePro("cloudBackup", "account_membership")} />
                 {cloudRetentionReadOnly ? (
-                  <Text style={styles.membershipFootnote}>
+                  <Text brandBuki={false} style={styles.membershipFootnote}>
                     {retentionStatus === "pending_deletion"
                       ? "Cloud deletion is being rechecked against RevenueCat. Renewing before deletion resumes synchronization."
                       : `Cloud restore remains available${retentionDeleteDate ? ` until ${retentionDeleteDate}` : " for 90 days"}. Renew to resume backup or export.`}
@@ -711,19 +736,29 @@ export function AccountCenter() {
           />
           <View style={styles.preferenceBlock}>
             <Text style={styles.rowTitle}>Default child</Text>
-            <View style={styles.chipRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRailContent}
+              style={styles.chipRail}
+            >
               {children.map((child) => (
                 <Chip key={child.id} label={child.name} selected={child.id === activeChildId} onPress={() => void setActiveChild(child.id)} />
               ))}
-            </View>
+            </ScrollView>
           </View>
           <View style={styles.preferenceBlock}>
             <Text style={styles.rowTitle}>Default sketchpad</Text>
-            <View style={styles.chipRow}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRailContent}
+              style={styles.chipRail}
+            >
               {visiblePads.map((pad) => (
                 <Chip key={pad.id} label={pad.name} selected={pad.id === activePadId} onPress={() => setActivePad(pad.id)} />
               ))}
-            </View>
+            </ScrollView>
           </View>
         </Section>
 
@@ -749,7 +784,7 @@ export function AccountCenter() {
           <DangerButton title="Delete Buki account" busy={privacyBusy} onPress={() => void confirmDeleteAccount()} />
         </Section>
 
-        <ActionButton title="Sign out" destructive busy={authBusy} onPress={confirmSignOut} />
+        <ActionButton title="Sign out" standalone destructive busy={authBusy} onPress={confirmSignOut} />
       </ScrollView>
 
       <AdultEditor
@@ -801,8 +836,8 @@ function SettingRow({ title, detail, right, onPress }: { title: string; detail?:
   const content = (
     <>
       <View style={styles.rowCopy}>
-        <Text style={styles.rowTitle}>{title}</Text>
-        {detail ? <Text style={styles.rowDetail}>{detail}</Text> : null}
+        <Text brandBuki={false} style={styles.rowTitle}>{title}</Text>
+        {detail ? <Text brandBuki={false} style={styles.rowDetail}>{detail}</Text> : null}
       </View>
       {right ?? (onPress ? <Text style={styles.chevron}>›</Text> : null)}
     </>
@@ -824,16 +859,66 @@ function Metric({ value, label }: { value: string; label: string }) {
   return <View style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>;
 }
 
-function ActionButton({ title, onPress, prominent, destructive, busy, disabled }: { title: string; onPress: () => void; prominent?: boolean; destructive?: boolean; busy?: boolean; disabled?: boolean }) {
+function ActionButton({ title, onPress, prominent, destructive, standalone, busy, disabled }: { title: string; onPress: () => void; prominent?: boolean; destructive?: boolean; standalone?: boolean; busy?: boolean; disabled?: boolean }) {
   return (
-    <Pressable haptic={destructive ? "warning" : prominent ? "medium" : "light"} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy || disabled), busy: Boolean(busy) }} disabled={busy || disabled} onPress={onPress} style={({ pressed }) => [styles.actionButton, prominent && styles.actionProminent, destructive && styles.actionDestructive, disabled && styles.disabled, pressed && styles.pressed]}>
-      {busy ? <ActivityIndicator color={destructive ? "#B43C3C" : prominent ? "#FFFFFF" : colors.titleTeal} /> : <Text style={[styles.actionLabel, prominent && styles.actionProminentLabel, destructive && styles.dangerText]}>{title}</Text>}
+    <Pressable haptic={destructive ? "warning" : prominent ? "medium" : "light"} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy || disabled), busy: Boolean(busy) }} disabled={busy || disabled} onPress={onPress} style={({ pressed }) => [styles.actionButton, standalone && styles.actionButtonStandalone, prominent && styles.actionProminent, destructive && styles.actionDestructive, disabled && styles.disabled, pressed && styles.pressed]}>
+      {busy ? <ActivityIndicator color={destructive ? "#B43C3C" : prominent ? "#FFFFFF" : colors.titleTeal} /> : <Text brandBuki={false} style={[styles.actionLabel, prominent && styles.actionProminentLabel, destructive && styles.dangerText]}>{title}</Text>}
     </Pressable>
   );
 }
 
-function MiniAction({ label, accessibilityLabel, onPress, disabled, destructive }: { label: string; accessibilityLabel?: string; onPress: () => void; disabled?: boolean; destructive?: boolean }) {
-  return <Pressable haptic={destructive ? "warning" : "light"} accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ disabled: Boolean(disabled) }} disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.miniAction, disabled && styles.disabled, pressed && styles.pressed]}><Text style={[styles.miniActionLabel, destructive && styles.dangerText]}>{label}</Text></Pressable>;
+function ChildArrowAction({
+  direction,
+  label,
+  onPress,
+  disabled,
+}: {
+  direction: "up" | "down";
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <NativeToolbarButton
+      label={label}
+      icon={direction === "up" ? "arrow.up" : "arrow.down"}
+      onPress={onPress}
+      size="regular"
+      disabled={disabled}
+      tintColor={colors.titleTeal}
+      foregroundColor={colors.titleTeal}
+      style={styles.childArrowAction}
+    />
+  );
+}
+
+function ChildTextAction({
+  title,
+  label,
+  onPress,
+  disabled,
+  destructive = false,
+}: {
+  title: "Edit" | "Remove";
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  destructive?: boolean;
+}) {
+  const actionColor = destructive ? "#B43C3C" : colors.titleTeal;
+  return (
+    <NativeToolbarButton
+      label={label}
+      title={title}
+      onPress={onPress}
+      size="regular"
+      disabled={disabled}
+      variant={destructive ? "destructive" : "prominent"}
+      tintColor={actionColor}
+      foregroundColor="#FFFFFF"
+      style={styles.childTextAction}
+    />
+  );
 }
 
 function NativeGlassEditButton({
@@ -860,7 +945,7 @@ function NativeGlassEditButton({
 }
 
 function DangerButton({ title, onPress, busy }: { title: string; onPress: () => void; busy?: boolean }) {
-  return <Pressable haptic="warning" accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy), busy: Boolean(busy) }} disabled={busy} onPress={onPress} style={({ pressed }) => [styles.dangerButton, busy && styles.disabled, pressed && styles.rowPressed]}><Text style={styles.dangerText}>{title}</Text>{busy ? <ActivityIndicator color="#B43C3C" /> : <Text style={styles.dangerChevron}>›</Text>}</Pressable>;
+  return <Pressable haptic="warning" accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy), busy: Boolean(busy) }} disabled={busy} onPress={onPress} style={({ pressed }) => [styles.dangerButton, busy && styles.disabled, pressed && styles.rowPressed]}><Text brandBuki={false} style={styles.dangerText}>{title}</Text>{busy ? <ActivityIndicator color="#B43C3C" /> : <Text style={styles.dangerChevron}>›</Text>}</Pressable>;
 }
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
@@ -959,14 +1044,14 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 15, fontWeight: "800", color: colors.ink },
   rowDetail: { fontSize: 12, lineHeight: 17, color: colors.mutedText, marginTop: 2 },
   chevron: { fontSize: 25, lineHeight: 25, color: "#AA9F91" },
-  childRow: { padding: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, gap: 9 },
-  childIdentity: { minHeight: 54, borderRadius: 16, padding: 8, flexDirection: "row", alignItems: "center", gap: 11 },
+  childRow: { paddingHorizontal: 10, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, gap: 4 },
+  childIdentity: { minHeight: 48, borderRadius: 14, padding: 6, flexDirection: "row", alignItems: "center", gap: 8 },
   childIdentityActive: { backgroundColor: "rgba(72,198,183,0.12)" },
-  childAvatar: { width: 42, height: 42, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  childInitial: { color: colors.ink, fontSize: 18, fontWeight: "900" },
-  compactActions: { flexDirection: "row", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" },
-  miniAction: { minWidth: 34, minHeight: 31, borderRadius: 11, paddingHorizontal: 9, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceAlt },
-  miniActionLabel: { fontSize: 12, fontWeight: "800", color: colors.ink },
+  childAvatar: { width: 38, height: 38, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  childInitial: { color: colors.ink, fontSize: 17, fontWeight: "900" },
+  compactActions: { flexDirection: "row", alignItems: "center", gap: 4, justifyContent: "flex-end", flexWrap: "wrap" },
+  childArrowAction: { width: 44, height: 44, flexShrink: 0 },
+  childTextAction: { minHeight: 44, flexShrink: 0 },
   disabled: { opacity: 0.35 },
   membershipCard: { padding: 16, gap: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   membershipHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
@@ -986,12 +1071,14 @@ const styles = StyleSheet.create({
   meterTrack: { height: 8, borderRadius: 4, backgroundColor: colors.surfaceAlt, overflow: "hidden" },
   meterFill: { height: "100%", borderRadius: 4, backgroundColor: colors.titleTeal },
   preferenceBlock: { padding: 16, gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chipRail: { marginHorizontal: -16 },
+  chipRailContent: { paddingHorizontal: 16, gap: 8 },
   chip: { minHeight: 34, paddingHorizontal: 12, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceAlt },
   chipSelected: { backgroundColor: colors.titleTeal },
   chipLabel: { fontSize: 13, fontWeight: "800", color: colors.ink },
   chipLabelSelected: { color: "#FFFFFF" },
   actionButton: { minHeight: 46, margin: 12, paddingHorizontal: 15, borderRadius: 15, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
+  actionButtonStandalone: { margin: 0 },
   actionProminent: { backgroundColor: colors.titleTeal, borderColor: colors.titleTeal },
   actionDestructive: { backgroundColor: "#FFF1F0", borderColor: "rgba(180,60,60,0.18)" },
   actionLabel: { fontSize: 15, fontWeight: "900", color: colors.titleTeal },

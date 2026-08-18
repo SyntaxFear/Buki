@@ -10,11 +10,10 @@ import {
   Image,
   Pressable,
   ScrollView,
-  Text,
   View,
 } from "react-native";
 
-import { BukiWordmark } from "@/components/buki-wordmark";
+import { BukiText as Text, BukiWordmark } from "@/components/buki-wordmark";
 import { SUPPORT_EMAIL } from "@/marketing/content";
 import { colors } from "@/theme";
 
@@ -832,6 +831,8 @@ export function PublicSectionHeading({
     >
       {eyebrow ? (
         <Text
+          brandBuki
+          brandWeight="600"
           style={{
             color: palette.coralText,
             fontSize: 13,
@@ -844,6 +845,7 @@ export function PublicSectionHeading({
         </Text>
       ) : null}
       <WebText
+        brandBuki
         accessibilityRole="header"
         aria-level={2}
         dataSet={{ publicHeading: "section" }}
@@ -860,6 +862,8 @@ export function PublicSectionHeading({
       </WebText>
       {description ? (
         <Text
+          brandBuki
+          brandWeight="600"
           style={{
             color: palette.muted,
             fontSize: compact ? 16 : 17,
@@ -922,6 +926,7 @@ export function PublicPageHero({
           {eyebrow}
         </Text>
         <WebText
+          brandBuki
           accessibilityRole="header"
           aria-level={1}
           dataSet={{ publicHeading: "page" }}

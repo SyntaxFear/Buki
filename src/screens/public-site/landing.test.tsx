@@ -24,6 +24,7 @@ jest.mock("expo-router", () => {
 });
 
 jest.mock("@/components/buki-wordmark", () => ({
+  BukiText: "Text",
   BukiWordmark: "BukiWordmark",
 }));
 

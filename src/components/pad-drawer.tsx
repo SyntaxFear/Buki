@@ -294,8 +294,9 @@ export function PadDrawerContent({ onClose }: Props) {
       </Text>
 
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 12 }}
+        style={styles.sketchpadScroll}
+        contentContainerStyle={styles.sketchpadScrollContent}
+        scrollIndicatorInsets={{ right: 2 }}
         keyboardShouldPersistTaps="handled"
       >
         {pads.map((pad) => {
@@ -1055,6 +1056,14 @@ const styles = StyleSheet.create({
     fontSize: 15.5,
     fontWeight: "800",
     color: colors.ink,
+  },
+  sketchpadScroll: {
+    flex: 1,
+    marginRight: -8,
+  },
+  sketchpadScrollContent: {
+    paddingRight: 10,
+    paddingBottom: 12,
   },
   rowMeta: {
     fontSize: 11.5,

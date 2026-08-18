@@ -7,12 +7,12 @@ import {
   Alert,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createBukiArchive, importBukiArchive } from "@/archive/buki-archive";
+import { BukiText as Text } from "@/components/buki-wordmark";
 import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import { NativeDoneHeader } from "@/components/native-navigation-header";
 import { createSketchpadPdf } from "@/export/sketchpad-pdf";
@@ -252,7 +252,7 @@ export function ExportsScreen() {
 
         {!canExport ? (
           <View style={styles.lockedCard}>
-            <Text style={styles.lockedTitle}>Exports are a Buki Pro feature</Text>
+            <Text brandBuki brandWeight="600" minimumBrandFontSize={20} style={styles.lockedTitle}>Exports are a Buki Pro feature</Text>
             <Text style={styles.lockedDetail}>Your local artwork stays available. Upgrade to create files you can save or share.</Text>
             <Pressable
               onPress={() => requestUpgrade("exportData", "export_center")}
@@ -261,7 +261,7 @@ export function ExportsScreen() {
               accessibilityHint="Opens the Buki Pro purchase options"
               style={({ pressed }) => [styles.proButton, pressed && styles.pressed]}
             >
-              <Text style={styles.proButtonLabel}>See Buki Pro</Text>
+              <Text brandBuki brandWeight="600" minimumBrandFontSize={16} style={styles.proButtonLabel}>See Buki Pro</Text>
             </Pressable>
           </View>
         ) : (
