@@ -550,11 +550,11 @@ export function AccountCenter() {
         <Section title="Membership">
           <View style={styles.membershipCard}>
             <View style={styles.membershipHeader}>
-              <View>
+              <View style={styles.membershipCopy}>
                 <Text
                   brandBuki
-                  brandWeight="600"
-                  minimumBrandFontSize={23}
+                  brandWeight="700"
+                  minimumBrandFontSize={27}
                   style={styles.membershipName}
                 >
                   {tier === "pro" ? "Buki Pro" : "Buki Free"}
@@ -1055,8 +1055,9 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.35 },
   membershipCard: { padding: 16, gap: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   membershipHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  membershipName: { fontSize: 21, fontWeight: "900", color: colors.ink },
-  membershipDetail: { fontSize: 13, color: colors.mutedText, marginTop: 3 },
+  membershipCopy: { flex: 1, minWidth: 0 },
+  membershipName: { fontSize: 27, lineHeight: 32, fontWeight: "900", letterSpacing: 0.1, color: colors.ink },
+  membershipDetail: { fontSize: 13, color: colors.mutedText, marginTop: 1 },
   membershipFootnote: { fontSize: 12, color: colors.titleTeal, fontWeight: "700" },
   badge: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, backgroundColor: colors.surfaceAlt },
   proBadge: { backgroundColor: colors.bloomYellow },

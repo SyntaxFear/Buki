@@ -140,11 +140,20 @@ export function BukiText({
     typeof flattenedStyle?.lineHeight === "number" ? flattenedStyle.lineHeight : 0,
     Math.ceil(fontSize * 1.15),
   );
+  const numericBrandWeight = Number.parseInt(String(brandWeight), 10);
+  const emphasizeBrand = Number.isFinite(numericBrandWeight) && numericBrandWeight >= 700;
   const brandTextStyle: TextStyle = {
     fontFamily: "PatrickHand",
     fontSize,
     lineHeight,
     fontWeight: brandWeight,
+    ...(emphasizeBrand
+      ? {
+          textShadowColor: "rgba(40,67,90,0.18)",
+          textShadowOffset: { width: 0.35, height: 0.35 },
+          textShadowRadius: 0.25,
+        }
+      : {}),
   };
 
   return (
