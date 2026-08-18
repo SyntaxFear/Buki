@@ -456,8 +456,8 @@ export function ProPaywallHost() {
           <BukiBear style={styles.mascot} />
           <Text
             brandBuki
-            brandWeight={brandEyebrow ? "700" : "600"}
-            minimumBrandFontSize={18}
+            brandWeight={brandEyebrow ? "800" : "600"}
+            minimumBrandFontSize={32}
             style={[styles.eyebrow, brandEyebrow && styles.brandEyebrow]}
           >
             {copy?.eyebrow}
@@ -716,10 +716,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   brandEyebrow: {
-    fontSize: 18,
-    lineHeight: 22,
-    letterSpacing: 0.35,
-    marginTop: 7,
+    fontSize: 32,
+    lineHeight: 38,
+    letterSpacing: 0.05,
+    marginTop: 8,
   },
   title: {
     fontSize: 28,
