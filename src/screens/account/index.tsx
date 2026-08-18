@@ -859,9 +859,9 @@ function Metric({ value, label }: { value: string; label: string }) {
   return <View style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>;
 }
 
-function ActionButton({ title, onPress, prominent, destructive, standalone, busy, disabled }: { title: string; onPress: () => void; prominent?: boolean; destructive?: boolean; standalone?: boolean; busy?: boolean; disabled?: boolean }) {
+function ActionButton({ title, onPress, prominent, destructive, standalone, modalAction, busy, disabled }: { title: string; onPress: () => void; prominent?: boolean; destructive?: boolean; standalone?: boolean; modalAction?: boolean; busy?: boolean; disabled?: boolean }) {
   return (
-    <Pressable haptic={destructive ? "warning" : prominent ? "medium" : "light"} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy || disabled), busy: Boolean(busy) }} disabled={busy || disabled} onPress={onPress} style={({ pressed }) => [styles.actionButton, standalone && styles.actionButtonStandalone, prominent && styles.actionProminent, destructive && styles.actionDestructive, disabled && styles.disabled, pressed && styles.pressed]}>
+    <Pressable haptic={destructive ? "warning" : prominent ? "medium" : "light"} accessibilityRole="button" accessibilityLabel={title} accessibilityState={{ disabled: Boolean(busy || disabled), busy: Boolean(busy) }} disabled={busy || disabled} onPress={onPress} style={({ pressed }) => [styles.actionButton, standalone && styles.actionButtonStandalone, modalAction && styles.actionButtonModal, prominent && styles.actionProminent, destructive && styles.actionDestructive, disabled && styles.disabled, pressed && styles.pressed]}>
       {busy ? <ActivityIndicator color={destructive ? "#B43C3C" : prominent ? "#FFFFFF" : colors.titleTeal} /> : <Text brandBuki={false} style={[styles.actionLabel, prominent && styles.actionProminentLabel, destructive && styles.dangerText]}>{title}</Text>}
     </Pressable>
   );
@@ -1008,8 +1008,8 @@ function EditorShell({ visible, title, busy, canSave, onCancel, onSave, children
             <Text style={styles.editorTitle}>{title}</Text>
             {children}
             <View style={styles.editorActions}>
-              <ActionButton title="Cancel" onPress={cancel} />
-              <ActionButton title="Save" prominent busy={busy} disabled={!canSave} onPress={save} />
+              <ActionButton modalAction title="Cancel" onPress={cancel} />
+              <ActionButton modalAction title="Save" prominent busy={busy} disabled={!canSave} onPress={save} />
             </View>
             {!canSave ? <Text style={styles.editorHint}>A name is required.</Text> : null}
           </View>
@@ -1080,6 +1080,7 @@ const styles = StyleSheet.create({
   chipLabelSelected: { color: "#FFFFFF" },
   actionButton: { minHeight: 46, margin: 12, paddingHorizontal: 15, borderRadius: 15, borderCurve: "continuous", alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
   actionButtonStandalone: { margin: 0 },
+  actionButtonModal: { width: 108, minHeight: 48, margin: 0, paddingHorizontal: 18 },
   actionProminent: { backgroundColor: colors.titleTeal, borderColor: colors.titleTeal },
   actionDestructive: { backgroundColor: "#FFF1F0", borderColor: "rgba(180,60,60,0.18)" },
   actionLabel: { fontSize: 15, fontWeight: "900", color: colors.titleTeal },
@@ -1103,6 +1104,6 @@ const styles = StyleSheet.create({
   colorChoiceSelected: { borderWidth: 3, borderColor: colors.ink },
   birthRow: { flexDirection: "row", gap: 10 },
   birthInput: { flex: 1 },
-  editorActions: { flexDirection: "row" },
+  editorActions: { flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 10, paddingTop: 4 },
   editorHint: { textAlign: "center", color: colors.mutedText, fontSize: 12 },
 });

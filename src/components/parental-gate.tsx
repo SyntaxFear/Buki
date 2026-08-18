@@ -103,9 +103,9 @@ const styles = StyleSheet.create({
   deviceNoticeTitle: { color: colors.ink, fontSize: 15, fontWeight: "800" },
   deviceNoticeCopy: { color: colors.mutedText, fontSize: 13, lineHeight: 18 },
   error: { color: "#A93232", fontSize: 13, lineHeight: 18 },
-  actions: { flexDirection: "row", gap: 10, paddingTop: 4 },
+  actions: { flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 10, paddingTop: 4 },
   secondary: {
-    flex: 1,
+    width: 132,
     minHeight: 48,
     borderRadius: 14,
     borderCurve: "continuous",
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   primary: {
-    flex: 1,
+    width: 132,
     minHeight: 48,
     borderRadius: 14,
     borderCurve: "continuous",

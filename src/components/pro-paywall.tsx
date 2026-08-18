@@ -407,6 +407,7 @@ export function ProPaywallHost() {
 
   const config = getPublicAppConfig();
   if (!request) return null;
+  const brandEyebrow = /\bBuki\b/i.test(copy?.eyebrow ?? "");
 
   const content = (
     <View style={styles.root}>
@@ -453,7 +454,14 @@ export function ProPaywallHost() {
       >
         <View style={styles.hero}>
           <BukiBear style={styles.mascot} />
-          <Text brandBuki brandWeight="600" style={styles.eyebrow}>{copy?.eyebrow}</Text>
+          <Text
+            brandBuki
+            brandWeight={brandEyebrow ? "700" : "600"}
+            minimumBrandFontSize={18}
+            style={[styles.eyebrow, brandEyebrow && styles.brandEyebrow]}
+          >
+            {copy?.eyebrow}
+          </Text>
           <Text brandBuki brandWeight="600" style={styles.title}>{copy?.title}</Text>
           <Text style={styles.body}>{copy?.body}</Text>
         </View>
@@ -706,6 +714,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1.15,
     color: colors.titleCoral,
     textAlign: "center",
+  },
+  brandEyebrow: {
+    fontSize: 18,
+    lineHeight: 22,
+    letterSpacing: 0.35,
+    marginTop: 7,
   },
   title: {
     fontSize: 28,
