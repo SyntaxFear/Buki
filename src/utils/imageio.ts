@@ -5,7 +5,6 @@ import {
   Skia,
   type SkImage,
 } from "@shopify/react-native-skia";
-import { Asset } from "expo-asset";
 import { File } from "expo-file-system";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
@@ -18,6 +17,8 @@ import {
 import { extractDrawing } from "@/utils/cutout";
 import { inspectSafeImage, MAX_SAFE_IMAGE_BYTES } from "@/utils/image-safety";
 
+export { resolveBundledAssetUri as resolveAssetUri } from "@/utils/bundled-asset";
+
 const MAX_DECODE_EDGE = 1000;
 const SAVED_PHOTO_EDGE = 2048;
 
@@ -28,13 +29,6 @@ export type {
 
 export function readUriBytes(uri: string): Uint8Array {
   return new File(uri).bytesSync();
-}
-
-export async function resolveAssetUri(moduleId: number): Promise<string> {
-  const asset = Asset.fromModule(moduleId);
-  if (!asset.localUri) await asset.downloadAsync();
-  if (!asset.localUri) throw new Error("Could not resolve bundled asset");
-  return asset.localUri;
 }
 
 export function decodeImage(bytes: Uint8Array): SkImage {
