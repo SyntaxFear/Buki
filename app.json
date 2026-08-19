@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.parastashvili.bloombook",
-      "buildNumber": "36",
+      "buildNumber": "37",
       "appStoreUrl": "https://apps.apple.com/app/id6798754626?action=write-review",
       "supportsTablet": false,
       "usesAppleSignIn": true,

@@ -1449,12 +1449,12 @@ export function Home() {
               onLongPress={() => {
                 void (async () => {
                   const confirmed = await confirmAdult(
-                    "Clearing a sketchpad permanently removes its saved drawings from this device.",
+                    "Clearing a sketchpad permanently removes its saved artwork from this device.",
                   );
                   if (!confirmed) return;
                   Alert.alert(
                     `Clear “${pad?.name ?? "this sketchpad"}”?`,
-                    "This removes every saved drawing from this sketchpad.",
+                    "This removes every saved artwork from this sketchpad.",
                     [
                       { text: "Cancel", style: "cancel" },
                       {

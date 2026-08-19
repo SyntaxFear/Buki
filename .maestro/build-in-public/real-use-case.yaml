@@ -14,7 +14,7 @@ appId: com.parastashvili.bloombook
 - extendedWaitUntil:
     visible: "Does this look right?"
     timeout: 30000
-- tapOn: "Add drawing to sketchpad"
+- tapOn: "Add artwork to sketchpad"
 - extendedWaitUntil:
     visible: "Scan a drawing"
     timeout: 30000

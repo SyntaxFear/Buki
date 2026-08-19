@@ -13,6 +13,7 @@ import { BukiWordmark } from "@/components/buki-wordmark";
 import { Glass } from "@/components/glass";
 import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import { NativeToolbarButton } from "@/components/native-toolbar-button";
+import { artworkCountLabel } from "@/layouts/child-content-counts";
 import { useAuth } from "@/store/auth";
 import { useDrawings, type PadStyle, type Sketchpad } from "@/store/drawings";
 import { useProfiles } from "@/store/profiles";
@@ -123,7 +124,7 @@ export function PadDrawerContent({ onClose }: Props) {
             Alert.alert(
               `Delete “${pad.name}”?`,
               count > 0
-                ? `Its ${count} drawing${count === 1 ? "" : "s"} will be deleted too.`
+                ? `Its ${artworkCountLabel(count)} will be deleted too.`
                 : undefined,
               [
                 { text: "Cancel", style: "cancel" },
@@ -324,7 +325,7 @@ export function PadDrawerContent({ onClose }: Props) {
                 }}
                 onLongPress={() => managePad(pad)}
                 accessibilityRole="button"
-                accessibilityLabel={`${pad.name}, ${icon.name} icon, ${design.name}, ${STYLE_LABEL[pad.style]}, ${count} ${count === 1 ? "drawing" : "drawings"}`}
+                accessibilityLabel={`${pad.name}, ${icon.name} icon, ${design.name}, ${STYLE_LABEL[pad.style]}, ${artworkCountLabel(count)}`}
                 accessibilityHint="Selects this sketchpad. Long-press to rename or delete it."
                 accessibilityState={{ selected: active }}
                 style={({ pressed }) => [
@@ -394,8 +395,7 @@ export function PadDrawerContent({ onClose }: Props) {
                     numberOfLines={1}
                     maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
                   >
-                    {design.name} · {count}{" "}
-                    {count === 1 ? "drawing" : "drawings"}
+                    {design.name} · {artworkCountLabel(count)}
                   </Text>
                 </View>
               </Pressable>

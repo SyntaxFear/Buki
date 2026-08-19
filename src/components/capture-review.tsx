@@ -142,7 +142,7 @@ export function CaptureReview({
           onPress={onAccept}
           haptic="medium"
           accessibilityRole="button"
-          accessibilityLabel="Add drawing to sketchpad"
+          accessibilityLabel="Add artwork to sketchpad"
           accessibilityState={{ disabled: accepting, busy: accepting }}
           style={({ pressed }) => [
             styles.primaryButton,

@@ -16,6 +16,13 @@ import { BukiBear } from "@/components/buki-bear";
 import { BukiWordmark } from "@/components/buki-wordmark";
 import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import { getPublicAppConfig } from "@/config/env";
+import {
+  SOCIAL_AUTH_BUTTON_HEIGHT,
+  SOCIAL_AUTH_BUTTON_RADIUS,
+  SOCIAL_AUTH_CONTENT_GAP,
+  SOCIAL_AUTH_ICON_SIZE,
+  SOCIAL_AUTH_LABEL_FONT_SIZE,
+} from "@/layouts/social-auth-layout";
 import { shouldHydrateOnboardingField } from "@/screens/onboarding/form-hydration";
 import { useAuth } from "@/store/auth";
 import { confirmAdult } from "@/store/parental-gate";
@@ -36,11 +43,6 @@ const CHILD_COLORS = [
   "#FFA7B9",
   "#A98BE6",
 ] as const;
-
-const SOCIAL_AUTH_BUTTON_HEIGHT = 44;
-const SOCIAL_AUTH_BUTTON_RADIUS = SOCIAL_AUTH_BUTTON_HEIGHT / 2;
-const SOCIAL_AUTH_ICON_SIZE = 15;
-const SOCIAL_AUTH_CONTENT_GAP = 6;
 
 async function openExternal(url: string) {
   if (!(await confirmAdult("This link opens outside Buki."))) return;
@@ -514,7 +516,7 @@ const styles = StyleSheet.create({
   },
   googleButtonLabel: {
     color: "#E3E3E3",
-    fontSize: 17,
+    fontSize: SOCIAL_AUTH_LABEL_FONT_SIZE,
     lineHeight: 21,
     fontWeight: "600",
     textAlign: "center",

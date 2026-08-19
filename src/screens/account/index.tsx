@@ -23,6 +23,10 @@ import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import { NativeDoneHeader } from "@/components/native-navigation-header";
 import { NativeToolbarButton } from "@/components/native-toolbar-button";
 import { loadBukiUsage } from "@/database";
+import {
+  childContentCounts,
+  childContentSummary,
+} from "@/layouts/child-content-counts";
 import { removeBukiCloudCopies } from "@/privacy/account-data";
 import { useAuth } from "@/store/auth";
 import { useDrawings } from "@/store/drawings";
@@ -172,6 +176,10 @@ export function AccountCenter() {
   const visiblePads = useMemo(
     () => pads.filter((pad) => pad.childId === activeChildId),
     [activeChildId, pads],
+  );
+  const countsByChild = useMemo(
+    () => childContentCounts(children, pads, drawingsByPad),
+    [children, drawingsByPad, pads],
   );
   const providers = useMemo(() => {
     const names = user?.identities?.map((identity) => identity.provider) ?? [];
@@ -493,7 +501,13 @@ export function AccountCenter() {
         ) : null}
 
         <Section title="Children" caption="Child profiles belong to the adult account—children never sign in.">
-          {children.map((child, index) => (
+          {children.map((child, index) => {
+            const contentCount = countsByChild[child.id] ?? {
+              sketchpads: 0,
+              artworks: 0,
+            };
+            const contentSummary = childContentSummary(contentCount);
+            return (
             <View key={child.id} style={styles.childRow}>
               <Pressable
                 haptic={child.id === activeChildId ? false : "selection"}
@@ -501,7 +515,7 @@ export function AccountCenter() {
                   void setActiveChild(child.id);
                 }}
                 accessibilityRole="radio"
-                accessibilityLabel={`${child.name}${child.id === activeChildId ? ", current child" : ", make current child"}`}
+                accessibilityLabel={`${child.name}${child.id === activeChildId ? ", current child" : ", make current child"}, ${contentSummary}`}
                 accessibilityState={{ selected: child.id === activeChildId }}
                 style={[styles.childIdentity, child.id === activeChildId && styles.childIdentityActive]}
               >
@@ -514,6 +528,7 @@ export function AccountCenter() {
                     {child.id === activeChildId ? "Current child" : "Tap to make current"}
                     {child.birthYear ? ` · ${child.birthMonth ? `${child.birthMonth}/` : ""}${child.birthYear}` : ""}
                   </Text>
+                  <Text style={styles.childStats}>{contentSummary}</Text>
                 </View>
               </Pressable>
               <View style={styles.compactActions}>
@@ -543,7 +558,8 @@ export function AccountCenter() {
                 />
               </View>
             </View>
-          ))}
+            );
+          })}
           <ActionButton title="Add child profile" onPress={beginCreateChild} />
         </Section>
 
@@ -1055,6 +1071,7 @@ const styles = StyleSheet.create({
   childIdentityActive: { backgroundColor: "rgba(72,198,183,0.12)" },
   childAvatar: { width: 38, height: 38, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   childInitial: { color: colors.ink, fontSize: 17, fontWeight: "900" },
+  childStats: { fontSize: 11, lineHeight: 15, color: colors.titleTeal, fontWeight: "700", marginTop: 1 },
   compactActions: { flexDirection: "row", alignItems: "center", gap: 4, justifyContent: "flex-end", flexWrap: "wrap" },
   childArrowAction: { width: 44, height: 44, flexShrink: 0 },
   childTextAction: { minHeight: 44, flexShrink: 0 },
