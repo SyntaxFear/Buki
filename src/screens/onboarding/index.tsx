@@ -21,7 +21,9 @@ import {
   SOCIAL_AUTH_BUTTON_RADIUS,
   SOCIAL_AUTH_CONTENT_GAP,
   SOCIAL_AUTH_ICON_SIZE,
+  SOCIAL_AUTH_LABEL_ALLOW_FONT_SCALING,
   SOCIAL_AUTH_LABEL_FONT_SIZE,
+  SOCIAL_AUTH_LABEL_LINE_HEIGHT,
 } from "@/layouts/social-auth-layout";
 import { shouldHydrateOnboardingField } from "@/screens/onboarding/form-hydration";
 import { useAuth } from "@/store/auth";
@@ -289,7 +291,10 @@ export function OnboardingScreen() {
                   accessibilityElementsHidden
                   style={styles.googleIcon}
                 />
-                <Text style={styles.googleButtonLabel}>
+                <Text
+                  allowFontScaling={SOCIAL_AUTH_LABEL_ALLOW_FONT_SCALING}
+                  style={styles.googleButtonLabel}
+                >
                   Sign in with Google
                 </Text>
               </View>
@@ -517,7 +522,7 @@ const styles = StyleSheet.create({
   googleButtonLabel: {
     color: "#E3E3E3",
     fontSize: SOCIAL_AUTH_LABEL_FONT_SIZE,
-    lineHeight: 21,
+    lineHeight: SOCIAL_AUTH_LABEL_LINE_HEIGHT,
     fontWeight: "600",
     textAlign: "center",
   },
