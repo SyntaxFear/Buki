@@ -1,5 +1,6 @@
 import { SymbolView } from "expo-symbols";
 import { useRouter } from "expo-router";
+import { useMemo, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -13,7 +14,11 @@ import { BukiWordmark } from "@/components/buki-wordmark";
 import { Glass } from "@/components/glass";
 import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import { NativeToolbarButton } from "@/components/native-toolbar-button";
-import { artworkCountLabel } from "@/layouts/child-content-counts";
+import {
+  artworkCountLabel,
+  childContentSummary,
+} from "@/layouts/child-content-counts";
+import { drawerChildGroups } from "@/layouts/drawer-child-groups";
 import { useAuth } from "@/store/auth";
 import { useDrawings, type PadStyle, type Sketchpad } from "@/store/drawings";
 import { useProfiles } from "@/store/profiles";
@@ -54,14 +59,35 @@ export function PadDrawerContent({ onClose }: Props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const allPads = useDrawings((s) => s.pads);
+  const children = useProfiles((s) => s.children);
   const activeChildId = useProfiles((s) => s.activeChildId);
-  const pads = allPads.filter((pad) => pad.childId === activeChildId);
+  const setActiveChild = useProfiles((s) => s.setActiveChild);
   const activePadId = useDrawings((s) => s.activePadId);
   const drawingsByPad = useDrawings((s) => s.drawingsByPad);
   const setActivePad = useDrawings((s) => s.setActivePad);
   const renamePad = useDrawings((s) => s.renamePad);
   const deletePad = useDrawings((s) => s.deletePad);
   const adultProfile = useAuth((s) => s.profile);
+  const [childFilterId, setChildFilterId] = useState<string | null>(null);
+  const effectiveChildFilterId = children.some(
+    (child) => child.id === childFilterId,
+  )
+    ? childFilterId
+    : null;
+  const allChildGroups = useMemo(
+    () => drawerChildGroups(children, allPads, drawingsByPad, null),
+    [allPads, children, drawingsByPad],
+  );
+  const childGroups = useMemo(
+    () =>
+      effectiveChildFilterId === null
+        ? allChildGroups
+        : allChildGroups.filter(
+            (group) => group.child.id === effectiveChildFilterId,
+          ),
+    [allChildGroups, effectiveChildFilterId],
+  );
+  const activeChild = children.find((child) => child.id === activeChildId);
 
   const openNewSketchpad = () => {
     // Keep the drawer mounted beneath the form sheet so dismissing the editor
@@ -90,6 +116,7 @@ export function PadDrawerContent({ onClose }: Props) {
   };
 
   const managePad = (pad: Sketchpad) => {
+    const childPads = allPads.filter((item) => item.childId === pad.childId);
     Alert.alert(pad.name, undefined, [
       {
         text: "Rename",
@@ -109,7 +136,7 @@ export function PadDrawerContent({ onClose }: Props) {
         text: "Delete",
         style: "destructive",
         onPress: () => {
-          if (pads.length <= 1) {
+          if (childPads.length <= 1) {
             Alert.alert("Can't delete", "This is your only sketchpad.");
             return;
           }
@@ -140,6 +167,134 @@ export function PadDrawerContent({ onClose }: Props) {
       },
       { text: "Cancel", style: "cancel" },
     ]);
+  };
+
+  const selectChild = (childId: string) => {
+    setChildFilterId(childId);
+    void setActiveChild(childId);
+  };
+
+  const selectPad = (pad: Sketchpad) => {
+    void (async () => {
+      if (pad.childId !== activeChildId) {
+        const selected = await setActiveChild(pad.childId);
+        if (!selected) return;
+      }
+      setActivePad(pad.id);
+      onClose();
+    })();
+  };
+
+  const renderPadRow = (pad: Sketchpad) => {
+    const count = (drawingsByPad[pad.id] ?? []).length;
+    const active = pad.id === activePadId;
+    const design = getPadDesign(pad.design, pad.coverColor);
+    const icon = getPadIcon(pad.icon);
+    return (
+      <View
+        key={pad.id}
+        style={[
+          styles.row,
+          active && styles.rowActive,
+          active && {
+            backgroundColor: design.paper,
+            borderColor: design.cover,
+          },
+        ]}
+      >
+        <Pressable
+          haptic={active ? false : "selection"}
+          onPress={() => selectPad(pad)}
+          onLongPress={() => managePad(pad)}
+          accessibilityRole="button"
+          accessibilityLabel={`${pad.name}, ${icon.name} icon, ${design.name}, ${STYLE_LABEL[pad.style]}, ${artworkCountLabel(count)}`}
+          accessibilityHint="Selects this child and sketchpad. Long-press to rename or delete it."
+          accessibilityState={{ selected: active }}
+          style={({ pressed }) => [
+            styles.rowMain,
+            pressed && styles.rowPressed,
+          ]}
+        >
+          <View style={styles.coverStatusWrap}>
+            <View
+              style={[
+                styles.coverTile,
+                {
+                  backgroundColor: design.paper,
+                  borderColor: active ? design.cover : colors.border,
+                },
+              ]}
+            >
+              {icon.id === "cover" ? (
+                <MiniCover
+                  style={pad.style}
+                  design={pad.design}
+                  color={pad.coverColor}
+                  pageColor={pad.pageColor}
+                  border={pad.border}
+                  decoration={pad.decoration}
+                  scale={0.78}
+                />
+              ) : (
+                <SymbolView
+                  name={icon.symbol}
+                  size={22}
+                  tintColor={design.coverDark}
+                  weight="semibold"
+                />
+              )}
+            </View>
+            {active ? (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.currentMarker,
+                  {
+                    backgroundColor: design.cover,
+                    borderColor: design.paper,
+                  },
+                ]}
+              >
+                <SymbolView
+                  name="checkmark"
+                  size={9}
+                  tintColor="#FFFDF4"
+                  weight="bold"
+                />
+              </View>
+            ) : null}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={styles.rowName}
+              numberOfLines={1}
+              maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+            >
+              {pad.name}
+            </Text>
+            <Text
+              style={styles.rowMeta}
+              numberOfLines={1}
+              maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+            >
+              {design.name} · {artworkCountLabel(count)}
+            </Text>
+          </View>
+        </Pressable>
+        <NativeToolbarButton
+          label={`Edit ${pad.name}`}
+          hint="Edits this sketchpad's name, layout, theme, paper, border, and decorations."
+          icon="pencil"
+          variant="prominent"
+          size="compact"
+          tintColor={design.coverDark}
+          foregroundColor="#FFFDF4"
+          onPress={() => openSketchpadEditor(pad.id)}
+          testID={`edit-sketchpad-${pad.id}`}
+          style={styles.editButton}
+        />
+      </View>
+    );
   };
 
   return (
@@ -217,7 +372,8 @@ export function PadDrawerContent({ onClose }: Props) {
             maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
             style={styles.rowMeta}
           >
-            Choose its name, layout, theme, paper, and details
+            {activeChild ? `For ${activeChild.name} · ` : ""}Choose its name,
+            layout, theme, paper, and details
           </Text>
         </View>
         <SymbolView
@@ -290,8 +446,113 @@ export function PadDrawerContent({ onClose }: Props) {
         </Pressable>
       </View>
 
+      <View style={styles.childFilterHeading}>
+        <Text
+          maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+          style={[styles.listLabel, styles.childFilterLabel]}
+        >
+          Children
+        </Text>
+        <Text
+          numberOfLines={1}
+          maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+          style={styles.childFilterHint}
+        >
+          Select or filter
+        </Text>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.childFilterContent}
+        style={styles.childFilterScroll}
+      >
+        <Pressable
+          haptic={effectiveChildFilterId === null ? false : "selection"}
+          onPress={() => setChildFilterId(null)}
+          accessibilityRole="button"
+          accessibilityLabel={`Show all ${children.length} children`}
+          accessibilityState={{ selected: effectiveChildFilterId === null }}
+          style={({ pressed }) => [
+            styles.childFilterChip,
+            effectiveChildFilterId === null && styles.childFilterChipActive,
+            pressed && styles.rowPressed,
+          ]}
+        >
+          <SymbolView
+            name="person.2.fill"
+            size={14}
+            tintColor={
+              effectiveChildFilterId === null
+                ? colors.surface
+                : colors.titleTeal
+            }
+          />
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+            style={[
+              styles.childFilterText,
+              effectiveChildFilterId === null &&
+                styles.childFilterTextActive,
+            ]}
+          >
+            All
+          </Text>
+        </Pressable>
+        {children.map((child) => {
+          const selected = effectiveChildFilterId === child.id;
+          const current = activeChildId === child.id;
+          const group = allChildGroups.find(
+            (item) => item.child.id === child.id,
+          );
+          return (
+            <Pressable
+              key={child.id}
+              testID={`child-filter-${child.id}`}
+              haptic={selected ? false : "selection"}
+              onPress={() => selectChild(child.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`${child.name}, ${childContentSummary(group?.counts ?? { sketchpads: 0, artworks: 0 })}${current ? ", current child" : ""}`}
+              accessibilityState={{ selected }}
+              style={({ pressed }) => [
+                styles.childFilterChip,
+                selected && styles.childFilterChipSelected,
+                pressed && styles.rowPressed,
+              ]}
+            >
+              <View
+                style={[
+                  styles.childFilterAvatar,
+                  { backgroundColor: child.avatarColor },
+                ]}
+              >
+                <Text style={styles.childFilterAvatarText}>
+                  {child.name.trim().charAt(0).toUpperCase() || "C"}
+                </Text>
+              </View>
+              <Text
+                numberOfLines={1}
+                maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+                style={styles.childFilterText}
+              >
+                {child.name}
+              </Text>
+              {current ? (
+                <SymbolView
+                  name="checkmark.circle.fill"
+                  size={14}
+                  tintColor={colors.titleTeal}
+                />
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
       <Text maxFontSizeMultiplier={DRAWER_TEXT_SCALE} style={styles.listLabel}>
-        Sketchpads
+        Children & sketchpads
       </Text>
 
       <ScrollView
@@ -300,117 +561,65 @@ export function PadDrawerContent({ onClose }: Props) {
         scrollIndicatorInsets={{ right: 2 }}
         keyboardShouldPersistTaps="handled"
       >
-        {pads.map((pad) => {
-          const count = (drawingsByPad[pad.id] ?? []).length;
-          const active = pad.id === activePadId;
-          const design = getPadDesign(pad.design, pad.coverColor);
-          const icon = getPadIcon(pad.icon);
+        {childGroups.map((group) => {
+          const current = group.child.id === activeChildId;
           return (
-            <View
-              key={pad.id}
-              style={[
-                styles.row,
-                active && styles.rowActive,
-                active && {
-                  backgroundColor: design.paper,
-                  borderColor: design.cover,
-                },
-              ]}
-            >
+            <View key={group.child.id} style={styles.childGroup}>
               <Pressable
-                haptic={active ? false : "selection"}
-                onPress={() => {
-                  setActivePad(pad.id);
-                  onClose();
-                }}
-                onLongPress={() => managePad(pad)}
+                testID={`child-group-${group.child.id}`}
+                haptic={current ? false : "selection"}
+                onPress={() => selectChild(group.child.id)}
                 accessibilityRole="button"
-                accessibilityLabel={`${pad.name}, ${icon.name} icon, ${design.name}, ${STYLE_LABEL[pad.style]}, ${artworkCountLabel(count)}`}
-                accessibilityHint="Selects this sketchpad. Long-press to rename or delete it."
-                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${group.child.name}, ${childContentSummary(group.counts)}${current ? ", current child" : ""}`}
+                accessibilityHint="Selects this child and filters the drawer to their sketchpads."
+                accessibilityState={{ selected: current }}
                 style={({ pressed }) => [
-                  styles.rowMain,
+                  styles.childGroupHeader,
+                  current && styles.childGroupHeaderCurrent,
                   pressed && styles.rowPressed,
                 ]}
               >
-                <View style={styles.coverStatusWrap}>
-                  <View
-                    style={[
-                      styles.coverTile,
-                      {
-                        backgroundColor: design.paper,
-                        borderColor: active ? design.cover : colors.border,
-                      },
-                    ]}
+                <View
+                  style={[
+                    styles.childGroupAvatar,
+                    { backgroundColor: group.child.avatarColor },
+                  ]}
+                >
+                  <Text style={styles.childGroupAvatarText}>
+                    {group.child.name.trim().charAt(0).toUpperCase() || "C"}
+                  </Text>
+                </View>
+                <View style={styles.childGroupCopy}>
+                  <Text
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+                    style={styles.childGroupName}
                   >
-                    {icon.id === "cover" ? (
-                      <MiniCover
-                        style={pad.style}
-                        design={pad.design}
-                        color={pad.coverColor}
-                        pageColor={pad.pageColor}
-                        border={pad.border}
-                        decoration={pad.decoration}
-                        scale={0.78}
-                      />
-                    ) : (
-                      <SymbolView
-                        name={icon.symbol}
-                        size={22}
-                        tintColor={design.coverDark}
-                        weight="semibold"
-                      />
-                    )}
+                    {group.child.name}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
+                    style={styles.childGroupMeta}
+                  >
+                    {childContentSummary(group.counts)}
+                  </Text>
+                </View>
+                {current ? (
+                  <View style={styles.currentChildBadge}>
+                    <Text style={styles.currentChildBadgeText}>CURRENT</Text>
                   </View>
-                  {active ? (
-                    <View
-                      pointerEvents="none"
-                      style={[
-                        styles.currentMarker,
-                        {
-                          backgroundColor: design.cover,
-                          borderColor: design.paper,
-                        },
-                      ]}
-                    >
-                      <SymbolView
-                        name="checkmark"
-                        size={9}
-                        tintColor="#FFFDF4"
-                        weight="bold"
-                      />
-                    </View>
-                  ) : null}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={styles.rowName}
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
-                  >
-                    {pad.name}
-                  </Text>
-                  <Text
-                    style={styles.rowMeta}
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={DRAWER_TEXT_SCALE}
-                  >
-                    {design.name} · {artworkCountLabel(count)}
-                  </Text>
-                </View>
+                ) : (
+                  <SymbolView
+                    name="chevron.right"
+                    size={12}
+                    tintColor={colors.mutedText}
+                  />
+                )}
               </Pressable>
-              <NativeToolbarButton
-                label={`Edit ${pad.name}`}
-                hint="Edits this sketchpad's name, layout, theme, paper, border, and decorations."
-                icon="pencil"
-                variant="prominent"
-                size="compact"
-                tintColor={design.coverDark}
-                foregroundColor="#FFFDF4"
-                onPress={() => openSketchpadEditor(pad.id)}
-                testID={`edit-sketchpad-${pad.id}`}
-                style={styles.editButton}
-              />
+              <View style={styles.childPadList}>
+                {group.pads.map(renderPadRow)}
+              </View>
             </View>
           );
         })}
@@ -975,7 +1184,7 @@ const styles = StyleSheet.create({
   quickActionRow: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   quickAction: {
     flex: 1,
@@ -1008,6 +1217,70 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: colors.ink,
   },
+  childFilterHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+    marginBottom: 6,
+  },
+  childFilterLabel: {
+    paddingHorizontal: 0,
+    paddingBottom: 0,
+  },
+  childFilterHint: {
+    fontSize: 11,
+    color: colors.mutedText,
+  },
+  childFilterScroll: {
+    flexGrow: 0,
+    marginBottom: 11,
+  },
+  childFilterContent: {
+    gap: 6,
+    paddingRight: 8,
+  },
+  childFilterChip: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    borderRadius: 22,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  childFilterChipActive: {
+    borderColor: colors.titleTeal,
+    backgroundColor: colors.titleTeal,
+  },
+  childFilterChipSelected: {
+    borderColor: colors.titleTeal,
+    backgroundColor: "rgba(22,125,130,0.09)",
+  },
+  childFilterAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  childFilterAvatarText: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: colors.ink,
+  },
+  childFilterText: {
+    maxWidth: 112,
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.ink,
+  },
+  childFilterTextActive: {
+    color: colors.surface,
+  },
   listLabel: {
     paddingHorizontal: 4,
     paddingBottom: 7,
@@ -1016,6 +1289,69 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     textTransform: "uppercase",
     color: colors.mutedText,
+  },
+  childGroup: {
+    marginBottom: 8,
+  },
+  childGroupHeader: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 15,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    marginBottom: 3,
+  },
+  childGroupHeaderCurrent: {
+    borderColor: colors.titleTeal,
+    backgroundColor: "rgba(22,125,130,0.08)",
+  },
+  childGroupAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    borderCurve: "continuous",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  childGroupAvatarText: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: colors.ink,
+  },
+  childGroupCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  childGroupName: {
+    fontSize: 14.5,
+    fontWeight: "900",
+    color: colors.ink,
+  },
+  childGroupMeta: {
+    marginTop: 1,
+    fontSize: 11,
+    color: colors.mutedText,
+  },
+  currentChildBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: "rgba(22,125,130,0.12)",
+  },
+  currentChildBadgeText: {
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    color: colors.titleTeal,
+  },
+  childPadList: {
+    paddingLeft: 3,
   },
   rowActive: {
     borderWidth: 1.5,

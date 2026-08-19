@@ -2,6 +2,7 @@ import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 
 const mockPush = jest.fn();
+const mockSetActiveChild = jest.fn(async () => true);
 
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockPush }),
@@ -21,7 +22,11 @@ jest.mock("@/store/profiles", () => ({
   useProfiles: (selector: (state: unknown) => unknown) =>
     selector({
       activeChildId: "child-a",
-      children: [{ id: "child-a", name: "Ava" }],
+      children: [
+        { id: "child-a", name: "Ava", avatarColor: "#FFD75A" },
+        { id: "child-b", name: "Bea", avatarColor: "#FF9CB5" },
+      ],
+      setActiveChild: mockSetActiveChild,
     }),
 }));
 jest.mock("@/store/drawings", () => ({
@@ -35,9 +40,16 @@ jest.mock("@/store/drawings", () => ({
           style: "spread",
           design: "sunshine",
         },
+        {
+          id: "pad-b",
+          childId: "child-b",
+          name: "Bea Book",
+          style: "vertical",
+          design: "garden",
+        },
       ],
       activePadId: "pad-a",
-      drawingsByPad: { "pad-a": [] },
+      drawingsByPad: { "pad-a": [], "pad-b": [] },
       setActivePad: jest.fn(),
       renamePad: jest.fn(),
       deletePad: jest.fn(),
@@ -52,6 +64,7 @@ import { PadDrawerContent } from "./pad-drawer";
 describe("PadDrawer sketchpad editor navigation", () => {
   beforeEach(() => {
     mockPush.mockReset();
+    mockSetActiveChild.mockClear();
   });
 
   it("keeps the drawer open beneath the new-sketchpad form sheet", () => {
@@ -97,6 +110,32 @@ describe("PadDrawer sketchpad editor navigation", () => {
       pathname: "/sketchpad-editor",
       params: { id: "pad-a", mode: "edit" },
     });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("filters to another child without closing the drawer", () => {
+    const onClose = jest.fn();
+    let renderer!: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      renderer = TestRenderer.create(<PadDrawerContent onClose={onClose} />);
+    });
+
+    act(() => {
+      renderer.root
+        .findByProps({
+          testID: "child-filter-child-b",
+        })
+        .props.onPress();
+    });
+
+    expect(mockSetActiveChild).toHaveBeenCalledWith("child-b");
+    expect(
+      renderer.root.findByProps({
+        accessibilityLabel:
+          "Bea Book, Cover icon, Garden Club, Vertical pad, 0 artworks",
+      }),
+    ).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
   });
 });
