@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  PixelRatio,
   ScrollView,
   StyleSheet,
   View,
@@ -19,6 +20,7 @@ import {
   copyArtworkExport,
   type ArtworkImageExport,
 } from "@/export/artwork-export";
+import { artworkCapturePlan } from "@/export/artwork-capture";
 import { NativeToolbarButton } from "@/components/native-toolbar-button";
 import { requireExportAccess } from "@/export/export-access";
 import { deleteLocalFile } from "@/export/file-cleanup";
@@ -79,14 +81,14 @@ export function ArtworkExportSheet({ visible, drawing, padName, childName, onClo
       throw new Error("The export preview is still loading.");
     }
     const ratio = format === "card" ? 4 / 5 : Math.max(0.55, Math.min(1.8, drawing.width / drawing.height));
-    const width = 1600;
+    const capture = artworkCapturePlan(ratio, PixelRatio.get());
     const uri = await captureRef(previewRef, {
       format: format === "jpg" ? "jpg" : "png",
       quality: 0.96,
       result: "tmpfile",
-      width,
-      height: Math.round(width / ratio),
-      useRenderInContext: true,
+      width: capture.width,
+      height: capture.height,
+      useRenderInContext: capture.useRenderInContext,
     });
     return copyArtworkExport(uri, drawing, format, {
       releaseSource: () => releaseCapture(uri),
