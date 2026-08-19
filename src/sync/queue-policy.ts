@@ -48,13 +48,16 @@ export function sanitizeSyncError(error: unknown): string {
 
 export async function processSyncItems(
   items: SyncQueueItem[],
-  push: (item: SyncQueueItem) => Promise<void>,
+  push: (
+    item: SyncQueueItem,
+  ) => Promise<void | { restartBatch?: boolean }>,
 ): Promise<{ completedIds: string[]; failedItem: SyncQueueItem | null; error: unknown }> {
   const completedIds: string[] = [];
   for (const item of sortSyncItems(items)) {
     try {
-      await push(item);
+      const result = await push(item);
       completedIds.push(item.id);
+      if (result?.restartBatch) break;
     } catch (error) {
       return { completedIds, failedItem: item, error };
     }

@@ -19,6 +19,14 @@ interface QueuedTagRemapResult {
   queuedOperations: { key: string; operation: string }[];
 }
 
+export interface CanonicalRemoteTag {
+  id: string;
+  name: string;
+  normalizedName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function timestamp(value: string): number {
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : Date.now();
@@ -122,6 +130,90 @@ export async function remapQueuedTagReferences(
   }
 
   return { removedKeys, queuedOperations };
+}
+
+export async function reconcileLocalTagIdentity(
+  db: SQLiteDatabase,
+  ownerId: string,
+  localTagId: string,
+  remoteTag: CanonicalRemoteTag,
+): Promise<void> {
+  if (localTagId === remoteTag.id) return;
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    const local = await tx.getFirstAsync<{
+      name: string;
+      normalized_name: string;
+      created_at: number;
+      updated_at: number;
+    }>(
+      `SELECT name, normalized_name, created_at, updated_at
+       FROM tags
+       WHERE owner_id = ? AND id = ? AND deleted_at IS NULL`,
+      ownerId,
+      localTagId,
+    );
+
+    await remapQueuedTagReferences(tx, ownerId, localTagId, remoteTag.id);
+    if (!local) return;
+    if (local.normalized_name !== remoteTag.normalizedName) {
+      throw new Error("Cloud tag identity did not match the local tag name.");
+    }
+
+    const idCollision = await tx.getFirstAsync<{ owner_id: string | null }>(
+      "SELECT owner_id FROM tags WHERE id = ? LIMIT 1",
+      remoteTag.id,
+    );
+    if (idCollision && idCollision.owner_id !== ownerId) {
+      throw new Error("Cloud tag identity conflicts with another local account.");
+    }
+
+    const relations = await tx.getAllAsync<{
+      artwork_id: string;
+      created_at: number;
+    }>(
+      "SELECT artwork_id, created_at FROM artwork_tags WHERE tag_id = ?",
+      localTagId,
+    );
+
+    await tx.runAsync("DELETE FROM artwork_tags WHERE tag_id = ?", localTagId);
+    await tx.runAsync(
+      "DELETE FROM tags WHERE owner_id = ? AND id = ?",
+      ownerId,
+      localTagId,
+    );
+    await tx.runAsync(
+      `INSERT INTO tags (
+        id, owner_id, name, normalized_name, created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, NULL)
+      ON CONFLICT(id) DO UPDATE SET
+        owner_id = excluded.owner_id,
+        name = excluded.name,
+        normalized_name = excluded.normalized_name,
+        updated_at = excluded.updated_at,
+        deleted_at = NULL`,
+      remoteTag.id,
+      ownerId,
+      remoteTag.name,
+      remoteTag.normalizedName,
+      timestamp(remoteTag.createdAt),
+      timestamp(remoteTag.updatedAt),
+    );
+    for (const relation of relations) {
+      await tx.runAsync(
+        `INSERT OR IGNORE INTO artwork_tags (artwork_id, tag_id, created_at)
+         VALUES (?, ?, ?)`,
+        relation.artwork_id,
+        remoteTag.id,
+        relation.created_at,
+      );
+    }
+    await tx.runAsync(
+      `DELETE FROM tombstones
+       WHERE owner_id = ? AND entity_type = 'tag' AND entity_id = ?`,
+      ownerId,
+      localTagId,
+    );
+  });
 }
 
 async function localMediaUris(db: SQLiteDatabase, ownerId?: string): Promise<Set<string>> {

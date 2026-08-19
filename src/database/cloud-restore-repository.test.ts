@@ -28,6 +28,7 @@ import type { RemoteCloudSnapshot } from "@/sync/cloud-types";
 import {
   applyRemoteCloudSnapshot,
   CloudRestoreCollisionError,
+  reconcileLocalTagIdentity,
   remapQueuedTagReferences,
 } from "./cloud-restore-repository";
 
@@ -132,6 +133,82 @@ describe("cloud restore tag queue reconciliation", () => {
     expect(mockEnqueue).not.toHaveBeenCalled();
     expect(result.queuedOperations).toEqual([]);
     expect(result.removedKeys).toContain(`artwork_tag:${oldEntityId}`);
+  });
+
+  it("replaces a conflicting local tag while preserving artwork relations", async () => {
+    const oldEntityId = artworkTagEntityId("art-a", "local-tag");
+    const tx = {
+      getFirstAsync: jest
+        .fn()
+        .mockResolvedValueOnce({
+          name: "Qa",
+          normalized_name: "qa",
+          created_at: 1,
+          updated_at: 2,
+        })
+        .mockResolvedValueOnce(null),
+      getAllAsync: jest
+        .fn()
+        .mockResolvedValueOnce([{
+          operation: "upsert",
+          entity_id: oldEntityId,
+          payload: JSON.stringify({
+            owner_id: "adult-a",
+            artwork_id: "art-a",
+            tag_id: "local-tag",
+          }),
+          updated_at: 10,
+        }])
+        .mockResolvedValueOnce([{ artwork_id: "art-a", created_at: 3 }]),
+      runAsync: jest.fn().mockResolvedValue(undefined),
+    };
+    const db = {
+      withExclusiveTransactionAsync: jest.fn(
+        async (operation: (database: typeof tx) => Promise<void>) =>
+          operation(tx),
+      ),
+    };
+
+    await reconcileLocalTagIdentity(
+      db as never,
+      "adult-a",
+      "local-tag",
+      {
+        id: "remote-tag",
+        name: "Qa",
+        normalizedName: "qa",
+        createdAt: "2026-08-18T00:00:00.000Z",
+        updatedAt: "2026-08-19T00:00:00.000Z",
+      },
+    );
+
+    expect(tx.runAsync).toHaveBeenCalledWith(
+      "DELETE FROM tags WHERE owner_id = ? AND id = ?",
+      "adult-a",
+      "local-tag",
+    );
+    expect(tx.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO tags"),
+      "remote-tag",
+      "adult-a",
+      "Qa",
+      "qa",
+      expect.any(Number),
+      expect.any(Number),
+    );
+    expect(tx.runAsync).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT OR IGNORE INTO artwork_tags"),
+      "art-a",
+      "remote-tag",
+      3,
+    );
+    expect(mockEnqueue).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        entityType: "artwork_tag",
+        entityId: artworkTagEntityId("art-a", "remote-tag"),
+      }),
+    );
   });
 
   it("preserves pending relation deletions under the canonical tag id", async () => {

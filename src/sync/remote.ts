@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "@/auth/supabase";
+import { reconcileBukiTagIdentity } from "@/database";
 import { verifyServerEntitlement, type ServerEntitlementState } from "@/subscription/server-entitlement";
 import { deleteQueuedMedia, uploadQueuedMedia } from "./media-upload";
 import type { SyncEntityType, SyncQueueItem } from "./types";
@@ -40,6 +41,18 @@ class RemoteSyncError extends Error {
   }
 }
 
+interface RemoteTagRow {
+  id: string;
+  name: string;
+  normalized_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RemoteSyncPushResult {
+  restartBatch?: boolean;
+}
+
 function payloadFor(item: SyncQueueItem): Record<string, unknown> {
   if (!item.payload) throw new RemoteSyncError(`Missing payload for ${item.entityType}.`, "invalid_payload");
   if (item.payload.owner_id !== item.ownerId) {
@@ -61,7 +74,82 @@ export async function verifyRemoteCloudAccess(): Promise<ServerEntitlementState>
   }
 }
 
-async function pushUpsert(item: SyncQueueItem): Promise<void> {
+async function findRemoteTag(
+  ownerId: string,
+  normalizedName: string,
+): Promise<RemoteTagRow | null> {
+  const { data, error } = await getSupabaseClient()
+    .from("tags")
+    .select("id,name,normalized_name,created_at,updated_at")
+    .eq("owner_id", ownerId)
+    .eq("normalized_name", normalizedName)
+    .maybeSingle();
+  throwIfError(error);
+  return (data as RemoteTagRow | null) ?? null;
+}
+
+async function adoptRemoteTag(
+  item: SyncQueueItem,
+  payload: Record<string, unknown>,
+  remoteTag: RemoteTagRow,
+): Promise<RemoteSyncPushResult> {
+  const { error } = await getSupabaseClient()
+    .from("tags")
+    .update({
+      name: typeof payload.name === "string" ? payload.name : remoteTag.name,
+      normalized_name: remoteTag.normalized_name,
+      updated_at:
+        typeof payload.updated_at === "string"
+          ? payload.updated_at
+          : remoteTag.updated_at,
+      deleted_at: null,
+    })
+    .eq("owner_id", item.ownerId)
+    .eq("id", remoteTag.id);
+  throwIfError(error);
+  await reconcileBukiTagIdentity(item.ownerId, item.entityId, {
+    id: remoteTag.id,
+    name: typeof payload.name === "string" ? payload.name : remoteTag.name,
+    normalizedName: remoteTag.normalized_name,
+    createdAt: remoteTag.created_at,
+    updatedAt:
+      typeof payload.updated_at === "string"
+        ? payload.updated_at
+        : remoteTag.updated_at,
+  });
+  return { restartBatch: true };
+}
+
+async function pushTagUpsert(
+  item: SyncQueueItem,
+): Promise<RemoteSyncPushResult | void> {
+  const payload = payloadFor(item);
+  const normalizedName = payload.normalized_name;
+  if (typeof normalizedName !== "string" || !normalizedName) {
+    throw new RemoteSyncError("Queued tag payload is incomplete.", "invalid_payload");
+  }
+  const existing = await findRemoteTag(item.ownerId, normalizedName);
+  if (existing && existing.id !== item.entityId) {
+    return adoptRemoteTag(item, payload, existing);
+  }
+
+  const { error } = await getSupabaseClient()
+    .from("tags")
+    .upsert(payload, { onConflict: CONFLICT_COLUMNS.tag });
+  if (!error) return;
+  if (error.code === "23505") {
+    const raced = await findRemoteTag(item.ownerId, normalizedName);
+    if (raced && raced.id !== item.entityId) {
+      return adoptRemoteTag(item, payload, raced);
+    }
+  }
+  throwIfError(error);
+}
+
+async function pushUpsert(
+  item: SyncQueueItem,
+): Promise<RemoteSyncPushResult | void> {
+  if (item.entityType === "tag") return pushTagUpsert(item);
   const { error } = await getSupabaseClient()
     .from(TABLE_NAME[item.entityType])
     .upsert(payloadFor(item), { onConflict: CONFLICT_COLUMNS[item.entityType] });
@@ -130,13 +218,15 @@ async function pushDelete(item: SyncQueueItem): Promise<void> {
   throwIfError(error);
 }
 
-export async function pushRemoteSyncItem(item: SyncQueueItem): Promise<void> {
+export async function pushRemoteSyncItem(
+  item: SyncQueueItem,
+): Promise<RemoteSyncPushResult | void> {
   if (item.entityType === "media_file") {
     payloadFor(item);
     if (item.operation === "upsert") await uploadQueuedMedia(item);
     else await deleteQueuedMedia(item);
     return;
   }
-  if (item.operation === "upsert") await pushUpsert(item);
-  else await pushDelete(item);
+  if (item.operation === "upsert") return pushUpsert(item);
+  await pushDelete(item);
 }

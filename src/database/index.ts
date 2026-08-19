@@ -60,7 +60,11 @@ import {
   markLocalMediaUploading,
   saveLocalCloudUsage,
 } from "./media-repository";
-import { applyRemoteCloudSnapshot } from "./cloud-restore-repository";
+import {
+  applyRemoteCloudSnapshot,
+  reconcileLocalTagIdentity,
+  type CanonicalRemoteTag,
+} from "./cloud-restore-repository";
 import type { RemoteCloudSnapshot } from "@/sync/cloud-types";
 import { deleteLocalAccountData, resetLocalCloudState } from "./privacy-repository";
 import {
@@ -297,6 +301,20 @@ export function saveBukiCloudUsage(ownerId: string, bytesUsed: number, bytesLimi
 
 export function restoreBukiCloudSnapshot(ownerId: string, snapshot: RemoteCloudSnapshot) {
   return applyRemoteCloudSnapshot(requireBukiDatabase(), ownerId, snapshot);
+}
+
+export async function reconcileBukiTagIdentity(
+  ownerId: string,
+  localTagId: string,
+  remoteTag: CanonicalRemoteTag,
+): Promise<void> {
+  await reconcileLocalTagIdentity(
+    requireBukiDatabase(),
+    ownerId,
+    localTagId,
+    remoteTag,
+  );
+  notifySyncQueueChanged();
 }
 
 export function deleteBukiLocalAccount(ownerId: string) {

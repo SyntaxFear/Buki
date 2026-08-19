@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createBukiArchive, importBukiArchive } from "@/archive/buki-archive";
+import { reconcileBeforeArchiveImport } from "@/archive/import-guard";
 import { BukiText as Text } from "@/components/buki-wordmark";
 import { HapticPressable as Pressable } from "@/components/haptic-pressable";
 import { NativeDoneHeader } from "@/components/native-navigation-header";
@@ -22,6 +23,7 @@ import { useDrawings } from "@/store/drawings";
 import { useMembership } from "@/store/membership";
 import { confirmAdult } from "@/store/parental-gate";
 import { useProfiles } from "@/store/profiles";
+import { useCloudSync } from "@/store/sync";
 import type { PadStyle } from "@/store/migrate";
 import { colors } from "@/theme";
 import { useAuth } from "@/store/auth";
@@ -64,6 +66,7 @@ export function ExportsScreen() {
   const canExport = useMembership((state) => state.capabilities.exportData);
   const ownerId = useAuth((state) => state.user?.id ?? null);
   const requestUpgrade = useMembership((state) => state.requestUpgrade);
+  const restoreCloud = useCloudSync((state) => state.restoreNow);
   const visiblePads = useMemo(
     () => pads.filter((pad) => pad.childId === activeChildId),
     [activeChildId, pads],
@@ -169,7 +172,12 @@ export function ExportsScreen() {
     }
     if (!(await confirmAdult("Importing a Buki archive adds child profiles, sketchpads, and artwork to this account."))) return;
     let selectedUri: string | null = null;
+    setBusy("import");
     try {
+      await reconcileBeforeArchiveImport(
+        restoreCloud,
+        () => useCloudSync.getState().error,
+      );
       const selection = await DocumentPicker.getDocumentAsync({
         type: "*/*",
         copyToCacheDirectory: true,
@@ -177,7 +185,6 @@ export function ExportsScreen() {
       });
       if (selection.canceled) return;
       selectedUri = selection.assets[0].uri;
-      setBusy("import");
       const result = await importBukiArchive(selectedUri);
       const added = result.childrenAdded + result.sketchpadsAdded + result.artworksAdded;
       Alert.alert(

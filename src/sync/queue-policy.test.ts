@@ -41,6 +41,22 @@ describe("sync queue policy", () => {
     ).toEqual(["adult", "child", "pad", "art", "tag", "relation"]);
   });
 
+  it("restarts after canonical identity reconciliation before stale items run", async () => {
+    const tag = item("tag-local", "tag", "upsert", 1);
+    const staleRelation = item("relation-local", "artwork_tag", "upsert", 2);
+    const push = jest.fn(async (current: SyncQueueItem) =>
+      current.entityType === "tag" ? { restartBatch: true } : undefined,
+    );
+
+    await expect(processSyncItems([staleRelation, tag], push)).resolves.toEqual({
+      completedIds: [tag.id],
+      failedItem: null,
+      error: null,
+    });
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith(tag);
+  });
+
   it("orders dependent deletes before parents", () => {
     expect(
       sortSyncItems([
